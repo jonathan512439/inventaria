@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/types/database";
 import { resizeImage } from "@/lib/image";
-import { cancelAll, cancelItem, clearDone, enqueue, queueSummary, removeItem, retryItem, useQueue, type QueueItem } from "@/lib/queue";
+import { cancelAll, cancelItem, clearDone, enqueue, queueSummary, removeItem, resumeNow, retryItem, useQueue, type QueueItem } from "@/lib/queue";
 import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import CategoryPicker from "@/components/CategoryPicker";
@@ -49,7 +49,15 @@ export default function CapturePage() {
   }
 
   const items = useMemo(() => [...queue.items].sort((a, b) => b.createdAt - a.createdAt), [queue.items]);
+  // Reloj para refrescar la cuenta regresiva de la pausa
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!queue.pausedUntil) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [queue.pausedUntil]);
   const waiting = queue.pausedUntil ? Math.max(0, Math.ceil((queue.pausedUntil - Date.now()) / 1000)) : 0;
+  const resumeAt = queue.pausedUntil ? new Date(queue.pausedUntil).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -137,9 +145,19 @@ export default function CapturePage() {
               )}
             </span>
           </div>
-          {waiting > 0 && (
+          {waiting > 0 && queue.pausedReason === "daily" && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+              <p className="font-semibold">Se agotó el cupo gratuito de la IA por hoy.</p>
+              <p className="mt-0.5">
+                Tus fotos quedan guardadas en el teléfono y se analizarán solas a partir de las <b>{resumeAt}</b>
+                {waiting > 3600 ? ` (en ${Math.ceil(waiting / 3600)} h)` : ""}. Puedes seguir tomando fotos.
+              </p>
+              <button onClick={resumeNow} className="btn-secondary btn-sm mt-2">Reintentar ahora</button>
+            </div>
+          )}
+          {waiting > 0 && queue.pausedReason !== "daily" && (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              La IA está ocupada, continúa en {waiting}s. Puedes seguir tomando fotos.
+              {queue.pausedReason === "offline" ? "Sin conexión." : "La IA está saturada,"} reintentamos en {waiting}s. Puedes seguir tomando fotos.
             </p>
           )}
           <div className="stagger grid grid-cols-4 gap-2 sm:grid-cols-6">

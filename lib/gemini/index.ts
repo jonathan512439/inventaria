@@ -151,84 +151,139 @@ interface AnalyzeArgs {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Llama a Gemini con structured output. Reintenta con backoff exponencial ante 429/503.
- * Devuelve el objeto JSON ya parseado.
+ * Cadena de modelos: el cupo gratuito es POR MODELO y por día (p. ej. 20 peticiones/día en gemini-3.6-flash),
+ * así que al agotarse uno pasamos al siguiente. Configurable con GEMINI_MODELS="a,b,c" (GEMINI_MODEL va primero).
  */
-export async function analyzeImage({ imageBase64, mimeType, prompt, schema }: AnalyzeArgs): Promise<Record<string, unknown>> {
+const DEFAULT_CHAIN = ["gemini-3.6-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-flash-latest"];
+
+export function modelChain(): string[] {
+  const env = (process.env.GEMINI_MODELS || "").split(",").map((m) => m.trim()).filter(Boolean);
+  const first = process.env.GEMINI_MODEL?.trim();
+  const list = [...(first ? [first] : []), ...(env.length ? env : DEFAULT_CHAIN)];
+  return Array.from(new Set(list));
+}
+
+/** Modelos con cupo diario agotado (por instancia del servidor) → hasta cuándo evitarlos. */
+const exhaustedUntil = new Map<string, number>();
+
+/** Próximo reinicio del cupo diario de Google (medianoche, hora del Pacífico). */
+export function nextQuotaReset(): Date {
+  const now = new Date();
+  const pt = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+  const offsetMs = now.getTime() - pt.getTime(); // diferencia local(UTC)–PT
+  const midnightPt = new Date(pt);
+  midnightPt.setHours(24, 0, 0, 0);
+  return new Date(midnightPt.getTime() + offsetMs);
+}
+
+export class QuotaError extends GeminiError {
+  daily = true;
+  retryAfterSec: number;
+  constructor(message: string, retryAfterSec: number) {
+    super(429, message);
+    this.retryAfterSec = retryAfterSec;
+  }
+}
+
+interface GeminiFailure {
+  status: number;
+  message: string;
+  daily: boolean; // cupo por día agotado
+  demand: boolean; // "high demand" (temporal, cambiar de modelo)
+  retryDelaySec: number | null;
+}
+
+function parseFailure(status: number, errText: string): GeminiFailure {
+  let message = `Error de Gemini (${status})`;
+  let daily = false;
+  let retryDelaySec: number | null = null;
+  try {
+    const parsed = JSON.parse(errText) as {
+      error?: { message?: string; details?: Array<{ violations?: Array<{ quotaId?: string }>; retryDelay?: string }> };
+    };
+    if (parsed.error?.message) message = parsed.error.message;
+    for (const d of parsed.error?.details ?? []) {
+      for (const v of d.violations ?? []) if (/PerDay/i.test(v.quotaId ?? "")) daily = true;
+      if (d.retryDelay) retryDelaySec = parseFloat(d.retryDelay) || null;
+    }
+  } catch {
+    /* texto plano */
+  }
+  return { status, message, daily, demand: /high demand/i.test(message), retryDelaySec };
+}
+
+/**
+ * Llama a generateContent probando la cadena de modelos. Devuelve el texto y el modelo usado.
+ * - Cupo diario agotado → siguiente modelo (y se recuerda hasta el reinicio)
+ * - "High demand" / 503 → siguiente modelo
+ * - Límite por minuto → espera breve (máx. 12 s) y reintenta una vez en el mismo modelo, luego siguiente
+ */
+export async function generateContent(parts: unknown[], generationConfig: Record<string, unknown>): Promise<{ text: string; model: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new GeminiError(500, "Falta GEMINI_API_KEY en el entorno del servidor");
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
-  const url = `${API_BASE}/${model}:generateContent`;
+  const now = Date.now();
+  const chain = modelChain().filter((m) => (exhaustedUntil.get(m) ?? 0) < now);
+  if (chain.length === 0) {
+    const reset = nextQuotaReset();
+    throw new QuotaError("Se agotó el cupo diario gratuito de la IA en todos los modelos.", Math.max(60, Math.ceil((reset.getTime() - now) / 1000)));
+  }
+  const body = JSON.stringify({ contents: [{ role: "user", parts }], generationConfig });
+  let last: GeminiFailure | null = null;
 
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ inline_data: { mime_type: mimeType, data: imageBase64 } }, { text: prompt }],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.2,
-      responseMimeType: "application/json",
-      responseSchema: schema,
-    },
-  };
-
-  const MAX_ATTEMPTS = 4;
-  let lastError: GeminiError | null = null;
-
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify(body),
-    });
-
-    if (res.ok) {
-      const json = (await res.json()) as {
-        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
-        promptFeedback?: { blockReason?: string };
-      };
-      if (json.promptFeedback?.blockReason) {
-        throw new GeminiError(422, `La imagen fue bloqueada por seguridad (${json.promptFeedback.blockReason}).`);
+  for (const model of chain) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch(`${API_BASE}/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body,
+      });
+      if (res.ok) {
+        const json = (await res.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+          promptFeedback?: { blockReason?: string };
+        };
+        if (json.promptFeedback?.blockReason) throw new GeminiError(422, `La imagen fue bloqueada por seguridad (${json.promptFeedback.blockReason}).`);
+        return { text: json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "", model };
       }
-      const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-      try {
-        return JSON.parse(text) as Record<string, unknown>;
-      } catch {
-        throw new GeminiError(502, "Gemini devolvió una respuesta que no es JSON válido.");
+      const f = parseFailure(res.status, await res.text().catch(() => ""));
+      last = f;
+      if (res.status === 404) break; // modelo inexistente → siguiente
+      if (res.status === 429 && f.daily) {
+        exhaustedUntil.set(model, nextQuotaReset().getTime());
+        break; // siguiente modelo
       }
-    }
-
-    const errText = await res.text().catch(() => "");
-    let message = `Error de Gemini (${res.status})`;
-    try {
-      const parsed = JSON.parse(errText) as { error?: { message?: string } };
-      if (parsed.error?.message) message = parsed.error.message;
-    } catch {
-      /* texto plano */
-    }
-
-    if (res.status === 429 || res.status === 503) {
-      lastError = new GeminiError(res.status, message);
-      if (attempt < MAX_ATTEMPTS - 1) {
-        // 2s, 4s, 8s
-        await sleep(2000 * 2 ** attempt);
-        continue;
+      if (res.status === 503 || f.demand) break; // siguiente modelo
+      if (res.status === 429) {
+        if (attempt === 0) {
+          await sleep(Math.min(12, f.retryDelaySec ?? 4) * 1000);
+          continue; // reintento en el mismo modelo
+        }
+        break;
       }
-      break;
+      throw new GeminiError(res.status, f.message); // 400 (schema/imagen), 401, etc.: no tiene sentido cambiar de modelo
     }
-    if (res.status === 404) {
-      throw new GeminiError(500, `Modelo "${model}" no disponible. Cambia GEMINI_MODEL en el entorno. Detalle: ${message}`);
-    }
-    throw new GeminiError(res.status, message);
   }
 
-  throw new GeminiError(
-    429,
-    "Se alcanzó el límite de solicitudes de la IA (free tier). Espera un minuto e inténtalo de nuevo. " +
-      (lastError?.message ? `Detalle: ${lastError.message}` : "")
+  // Todos fallaron
+  const allDaily = modelChain().every((m) => (exhaustedUntil.get(m) ?? 0) > Date.now());
+  if (allDaily || last?.daily) {
+    const reset = nextQuotaReset();
+    throw new QuotaError("Se agotó el cupo diario gratuito de la IA. Tus fotos quedan guardadas y se analizarán cuando se renueve.", Math.max(60, Math.ceil((reset.getTime() - Date.now()) / 1000)));
+  }
+  throw new GeminiError(429, `La IA está saturada en este momento. Reintentamos en un momento. ${last?.message ? `Detalle: ${last.message.slice(0, 160)}` : ""}`);
+}
+
+/** Analiza una imagen con structured output. Devuelve el JSON parseado y el modelo usado. */
+export async function analyzeImage({ imageBase64, mimeType, prompt, schema }: AnalyzeArgs): Promise<{ result: Record<string, unknown>; model: string }> {
+  const { text, model } = await generateContent(
+    [{ inline_data: { mime_type: mimeType, data: imageBase64 } }, { text: prompt }],
+    { temperature: 0.2, responseMimeType: "application/json", responseSchema: schema }
   );
+  try {
+    return { result: JSON.parse(text) as Record<string, unknown>, model };
+  } catch {
+    throw new GeminiError(502, "Gemini devolvió una respuesta que no es JSON válido.");
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -273,34 +328,16 @@ const PRESET_SCHEMA = {
 
 /** Pide a Gemini una categoría completa (subcategorías + datos) a partir de "vendo repuestos de moto y aceites". */
 export async function generatePreset(description: string): Promise<GeneratedPreset> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new GeminiError(500, "Falta GEMINI_API_KEY en el entorno del servidor");
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
-  const res = await fetch(`${API_BASE}/${model}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text:
-                `Un pequeño negocio describe lo que vende: "${description.slice(0, 300)}".\n` +
-                `Diseña cómo organizaría su inventario: nombre de la categoría, un emoji, las subcategorías (estantes) y 2-4 datos específicos por producto. Todo en español, breve y práctico.`,
-            },
-          ],
-        },
-      ],
-      generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: PRESET_SCHEMA },
-    }),
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new GeminiError(res.status === 429 ? 429 : 502, res.status === 429 ? "La IA está ocupada, intenta en un minuto." : `Error de Gemini (${res.status}) ${t.slice(0, 200)}`);
-  }
-  const json = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  const { text } = await generateContent(
+    [
+      {
+        text:
+          `Un pequeño negocio describe lo que vende: "${description.slice(0, 300)}".\n` +
+          `Diseña cómo organizaría su inventario: nombre de la categoría, un emoji, las subcategorías (estantes) y 2-4 datos específicos por producto. Todo en español, breve y práctico.`,
+      },
+    ],
+    { temperature: 0.4, responseMimeType: "application/json", responseSchema: PRESET_SCHEMA }
+  );
   try {
     return JSON.parse(text) as GeneratedPreset;
   } catch {
@@ -310,26 +347,17 @@ export async function generatePreset(description: string): Promise<GeneratedPres
 
 /** Elige la subcategoría más adecuada para un producto (solo texto, sin imagen). */
 export async function pickSubcategory(productText: string, options: string[]): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || !options.length) return null;
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  if (!options.length) return null;
   const NONE = "ninguna";
-  const res = await fetch(`${API_BASE}/${model}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: `Producto: ${productText.slice(0, 500)}\nElige la subcategoría más adecuada de la lista, o "${NONE}" si ninguna encaja.` }] }],
-      generationConfig: {
+  try {
+    const { text } = await generateContent(
+      [{ text: `Producto: ${productText.slice(0, 500)}\nElige la subcategoría más adecuada de la lista, o "${NONE}" si ninguna encaja.` }],
+      {
         temperature: 0,
         responseMimeType: "application/json",
         responseSchema: { type: "OBJECT", properties: { subcategoria: { type: "STRING", enum: [...options, NONE] } }, required: ["subcategoria"] },
-      },
-    }),
-  });
-  if (!res.ok) return null;
-  const json = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-  try {
+      }
+    );
     const v = (JSON.parse(text) as { subcategoria?: string }).subcategoria;
     return v && v !== NONE ? v : null;
   } catch {

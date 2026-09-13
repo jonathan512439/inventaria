@@ -73,6 +73,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...       # solo backend
 GEMINI_API_KEY=AIza...                 # solo backend
 GEMINI_MODEL=gemini-3.6-flash
+# Opcional: cadena de respaldo cuando un modelo agota su cupo diario
+GEMINI_MODELS=gemini-3.7-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-flash-lite-latest
 ```
 
 > Las variables sin prefijo `NEXT_PUBLIC_` nunca se envían al navegador.
@@ -133,7 +135,7 @@ Cambios de base de datos: `npm run db:sql supabase/<archivo>.sql` (usa `SUPABASE
 
 | Recurso | Límite | Medida en el MVP |
 |---|---|---|
-| Gemini Flash | ~10–15 req/min, ~1 000–1 500/día | Reintento con backoff en 429, mensaje claro, 1 llamada por foto |
+| Gemini Flash (free) | **20 peticiones/día por modelo** (p. ej. gemini-3.6-flash) + límite por minuto | Cadena de modelos (`GEMINI_MODELS`, por defecto 3.6 → 3.7 → 3.5 → 3.5-lite → flash-lite-latest → flash-latest): al agotarse el cupo diario de uno se usa el siguiente; si se agotan todos, la app pausa hasta el reinicio (medianoche PT) y avisa. 1 llamada por foto. |
 | Supabase Storage | 1 GB | Fotos redimensionadas a ≤800 px JPEG (~60–120 KB c/u), límite 2 MB por archivo en el bucket |
 | Supabase DB | 500 MB | Datos en `jsonb` compacto, índices mínimos |
 | Supabase | pausa tras 7 días inactivo | Reactivar desde el dashboard si ocurre |

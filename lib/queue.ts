@@ -30,6 +30,8 @@ interface State {
   items: QueueItem[];
   paused: boolean;
   pausedUntil: number | null; // timestamp mientras esperamos por límite de IA
+  pausedReason: "busy" | "daily" | "offline" | null;
+  pausedMessage: string | null;
 }
 
 const CONCURRENCY = 2;
@@ -38,7 +40,7 @@ const MAX_ATTEMPTS = 3;
 const DB_NAME = "inventaria";
 const STORE = "queue";
 
-let state: State = { items: [], paused: false, pausedUntil: null };
+let state: State = { items: [], paused: false, pausedUntil: null, pausedReason: null, pausedMessage: null };
 const listeners = new Set<() => void>();
 let lastStart = 0;
 let running = 0;
@@ -178,8 +180,14 @@ export function clearDone() {
 }
 
 export function setPaused(paused: boolean) {
-  set({ paused, pausedUntil: paused ? state.pausedUntil : null });
+  set({ paused, pausedUntil: paused ? state.pausedUntil : null, pausedReason: paused ? state.pausedReason : null, pausedMessage: paused ? state.pausedMessage : null });
   if (!paused) schedule();
+}
+
+/** Reintenta ahora mismo (ignora la espera por límite de la IA). */
+export function resumeNow() {
+  set({ pausedUntil: null, pausedReason: null, pausedMessage: null });
+  schedule();
 }
 
 // ---------- Motor ----------
@@ -200,7 +208,7 @@ function tick() {
     }, state.pausedUntil - Date.now() + 100);
     return;
   }
-  if (state.pausedUntil) set({ pausedUntil: null });
+  if (state.pausedUntil) set({ pausedUntil: null, pausedReason: null, pausedMessage: null });
 
   while (running < CONCURRENCY) {
     const next = state.items.find((i) => i.status === "queued");
@@ -233,12 +241,13 @@ async function process(item: QueueItem) {
     controllers.set(item.id, controller);
     const res = await fetch("/api/analyze", { method: "POST", body: form, signal: controller.signal });
     controllers.delete(item.id);
-    const json = (await res.json().catch(() => ({}))) as { product?: Product; ai_fields?: string[]; error?: string; retry_after?: number };
+    const json = (await res.json().catch(() => ({}))) as { product?: Product; ai_fields?: string[]; error?: string; retry_after?: number; daily?: boolean };
 
     if (res.status === 429) {
-      // Límite de la IA: pausamos toda la cola y reintentamos este mismo elemento
-      const secs = json.retry_after ?? 30;
-      set({ pausedUntil: Date.now() + secs * 1000 });
+      // Límite de la IA: pausamos toda la cola y reintentamos este mismo elemento.
+      // daily = cupo gratuito del día agotado → esperar hasta el reinicio (medianoche del Pacífico)
+      const secs = json.daily ? (json.retry_after ?? 3600) : Math.min(json.retry_after ?? 20, 120);
+      set({ pausedUntil: Date.now() + secs * 1000, pausedReason: json.daily ? "daily" : "busy", pausedMessage: json.error ?? null });
       update(item.id, { status: "queued", attempts: item.attempts });
       return;
     }
@@ -253,7 +262,7 @@ async function process(item: QueueItem) {
     const attempts = item.attempts + 1;
     if (attempts < MAX_ATTEMPTS && /fetch|network|Failed|red/i.test(msg)) {
       // Sin conexión: reintentar más tarde sin consumir intentos de usuario
-      set({ pausedUntil: Date.now() + 8000 });
+      set({ pausedUntil: Date.now() + 8000, pausedReason: "offline", pausedMessage: null });
       update(item.id, { status: "queued" });
     } else {
       update(item.id, { status: "error", error: msg });
@@ -267,7 +276,7 @@ const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);
 };
-const serverSnapshot: State = { items: [], paused: false, pausedUntil: null };
+const serverSnapshot: State = { items: [], paused: false, pausedUntil: null, pausedReason: null, pausedMessage: null };
 
 export function useQueue() {
   return useSyncExternalStore(subscribe, getSnapshot, () => serverSnapshot);

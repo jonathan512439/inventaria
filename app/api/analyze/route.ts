@@ -9,6 +9,7 @@ import {
   META_KEYS,
   NEW_CATEGORY_OPTION,
   NO_CATALOG_OPTION,
+  QuotaError,
   UNKNOWN_OPTION,
 } from "@/lib/gemini";
 import { PRESETS } from "@/lib/presets";
@@ -107,22 +108,29 @@ export async function POST(request: Request) {
   const ctx = { categoryPaths: Array.from(idByPath.keys()), fixedCategoryPath: fixedCategoryId ? pathById.get(fixedCategoryId) : null, catalogs };
 
   let categoryId: string | null = fixedCategoryId;
-  const aiMeta: AiMeta = { modelo: process.env.GEMINI_MODEL || null };
+  const aiMeta: AiMeta = {};
   let result: Record<string, unknown> = {};
   let aiWarning: string | null = null;
 
   try {
-    result = await analyzeImage({
+    const out = await analyzeImage({
       imageBase64: bytesToBase64(bytes),
       mimeType: file.type,
       prompt: buildPrompt(aiFields, ctx),
       schema: buildResponseSchema(aiFields, ctx),
     });
+    result = out.result;
+    aiMeta.modelo = out.model;
   } catch (e) {
-    if (e instanceof GeminiError && e.status === 429) {
-      // Límite de la IA: avisamos al cliente para que espere y reintente (no creamos nada).
+    if (e instanceof QuotaError) {
+      // Cupo diario agotado en todos los modelos: el cliente pausa hasta el reinicio.
       await admin.storage.from("product-images").remove([path]);
-      return NextResponse.json({ error: e.message, retry_after: 30 }, { status: 429 });
+      return NextResponse.json({ error: e.message, retry_after: e.retryAfterSec, daily: true }, { status: 429 });
+    }
+    if (e instanceof GeminiError && e.status === 429) {
+      // Saturación momentánea: el cliente reintenta en breve (no creamos nada).
+      await admin.storage.from("product-images").remove([path]);
+      return NextResponse.json({ error: e.message, retry_after: 20 }, { status: 429 });
     }
     await admin.storage.from("product-images").remove([path]);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error analizando la imagen" }, { status: e instanceof GeminiError ? e.status : 500 });
