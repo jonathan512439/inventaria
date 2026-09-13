@@ -135,13 +135,23 @@ export async function POST(request: Request) {
   const etiqueta = String(result[META_KEYS.etiqueta] ?? "").trim();
   if (etiqueta) aiMeta.etiqueta = etiqueta.slice(0, 500);
 
-  // 4. Datos según los campos efectivos de la sección final (+ defaults)
-  const effective = getEffectiveFields(tpls, cats, categoryId);
+  // 4. Datos: guardamos TODO lo que la IA devolvió (así no se pierde si el usuario cambia la sección)
+  //    y completamos los campos de la sección final con sus valores por defecto.
   const data: ProductData = {};
-  effective.forEach((f) => {
-    const v = f.is_ai_fillable ? result[f.name] : undefined;
-    data[f.name] = coerceValue(f, v === UNKNOWN_OPTION ? "" : v);
+  aiFields.forEach((f) => {
+    const v = result[f.name];
+    const val = coerceValue(f, v === UNKNOWN_OPTION ? "" : v);
+    if (val !== "" && val !== null) data[f.name] = val;
   });
+  const effective = getEffectiveFields(tpls, cats, categoryId);
+  effective.forEach((f) => {
+    if (!(f.name in data)) data[f.name] = f.field_type === "number" ? null : "";
+  });
+  // Respaldo: si no hay nombre pero sí texto de etiqueta, usamos la etiqueta como nombre provisional
+  const nameField = effective.find((f) => /^(nombre|name|producto|titulo)$/i.test(f.name));
+  if (nameField && !data[nameField.name] && etiqueta) {
+    data[nameField.name] = etiqueta.replace(/\s+/g, " ").slice(0, 60);
+  }
   applyDefaults(effective, data);
 
   // 5. Crear pendiente

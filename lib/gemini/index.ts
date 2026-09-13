@@ -104,9 +104,10 @@ export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string
 
   return [
     "Eres un asistente de inventario para una tienda. Analiza la foto de este producto.",
-    "Devuelve SOLO un JSON que siga exactamente el schema dado, en español, con tus mejores estimaciones visuales.",
-    `Si no puedes determinar un campo con confianza razonable, usa cadena vacía (null en campos numéricos, "${UNKNOWN_OPTION}" en listas).`,
+    "Devuelve SOLO un JSON que siga exactamente el schema dado, en español.",
     "Lee con cuidado cualquier texto impreso (marca, modelo, talla, código, precio) y úsalo: es más fiable que adivinar.",
+    "Los campos de texto como nombre, descripcion, marca o color NUNCA deben quedar vacíos si el producto se ve: da siempre tu mejor estimación aunque no estés seguro (el usuario la corregirá).",
+    `Deja vacío solo lo que realmente no se puede inferir de la imagen (cadena vacía; null en campos numéricos; "${UNKNOWN_OPTION}" en listas).`,
     "No inventes precios ni stock: solo si están impresos y legibles.",
     'Para "nombre" usa un nombre comercial corto y útil para buscar (marca + producto + variante, máx. 8 palabras). Para "descripcion" 1-2 frases concretas.',
     catLine,
