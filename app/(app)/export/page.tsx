@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product } from "@/types/database";
 import { categoryPath, getDescendantIds } from "@/lib/categories";
 import { exportToExcel } from "@/lib/export";
-import CategorySelect from "@/components/CategorySelect";
+import CategoryPicker from "@/components/CategoryPicker";
 
 type StatusFilter = "confirmed" | "draft" | "all";
 
@@ -64,8 +64,8 @@ export default function ExportPage() {
 
       <div className="animate-in card space-y-4">
         <div>
-          <label className="label" htmlFor="cat">Categoría</label>
-          <CategorySelect id="cat" categories={categories} value={categoryId} onChange={setCategoryId} emptyLabel="Todas las subcategorías" />
+          <label className="label">Categoría</label>
+          <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} allowCreate={false} emptyLabel="Todas las categorías" />
           {categoryId && (
             <label className="mt-2 flex items-center gap-2 text-sm">
               <input type="checkbox" checked={includeSub} onChange={(e) => setIncludeSub(e.target.checked)} />

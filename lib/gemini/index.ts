@@ -306,3 +306,32 @@ export async function generatePreset(description: string): Promise<GeneratedPres
     throw new GeminiError(502, "La IA no devolvió una respuesta válida.");
   }
 }
+
+/** Elige la subcategoría más adecuada para un producto (solo texto, sin imagen). */
+export async function pickSubcategory(productText: string, options: string[]): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || !options.length) return null;
+  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const NONE = "ninguna";
+  const res = await fetch(`${API_BASE}/${model}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: `Producto: ${productText.slice(0, 500)}\nElige la subcategoría más adecuada de la lista, o "${NONE}" si ninguna encaja.` }] }],
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: "application/json",
+        responseSchema: { type: "OBJECT", properties: { subcategoria: { type: "STRING", enum: [...options, NONE] } }, required: ["subcategoria"] },
+      },
+    }),
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+  const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  try {
+    const v = (JSON.parse(text) as { subcategoria?: string }).subcategoria;
+    return v && v !== NONE ? v : null;
+  } catch {
+    return null;
+  }
+}

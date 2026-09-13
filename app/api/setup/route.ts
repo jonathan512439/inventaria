@@ -8,9 +8,20 @@ export const runtime = "edge";
 interface Body {
   presets?: string[]; // ids de lib/presets
   description?: string; // "vendo repuestos de moto" → la IA genera la categoría
+  plain_names?: string[]; // categorías "solo con nombre": traen los datos básicos, sin subcategorías
   business_name?: string;
   onboarded?: boolean;
 }
+
+const BASE_FIELDS: PresetField[] = [
+  { name: "nombre", field_type: "text", is_ai_fillable: true },
+  { name: "marca", field_type: "text", is_ai_fillable: true },
+  { name: "descripcion", field_type: "text", is_ai_fillable: true },
+  { name: "color", field_type: "text", is_ai_fillable: true },
+  { name: "precio", field_type: "number", is_ai_fillable: false },
+  { name: "precio_compra", field_type: "number", is_ai_fillable: false },
+  { name: "stock", field_type: "number", is_ai_fillable: false, default_value: "1" },
+];
 
 interface TypeSpec {
   name: string;
@@ -39,6 +50,10 @@ export async function POST(request: Request) {
   }
 
   const specs: TypeSpec[] = [];
+  for (const raw of body.plain_names ?? []) {
+    const name = String(raw).trim().slice(0, 60);
+    if (name) specs.push({ name, icon: "🏷️", sections: [], fields: BASE_FIELDS });
+  }
   for (const id of body.presets ?? []) {
     const p = getPreset(id);
     if (p) specs.push({ name: p.name, icon: p.icon, sections: p.sections, fields: p.fields });

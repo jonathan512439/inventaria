@@ -20,6 +20,7 @@ export default function PresetPicker({ existingNames = [], businessName, submitL
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [describe, setDescribe] = useState(false);
   const [description, setDescription] = useState("");
+  const [quickName, setQuickName] = useState("");
   const [loading, setLoading] = useState(false);
 
   const toggle = (id: string) =>
@@ -29,7 +30,7 @@ export default function PresetPicker({ existingNames = [], businessName, submitL
       return n;
     });
 
-  const canSubmit = selected.size > 0 || description.trim().length > 3;
+  const canSubmit = selected.size > 0 || description.trim().length > 3 || quickName.trim().length > 0;
 
   async function submit() {
     if (!canSubmit) return;
@@ -40,6 +41,7 @@ export default function PresetPicker({ existingNames = [], businessName, submitL
       body: JSON.stringify({
         presets: Array.from(selected),
         description: description.trim() || undefined,
+        plain_names: quickName.trim() ? [quickName.trim()] : undefined,
         business_name: businessName,
         onboarded: true,
       }),
@@ -104,6 +106,12 @@ export default function PresetPicker({ existingNames = [], businessName, submitL
           />
         </div>
       )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-3">
+        <label className="label" htmlFor="quick">¿Solo quieres una categoría con tu propio nombre?</label>
+        <input id="quick" className="input" placeholder="Ej. Regalos, Ofertas, Temporada…" value={quickName} onChange={(e) => setQuickName(e.target.value)} />
+        <p className="mt-1 text-xs text-slate-500">Se crea vacía, con los datos básicos (nombre, marca, descripción, color, precio, stock). Las subcategorías las agregas después o las propone la IA.</p>
+      </div>
 
       <button type="button" onClick={submit} disabled={!canSubmit || loading} className="btn-primary btn-lg w-full">
         {loading ? (

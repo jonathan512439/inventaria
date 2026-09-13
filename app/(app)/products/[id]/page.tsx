@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
-import CategorySelect from "@/components/CategorySelect";
+import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import { IconArrowLeft, IconSparkles, IconTag } from "@/components/ui/Icons";
 
@@ -125,7 +125,7 @@ export default function ProductDetailPage() {
         <div className="animate-in card space-y-4">
           <div>
             <label className="label">Categoría</label>
-            <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} emptyLabel="— Sin categoría —" />
+            <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} onCategoriesChange={setCategories} emptyLabel="Sin categoría" />
           </div>
 
           {fields.map((f) => (

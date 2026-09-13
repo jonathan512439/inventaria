@@ -9,7 +9,7 @@ import { categoryPath } from "@/lib/categories";
 import { applyDefaults, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import { useQueue, queueSummary, removeByProductId } from "@/lib/queue";
 import { getPreset } from "@/lib/presets";
-import CategorySelect from "@/components/CategorySelect";
+import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import ProductTable from "@/components/ProductTable";
 import { useToast } from "@/components/ui/Toast";
@@ -53,6 +53,18 @@ function Review() {
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [newParent, setNewParent] = useState<string | null>(null);
   const [settingUp, setSettingUp] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+
+  /** Pide al servidor que elija la subcategoría dentro de una categoría (texto → IA si hace falta). */
+  async function autoSubcategory(productId: string, categoryId: string) {
+    setClassifying(true);
+    const res = await fetch("/api/classify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ product_id: productId, category_id: categoryId }) });
+    const json = (await res.json().catch(() => ({}))) as { category_id?: string; subcategory?: string | null; error?: string };
+    setClassifying(false);
+    if (!res.ok) return toast("error", json.error || "No se pudo elegir la subcategoría");
+    if (json.category_id) setDraft((d) => (d ? { ...d, categoryId: json.category_id! } : d));
+    toast(json.subcategory ? "success" : "info", json.subcategory ? `Subcategoría: ${json.subcategory}` : "Sin subcategoría clara: queda en la categoría general");
+  }
   const types = useMemo(() => categories.filter((c) => !c.parent_id), [categories]);
   const tableView = params.get("view") === "table";
 
@@ -151,10 +163,10 @@ function Review() {
     setProducts((list) => list.filter((p) => p.id !== current.id));
   }
 
-  async function createSuggestedCategory() {
+  async function createSuggestedCategory(parentOverride?: string | null) {
     const name = current?.ai_meta?.categoria_nueva;
     if (!name) return;
-    const parent = newParent ?? types[0]?.id ?? null;
+    const parent = parentOverride ?? newParent ?? types[0]?.id ?? null;
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -183,14 +195,12 @@ function Review() {
     setTemplates(tpls ?? []);
     const typeName = json.types?.[0];
     const top = all.find((c) => !c.parent_id && c.name.toLowerCase() === typeName?.toLowerCase());
-    let target = top ?? null;
-    if (top && preferSubName) {
-      const sub = all.find((c) => c.parent_id === top.id && c.name.toLowerCase() === preferSubName.toLowerCase());
-      if (sub) target = sub;
-    }
-    if (target) setDraft((d) => (d ? { ...d, categoryId: target!.id } : d));
     setSettingUp(false);
-    toast("success", `Categoría "${typeName}" lista${target && target !== top ? ` · ${target.name}` : ""}`);
+    if (!top) return toast("error", "La categoría no se encontró tras crearla");
+    setDraft((d) => (d ? { ...d, categoryId: top.id } : d));
+    toast("success", `Categoría "${typeName}" lista`);
+    // Elegir la subcategoría automáticamente (coincidencia de texto o IA)
+    if (current) await autoSubcategory(current.id, top.id);
   }
 
   // ---------- Vistas ----------
@@ -249,7 +259,32 @@ function Review() {
             <label className="label flex items-center gap-1">
               <IconSparkles size={14} className="text-brand-500" /> Categoría
             </label>
-            <CategorySelect categories={categories} value={draft.categoryId} onChange={(v) => setDraft({ ...draft, categoryId: v })} emptyLabel="— Elige categoría o subcategoría —" />
+            <CategoryPicker
+              categories={categories}
+              value={draft.categoryId}
+              onChange={(v) => setDraft({ ...draft, categoryId: v })}
+              onCategoriesChange={setCategories}
+              emptyLabel="Sin categoría"
+            />
+            {draft.categoryId && !categories.find((c) => c.id === draft.categoryId)?.parent_id && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {categories.some((c) => c.parent_id === draft.categoryId) && (
+                  <button type="button" disabled={classifying} onClick={() => autoSubcategory(current.id, draft.categoryId!)} className="chip border-brand-300 bg-brand-50 text-brand-700">
+                    {classifying ? <Spinner size={14} /> : <IconSparkles size={14} />} Elegir subcategoría automáticamente
+                  </button>
+                )}
+                {meta.categoria_nueva && !categories.some((c) => c.parent_id === draft.categoryId && c.name.toLowerCase() === meta.categoria_nueva!.toLowerCase()) && (
+                  <button
+                    type="button"
+                    disabled={settingUp}
+                    onClick={() => createSuggestedCategory(draft.categoryId)}
+                    className="chip border-brand-300 bg-white text-brand-700"
+                  >
+                    <IconPlus size={14} /> Subcategoría “{meta.categoria_nueva}” aquí
+                  </button>
+                )}
+              </div>
+            )}
 
             {!draft.categoryId && (meta.catalogo_sugerido || meta.categoria_nueva_general || meta.categoria_nueva) && (
               <div className="mt-2 space-y-2 rounded-2xl border border-brand-200 bg-brand-50/60 p-3">
@@ -283,7 +318,7 @@ function Review() {
                 )}
                 {meta.categoria_nueva && types.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <button type="button" disabled={settingUp} onClick={createSuggestedCategory} className="chip border-brand-300 bg-white text-brand-700">
+                    <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory()} className="chip border-brand-300 bg-white text-brand-700">
                       <IconPlus size={14} /> Subcategoría “{meta.categoria_nueva}”
                     </button>
                     <select className="input w-auto py-1.5 text-sm" value={newParent ?? types[0]?.id ?? ""} onChange={(e) => setNewParent(e.target.value)}>

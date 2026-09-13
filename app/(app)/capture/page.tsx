@@ -8,7 +8,7 @@ import { resizeImage } from "@/lib/image";
 import { clearDone, enqueue, queueSummary, removeItem, retryItem, useQueue, type QueueItem } from "@/lib/queue";
 import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
-import CategorySelect from "@/components/CategorySelect";
+import CategoryPicker from "@/components/CategoryPicker";
 import { useToast } from "@/components/ui/Toast";
 import { IconAlert, IconCamera, IconCheck, IconImages, IconRefresh, IconSparkles, IconX, Spinner } from "@/components/ui/Icons";
 
@@ -86,25 +86,27 @@ export default function CapturePage() {
         </button>
       </div>
 
-      {/* Subcategoría: automática por defecto */}
+      {/* Categoría: automática por defecto */}
       <div className="animate-in flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-slate-500">Subcategoría:</span>
+        <span className="text-slate-600">Categoría de las fotos:</span>
         {!showCategory ? (
           <button type="button" onClick={() => setShowCategory(true)} className="chip">
             <IconSparkles size={14} className="text-brand-600" />
             {categoryId ? categoryPath(categories, categoryId) : "Automática (la elige la IA)"}
+            <span className="text-xs text-slate-500">· cambiar</span>
           </button>
         ) : (
           <div className="flex flex-1 items-center gap-2">
-            <CategorySelect
+            <CategoryPicker
               categories={categories}
               value={categoryId}
               onChange={(v) => {
                 setCategoryId(v);
                 setShowCategory(false);
               }}
+              onCategoriesChange={setCategories}
               emptyLabel="✨ Automática (la elige la IA)"
-              className="input py-2"
+              className="py-2"
             />
             <button className="btn-ghost btn-sm" onClick={() => setShowCategory(false)}>Listo</button>
           </div>
