@@ -113,15 +113,16 @@ npm run build        # build Next.js
 6. Añade la URL `https://<tu-proyecto>.pages.dev/auth/callback` en Supabase → **Authentication → URL Configuration → Redirect URLs** y pon `https://<tu-proyecto>.pages.dev` como **Site URL**.
 7. Cada `git push` a la rama principal redepliega automáticamente.
 
-Despliegue manual alternativo (necesita `wrangler login`):
+Despliegue por scripts (sin `wrangler login`, usa un API token del proyecto — útil si manejas varias cuentas de Cloudflare):
 
-```bash
-npm run deploy                 # Linux/macOS/WSL
-npm run pages:build:win        # Windows: construye .vercel/output/static
-npx wrangler pages deploy      # luego sube
-```
+1. En `.env.local` añade `CLOUDFLARE_API_TOKEN` (token con permiso *Cloudflare Pages: Edit*), `CLOUDFLARE_ACCOUNT_ID` y `CLOUDFLARE_PAGES_PROJECT=inventaria`.
+2. Primera vez: crea el proyecto en el dashboard (Workers & Pages → Create → Pages → *Upload assets* → nombre `inventaria`) o con `npx wrangler pages project create inventaria --production-branch main`.
+3. `npm run cf:env` → sube las variables de la app y activa `nodejs_compat` (production + preview).
+4. `npm run deploy` → build (`vercel build` + `next-on-pages`) y publica en `https://inventaria.pages.dev`.
 
-> En Windows, `npx @cloudflare/next-on-pages` falla al lanzar `npx vercel build`; usa `npm run pages:build:win` o WSL. En Cloudflare (Linux) el comando estándar funciona sin cambios.
+Cambios de base de datos: añade `SUPABASE_ACCESS_TOKEN` (Supabase → Account → Access Tokens) a `.env.local` y ejecuta `npm run db:sql supabase/<archivo>.sql`.
+
+> En Windows, `npx @cloudflare/next-on-pages` falla al lanzar `npx vercel build`; `npm run deploy` y `npm run pages:build:win` ya lo evitan. En Cloudflare (Linux) el comando estándar funciona sin cambios.
 
 ---
 

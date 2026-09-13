@@ -8,9 +8,11 @@
     "start": "next start",
     "lint": "next lint",
     "pages:build": "npx @cloudflare/next-on-pages",
-    "pages:build:win": "vercel build --yes && npx @cloudflare/next-on-pages --skip-build",
     "preview": "npm run pages:build && wrangler pages dev",
-    "deploy": "npm run pages:build && wrangler pages deploy"
+    "deploy": "node scripts/deploy.mjs",
+    "cf:env": "node scripts/cf-env.mjs",
+    "db:sql": "node scripts/supabase-sql.mjs",
+    "pages:build:win": "vercel build --yes && npx @cloudflare/next-on-pages --skip-build"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
