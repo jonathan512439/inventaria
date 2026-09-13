@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generatePreset, GeminiError } from "@/lib/gemini";
 import { getPreset, type PresetField } from "@/lib/presets";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { logUsage } from "@/lib/aiUsage";
 
 export const runtime = "edge";
 
@@ -62,6 +64,7 @@ export async function POST(request: Request) {
   if (body.description?.trim()) {
     try {
       const g = await generatePreset(body.description.trim());
+      await logUsage(createAdminClient(), user.id, "setup");
       specs.push({
         name: g.name,
         icon: g.icon || "🏪",
@@ -82,6 +85,7 @@ export async function POST(request: Request) {
         ],
       });
     } catch (e) {
+      await logUsage(createAdminClient(), user.id, "setup");
       const status = e instanceof GeminiError ? e.status : 500;
       return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo generar la categoría" }, { status });
     }

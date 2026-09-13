@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { pickSubcategory } from "@/lib/gemini";
 import { productTitle } from "@/lib/fields";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { logUsage } from "@/lib/aiUsage";
 
 export const runtime = "edge";
 
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
     } catch {
       /* si la IA falla, queda en la categoría general */
     }
+    await logUsage(createAdminClient(), user.id, "classify");
   }
 
   const target = chosen?.id ?? category_id;

@@ -191,25 +191,32 @@ interface GeminiFailure {
   daily: boolean; // cupo por día agotado
   demand: boolean; // "high demand" (temporal, cambiar de modelo)
   retryDelaySec: number | null;
+  quotaLimit: number | null; // límite diario reportado
 }
 
 function parseFailure(status: number, errText: string): GeminiFailure {
   let message = `Error de Gemini (${status})`;
   let daily = false;
   let retryDelaySec: number | null = null;
+  let quotaLimit: number | null = null;
   try {
     const parsed = JSON.parse(errText) as {
-      error?: { message?: string; details?: Array<{ violations?: Array<{ quotaId?: string }>; retryDelay?: string }> };
+      error?: { message?: string; details?: Array<{ violations?: Array<{ quotaId?: string; quotaValue?: string }>; retryDelay?: string }> };
     };
     if (parsed.error?.message) message = parsed.error.message;
     for (const d of parsed.error?.details ?? []) {
-      for (const v of d.violations ?? []) if (/PerDay/i.test(v.quotaId ?? "")) daily = true;
+      for (const v of d.violations ?? []) {
+        if (/PerDay/i.test(v.quotaId ?? "")) {
+          daily = true;
+          if (v.quotaValue) quotaLimit = parseInt(v.quotaValue, 10) || null;
+        }
+      }
       if (d.retryDelay) retryDelaySec = parseFloat(d.retryDelay) || null;
     }
   } catch {
     /* texto plano */
   }
-  return { status, message, daily, demand: /high demand/i.test(message), retryDelaySec };
+  return { status, message, daily, demand: /high demand/i.test(message), retryDelaySec, quotaLimit };
 }
 
 /**
@@ -218,6 +225,18 @@ function parseFailure(status: number, errText: string): GeminiFailure {
  * - "High demand" / 503 → siguiente modelo
  * - Límite por minuto → espera breve (máx. 12 s) y reintenta una vez en el mismo modelo, luego siguiente
  */
+/** Registro de cada intento (para el medidor de consumo). */
+export interface UsageAttempt {
+  model: string;
+  status: "ok" | "quota" | "limited" | "error";
+  quota_limit?: number | null;
+}
+const usageLog: UsageAttempt[] = [];
+/** Vacía y devuelve los intentos registrados desde la última lectura. */
+export function drainUsage(): UsageAttempt[] {
+  return usageLog.splice(0, usageLog.length);
+}
+
 export async function generateContent(parts: unknown[], generationConfig: Record<string, unknown>): Promise<{ text: string; model: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new GeminiError(500, "Falta GEMINI_API_KEY en el entorno del servidor");
@@ -243,10 +262,12 @@ export async function generateContent(parts: unknown[], generationConfig: Record
           promptFeedback?: { blockReason?: string };
         };
         if (json.promptFeedback?.blockReason) throw new GeminiError(422, `La imagen fue bloqueada por seguridad (${json.promptFeedback.blockReason}).`);
+        usageLog.push({ model, status: "ok" });
         return { text: json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "", model };
       }
       const f = parseFailure(res.status, await res.text().catch(() => ""));
       last = f;
+      usageLog.push({ model, status: f.daily ? "quota" : res.status === 429 ? "limited" : "error", quota_limit: f.quotaLimit ?? null });
       if (res.status === 404) break; // modelo inexistente → siguiente
       if (res.status === 429 && f.daily) {
         exhaustedUntil.set(model, nextQuotaReset().getTime());

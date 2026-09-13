@@ -33,6 +33,16 @@ export type FieldTemplate = {
 
 export type ProductData = Record<string, string | number | null>;
 
+export type AiUsage = {
+  id: string;
+  user_id: string | null;
+  model: string;
+  purpose: string;
+  status: string;
+  quota_limit: number | null;
+  created_at: string;
+};
+
 /** Lo que la IA dedujo además de los campos: sugerencias y texto leído en la etiqueta. */
 export type AiMeta = {
   categoria_sugerida?: string | null; // ruta "Ropa > Camisas" elegida por la IA
@@ -83,6 +93,12 @@ export interface Database {
           default_value?: string | null;
         };
         Update: Partial<FieldTemplate>;
+        Relationships: [];
+      };
+      ai_usage: {
+        Row: AiUsage;
+        Insert: Omit<AiUsage, "id" | "created_at" | "quota_limit"> & { id?: string; created_at?: string; quota_limit?: number | null };
+        Update: Partial<AiUsage>;
         Relationships: [];
       };
       products: {

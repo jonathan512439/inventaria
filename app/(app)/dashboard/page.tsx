@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { queueSummary, useQueue } from "@/lib/queue";
 import { ProgressCard, StepByStep, computeStates, type GuideProgress } from "@/components/guide/Guide";
+import AiUsageCard from "@/components/AiUsageCard";
 import { IconBox, IconCamera, IconCheckCircle, IconChevronRight, IconDownload, IconSettings, Spinner } from "@/components/ui/Icons";
 
 interface Stats {
@@ -98,6 +99,8 @@ export default function DashboardPage() {
         <BigLink href="/review" icon={<IconCheckCircle size={28} />} title="Revisar pendientes" subtitle={stats.pending ? "Confirma precio y stock" : "Todo revisado"} count={stats.pending} tone="amber" />
         <BigLink href="/products" icon={<IconBox size={28} />} title="Mi inventario" subtitle={`${stats.types} categoría${stats.types === 1 ? "" : "s"}`} count={stats.confirmed} tone="emerald" />
       </div>
+
+      <AiUsageCard />
 
       <div className="flex justify-center gap-4 text-sm">
         <Link href="/export" className="inline-flex items-center gap-1.5 font-medium text-slate-500 hover:text-brand-700">

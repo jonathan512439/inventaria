@@ -13,6 +13,7 @@ import {
   UNKNOWN_OPTION,
 } from "@/lib/gemini";
 import { PRESETS } from "@/lib/presets";
+import { logUsage } from "@/lib/aiUsage";
 import { getEffectiveFields, coerceValue, applyDefaults } from "@/lib/fields";
 import { categoryPath } from "@/lib/categories";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
@@ -122,6 +123,7 @@ export async function POST(request: Request) {
     result = out.result;
     aiMeta.modelo = out.model;
   } catch (e) {
+    await logUsage(admin, user.id, "analyze");
     if (e instanceof QuotaError) {
       // Cupo diario agotado en todos los modelos: el cliente pausa hasta el reinicio.
       await admin.storage.from("product-images").remove([path]);
@@ -135,6 +137,8 @@ export async function POST(request: Request) {
     await admin.storage.from("product-images").remove([path]);
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error analizando la imagen" }, { status: e instanceof GeminiError ? e.status : 500 });
   }
+
+  await logUsage(admin, user.id, "analyze");
 
   // Subcategoría elegida por la IA
   if (!categoryId) {
