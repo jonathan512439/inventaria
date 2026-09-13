@@ -1,6 +1,10 @@
 /**
- * Despliegue a Cloudflare Pages desde Windows (o cualquier SO) usando un API token
- * del proyecto (no depende de `wrangler login`, así no choca con otras cuentas).
+ * Despliegue manual a Cloudflare Pages usando un API token del proyecto
+ * (no depende de `wrangler login`, así no choca con otras cuentas).
+ *
+ * ⚠️ SOLO en Linux/macOS/WSL. En Windows, `vercel build` mezcla los bundles de las rutas
+ *    (rutas que sirven el código de otra ruta). El despliegue oficial es GitHub Actions
+ *    (.github/workflows/deploy.yml): basta con `git push origin main`.
  *
  *   node scripts/deploy.mjs            → build + deploy a producción (rama main)
  *
@@ -10,6 +14,10 @@
 import { execSync } from "node:child_process";
 import { loadEnvLocal, requireEnv } from "./env.mjs";
 
+if (process.platform === "win32" && !process.env.FORCE_WINDOWS_DEPLOY) {
+  console.error("En Windows el build de Vercel CLI es incorrecto. Haz `git push origin main`: GitHub Actions despliega en Linux.");
+  process.exit(1);
+}
 loadEnvLocal();
 requireEnv("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID");
 const project = process.env.CLOUDFLARE_PAGES_PROJECT || "inventaria";

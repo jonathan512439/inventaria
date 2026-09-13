@@ -3,7 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient as createPlainClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+
+/** URL pública de la app: los enlaces del correo siempre apuntan aquí (se pueden abrir desde cualquier dispositivo). */
+const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,16 +23,21 @@ export default function RegisterPage() {
     if (password.length < 6) return setError("La contraseña debe tener al menos 6 caracteres.");
     if (password !== confirm) return setError("Las contraseñas no coinciden.");
     setLoading(true);
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
+    // Registro con flujo "implicit": el enlace del correo trae los tokens y funciona desde cualquier
+    // dispositivo (el flujo PKCE por defecto exige abrirlo en el mismo navegador del registro).
+    const plain = createPlainClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    const { data, error } = await plain.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: `${appUrl()}/auth/confirm` },
     });
     setLoading(false);
     if (error) return setError(error.message);
-    // Si la confirmación de correo está desactivada, ya hay sesión.
+    // Si la confirmación de correo está desactivada, ya hay sesión: la guardamos en cookies.
     if (data.session) {
+      await createClient().auth.setSession(data.session);
       router.replace("/dashboard");
       router.refresh();
     } else {

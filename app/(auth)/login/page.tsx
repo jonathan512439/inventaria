@@ -39,7 +39,17 @@ function LoginForm() {
       <h2 className="text-lg font-semibold">Iniciar sesión</h2>
       {params.get("registered") && (
         <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
-          Cuenta creada. Si tu proyecto exige confirmación de correo, revisa tu bandeja.
+          Cuenta creada. Te enviamos un correo: abre el enlace de confirmación (desde cualquier dispositivo) y entrarás
+          directamente.
+        </p>
+      )}
+      {params.get("error") && (
+        <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          {params.get("error") === "link_invalido"
+            ? "El enlace de confirmación no es válido."
+            : /expired|invalid/i.test(params.get("error") ?? "")
+              ? "El enlace de confirmación expiró o ya fue usado. Inicia sesión; si no puedes, regístrate de nuevo."
+              : params.get("error")}
         </p>
       )}
       <div>

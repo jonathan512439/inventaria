@@ -12,7 +12,7 @@
     "deploy": "node scripts/deploy.mjs",
     "cf:env": "node scripts/cf-env.mjs",
     "db:sql": "node scripts/supabase-sql.mjs",
-    "pages:build:win": "vercel build --yes && npx @cloudflare/next-on-pages --skip-build"
+    "supabase:auth": "node scripts/supabase-auth-config.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
