@@ -77,7 +77,7 @@ export default function ProductsPage() {
       </header>
 
       {/* Búsqueda */}
-      <div className="animate-in relative">
+      <div className="animate-in relative mx-auto w-full max-w-xl md:max-w-none">
         <IconSearch size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
         <input className="input pl-11" placeholder="Buscar por nombre, marca, código…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
@@ -114,30 +114,58 @@ export default function ProductsPage() {
         <ProductTable products={visible} categories={categories} templates={templates} mode="confirmed" onChanged={load} />
       ) : (
         <>
-          <ul className="stagger grid gap-2 md:grid-cols-2">
+          <ul className="stagger mx-auto grid w-full max-w-xl grid-cols-1 gap-3 md:max-w-none md:grid-cols-2">
             {visible.slice(0, limit).map((p) => {
               const pk = priceKey(p);
               const sk = stockKey(p);
               const cat = p.category_id ? categories.find((c) => c.id === p.category_id) : null;
               const top = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) ?? cat : cat;
               const col = categoryColor(top?.name);
+              const stockN = sk ? Number(p.data[sk]) : NaN;
               return (
-                <li key={p.id}>
-                  <Link href={`/products/${p.id}`} className="card press group flex items-center gap-3 p-3 transition hover:ring-brand-300" style={{ borderLeft: `4px solid ${col.dot}` }}>
+                <li key={p.id} className="min-w-0">
+                  <Link
+                    href={`/products/${p.id}`}
+                    className="press group flex w-full min-w-0 items-stretch gap-3 overflow-hidden rounded-3xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 transition hover:ring-brand-400"
+                    style={{ borderLeft: `5px solid ${col.dot}` }}
+                  >
                     {p.image_url ? (
-                      <Photo src={p.image_url} loading="lazy" wrapperClassName="h-16 w-16 shrink-0 rounded-2xl" className="h-16 w-16 object-cover" />
+                      <Photo src={p.image_url} loading="lazy" wrapperClassName="h-[84px] w-[84px] shrink-0 rounded-2xl ring-1 ring-slate-900/5" className="h-[84px] w-[84px] object-cover" />
                     ) : (
-                      <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-400"><IconBox /></span>
+                      <span className="grid h-[84px] w-[84px] shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-400"><IconBox size={28} /></span>
                     )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold text-ink">{productTitle(p.data) || "Sin nombre"}</span>
-                      <span className="block truncate text-xs text-slate-500">{categoryPath(categories, p.category_id)}</span>
-                      <span className="mt-1 flex gap-3 text-xs">
-                        {pk && <span className="font-semibold text-emerald-700">{fmtMoney(p.data[pk])}</span>}
-                        {sk && <span className="text-slate-500">Stock: <b className="text-ink">{String(p.data[sk])}</b></span>}
+                    <span className="flex min-w-0 flex-1 flex-col justify-between py-0.5">
+                      <span className="block truncate text-[15px] font-bold leading-tight text-ink">{productTitle(p.data) || "Sin nombre"}</span>
+                      <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-tight">
+                        {top ? (
+                          <>
+                            <span className={`inline-flex max-w-full items-center gap-1 truncate rounded-full px-2 py-0.5 font-semibold ${col.bg} ${col.text}`}>
+                              {top.icon ? `${top.icon} ` : ""}{top.name}
+                            </span>
+                            {cat && cat.parent_id ? (
+                              <span className="truncate text-slate-600"><span className="text-slate-400">Subcategoría:</span> <b>{cat.name}</b></span>
+                            ) : (
+                              <span className="text-amber-700">sin subcategoría</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-amber-700">Sin categoría</span>
+                        )}
+                      </span>
+                      <span className="mt-1.5 flex items-center gap-2">
+                        {pk ? (
+                          <span className="text-base font-bold tabular-nums text-emerald-700">{fmtMoney(p.data[pk])}</span>
+                        ) : (
+                          <span className="text-xs font-medium text-amber-700">Sin precio</span>
+                        )}
+                        {sk && (
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${Number.isFinite(stockN) && stockN <= 0 ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"}`}>
+                            Stock {String(p.data[sk])}
+                          </span>
+                        )}
                       </span>
                     </span>
-                    <IconChevronRight className="shrink-0 text-slate-300 group-hover:text-brand-500" />
+                    <span className="grid shrink-0 place-items-center text-slate-300 group-hover:text-brand-500"><IconChevronRight /></span>
                   </Link>
                 </li>
               );

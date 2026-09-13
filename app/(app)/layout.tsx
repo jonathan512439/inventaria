@@ -13,9 +13,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session?.user) redirect("/login");
 
   return (
-    <div className="min-h-screen pb-24 md:pb-10">
+    <div className="min-h-screen overflow-x-hidden pb-24 md:pb-10">
       <Nav />
-      <main className="mx-auto max-w-6xl px-4 py-5 md:px-6 md:py-8">{children}</main>
+      <main className="mx-auto w-full max-w-6xl px-4 py-5 md:px-6 md:py-8">{children}</main>
     </div>
   );
 }

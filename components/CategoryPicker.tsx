@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/types/database";
 import { useToast } from "./ui/Toast";
@@ -98,11 +99,7 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
     }
   }
 
-  const label = current
-    ? current.parent_id
-      ? `${currentTop?.icon ? currentTop.icon + " " : ""}${currentTop?.name} › ${current.name}`
-      : `${current.icon ? current.icon + " " : ""}${current.name}`
-    : emptyLabel ?? "Elegir categoría";
+  const subsOfCurrentTop = currentTop ? categories.filter((c) => c.parent_id === currentTop.id).length : 0;
 
   const stepCat = step ? byId.get(step) : null;
   const subs = step ? categories.filter((c) => c.parent_id === step).sort((a, b) => a.name.localeCompare(b.name, "es")) : [];
@@ -112,17 +109,34 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`input flex items-center justify-between gap-2 text-left ${current ? "border-brand-300 bg-brand-50/40 font-semibold" : "text-slate-500"} ${className}`}
+        className={`input flex items-center justify-between gap-2 text-left ${current ? "border-brand-300 bg-brand-50/40" : "text-slate-500"} ${className}`}
       >
-        <span className="truncate">{label}</span>
-        <IconChevronRight size={18} className="shrink-0 rotate-90 text-slate-400" />
+        {current ? (
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-medium text-slate-500">
+              Categoría: <b className="text-ink">{currentTop?.icon ? `${currentTop.icon} ` : ""}{currentTop?.name}</b>
+            </span>
+            <span className="block truncate text-sm">
+              {current.parent_id ? (
+                <><span className="text-xs font-medium text-slate-500">Subcategoría:</span> <b className="text-ink">{current.name}</b></>
+              ) : subsOfCurrentTop > 0 ? (
+                <span className="text-xs font-medium text-amber-700">Falta elegir la subcategoría</span>
+              ) : (
+                <span className="text-xs text-slate-400">sin subcategorías</span>
+              )}
+            </span>
+          </span>
+        ) : (
+          <span className="truncate">{emptyLabel ?? "Elegir categoría"}</span>
+        )}
+        <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700">cambiar</span>
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center" onClick={() => setOpen(false)}>
-          <div className="absolute inset-0 bg-black/40" />
+      {open && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3" onClick={() => setOpen(false)}>
+          <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
           <div
-            className="animate-in relative flex max-h-[85vh] w-full max-w-lg flex-col rounded-t-3xl bg-white shadow-2xl md:rounded-3xl"
+            className="animate-in relative flex max-h-[80vh] w-full max-w-lg flex-col rounded-3xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Cabecera */}
@@ -156,13 +170,13 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
                     const active = currentTop?.id === r.id;
                     return (
                       <li key={r.id}>
-                        <button type="button" onClick={() => setStep(r.id)} className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition ${active ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:border-brand-300 hover:bg-brand-50/40"}`}>
+                        <button type="button" onClick={() => (n > 0 || allowCreate ? setStep(r.id) : choose(r.id))} className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition ${active ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:border-brand-300 hover:bg-brand-50/40"}`}>
                           <span className={`grid h-9 w-9 place-items-center rounded-xl text-xl ring-1 ${categoryColor(r.name).bg} ${categoryColor(r.name).ring}`}>{r.icon || "🏷️"}</span>
                           <span className="flex-1">
                             <span className="block font-semibold text-ink">{r.name}</span>
-                            <span className="block text-xs text-slate-500">{n ? `${n} subcategorías` : "sin subcategorías"}</span>
+                            <span className="block text-xs text-slate-500">{n ? `${n} subcategorías · toca para elegir una` : allowCreate ? "sin subcategorías · toca para usarla o crear una" : "sin subcategorías"}</span>
                           </span>
-                          <IconChevronRight size={18} className="text-slate-400" />
+                          {value === r.id ? <IconCheck size={18} className="text-brand-600" /> : <IconChevronRight size={18} className="text-slate-400" />}
                         </button>
                       </li>
                     );
@@ -187,20 +201,21 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
               ) : (
                 /* ---------- Paso 2: subcategorías ---------- */
                 <ul className="space-y-1.5">
-                  <li className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Paso 2 de 2 · Elige la subcategoría</li>
-                  <li>
-                    <button type="button" onClick={() => choose(stepCat.id)} className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left ${value === stepCat.id ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:bg-slate-50"}`}>
-                      <span className="flex-1">
-                        <span className="block font-medium text-ink">Toda la categoría</span>
-                        <span className="block text-xs text-slate-500">sin subcategoría específica</span>
-                      </span>
-                      {value === stepCat.id && <IconCheck size={18} className="text-brand-600" />}
-                    </button>
+                  <li className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Paso 2 de 2 · {subs.length ? "Elige la subcategoría" : "Esta categoría aún no tiene subcategorías"}
                   </li>
+                  {subs.length === 0 && (
+                    <li>
+                      <button type="button" onClick={() => choose(stepCat.id)} className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left ${value === stepCat.id ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:bg-slate-50"}`}>
+                        <span className="flex-1 font-semibold text-ink">Usar “{stepCat.name}” tal cual</span>
+                        {value === stepCat.id && <IconCheck size={18} className="text-brand-600" />}
+                      </button>
+                    </li>
+                  )}
                   {subs.map((s) => (
                     <li key={s.id}>
                       <button type="button" onClick={() => choose(s.id)} className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition ${value === s.id ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:border-brand-300 hover:bg-brand-50/40"}`}>
-                        <span className="flex-1 font-medium text-ink">↳ {s.name}</span>
+                        <span className="flex-1 font-semibold text-ink">{s.name}</span>
                         {value === s.id && <IconCheck size={18} className="text-brand-600" />}
                       </button>
                     </li>
@@ -224,7 +239,8 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

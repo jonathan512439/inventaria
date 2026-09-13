@@ -89,13 +89,13 @@ export default function ProductDetailPage() {
   const isDraft = product.status === "draft";
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="mx-auto w-full max-w-4xl space-y-5 overflow-x-hidden">
       <div className="animate-in flex flex-wrap items-center justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <Link href={isDraft ? "/review" : "/products"} className="mb-1 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700">
             <IconArrowLeft size={16} /> {isDraft ? "Pendientes" : "Inventario"}
           </Link>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">{productTitle(data) || "Producto"}</h1>
+          <h1 className="break-words text-2xl font-bold tracking-tight text-ink">{productTitle(data) || "Producto"}</h1>
           <p className="text-xs text-slate-500">
             {categoryPath(categories, product.category_id)} · {new Date(product.created_at).toLocaleDateString("es")}
           </p>
