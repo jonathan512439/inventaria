@@ -84,7 +84,9 @@ export async function POST(request: Request) {
 
   // 2. Subir imagen
   const admin = createAdminClient();
-  const productId = crypto.randomUUID();
+  // El cliente puede fijar el id (uuid) para poder cancelar/limpiar; si no, se genera.
+  const requested = String(form.get("product_id") ?? "");
+  const productId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requested) ? requested : crypto.randomUUID();
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const path = `${user.id}/${productId}.${ext}`;
   const bytes = new Uint8Array(await file.arrayBuffer());

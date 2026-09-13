@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/types/database";
 import { resizeImage } from "@/lib/image";
-import { clearDone, enqueue, queueSummary, removeItem, retryItem, useQueue, type QueueItem } from "@/lib/queue";
+import { cancelAll, cancelItem, clearDone, enqueue, queueSummary, removeItem, retryItem, useQueue, type QueueItem } from "@/lib/queue";
 import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import CategoryPicker from "@/components/CategoryPicker";
@@ -122,6 +122,11 @@ export default function CapturePage() {
             <Stat n={summary.done} label="listos" tone="text-emerald-600" />
             {summary.error > 0 && <Stat n={summary.error} label="con error" tone="text-rose-600" />}
             <span className="ml-auto flex gap-2">
+              {summary.queued + summary.processing > 0 && (
+                <button onClick={() => confirm("¿Cancelar las fotos que faltan por analizar?") && cancelAll()} className="btn-ghost btn-sm text-rose-600">
+                  <IconX size={14} /> Cancelar {summary.queued + summary.processing > 1 ? "todas" : ""}
+                </button>
+              )}
               {summary.done > 0 && (
                 <Link href="/review" className="btn-success btn-sm">
                   <IconCheck size={14} /> Revisar {summary.done}
@@ -178,6 +183,17 @@ function Thumb({ item }: { item: QueueItem }) {
       )}
       {item.status === "queued" && (
         <span className="absolute left-1.5 top-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white">en cola</span>
+      )}
+      {(item.status === "queued" || item.status === "processing") && (
+        <button
+          type="button"
+          onClick={() => cancelItem(item.id)}
+          className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white shadow hover:bg-rose-600"
+          title="Cancelar"
+          aria-label="Cancelar análisis"
+        >
+          <IconX size={14} />
+        </button>
       )}
       {item.status === "done" && (
         <>

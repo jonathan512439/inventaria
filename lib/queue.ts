@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { Product } from "@/types/database";
+import { createClient } from "@/lib/supabase/client";
 
 /**
  * Cola de fotos para procesar con la IA en segundo plano.
@@ -43,6 +44,8 @@ let lastStart = 0;
 let running = 0;
 let hydrated = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
+const controllers = new Map<string, AbortController>(); // fetch en curso por elemento (para cancelar)
+const cancelled = new Set<string>(); // ids de producto cancelados (limpieza si el servidor alcanzó a crearlos)
 
 function emit() {
   listeners.forEach((l) => l());
@@ -128,6 +131,40 @@ export function removeItem(id: string) {
   set({ items: state.items.filter((i) => i.id !== id) });
 }
 
+/** Borra (mejor esfuerzo) un producto y su foto que el servidor pudo crear tras cancelar. */
+async function cleanupCancelled(productId: string) {
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    await supabase.from("products").delete().eq("id", productId);
+    if (user) await supabase.storage.from("product-images").remove([`${user.id}/${productId}.jpg`]);
+  } catch {
+    /* sin conexión: no pasa nada, el producto quedaría como pendiente */
+  }
+}
+
+/** Cancela una foto: si está en cola se quita; si se está analizando, se aborta y se limpia. */
+export function cancelItem(id: string) {
+  const it = state.items.find((i) => i.id === id);
+  if (!it) return;
+  if (it.status === "processing") {
+    controllers.get(id)?.abort();
+    controllers.delete(id);
+    cancelled.add(id);
+    // El servidor puede terminar igual: limpiamos ahora y otra vez más tarde.
+    cleanupCancelled(id);
+    setTimeout(() => cleanupCancelled(id), 25000);
+  }
+  removeItem(id);
+}
+
+/** Cancela todo lo que aún no terminó. */
+export function cancelAll() {
+  state.items.filter((i) => i.status === "queued" || i.status === "processing").forEach((i) => cancelItem(i.id));
+}
+
 /** Quita la miniatura del producto ya revisado/confirmado. */
 export function removeByProductId(productId: string) {
   const it = state.items.find((i) => i.product?.id === productId);
@@ -190,8 +227,12 @@ async function process(item: QueueItem) {
   try {
     const form = new FormData();
     form.append("image", item.blob, "foto.jpg");
+    form.append("product_id", item.id); // el servidor usa este id → permite limpiar si se cancela
     if (item.categoryId) form.append("category_id", item.categoryId);
-    const res = await fetch("/api/analyze", { method: "POST", body: form });
+    const controller = new AbortController();
+    controllers.set(item.id, controller);
+    const res = await fetch("/api/analyze", { method: "POST", body: form, signal: controller.signal });
+    controllers.delete(item.id);
     const json = (await res.json().catch(() => ({}))) as { product?: Product; ai_fields?: string[]; error?: string; retry_after?: number };
 
     if (res.status === 429) {
@@ -206,6 +247,8 @@ async function process(item: QueueItem) {
     update(item.id, { status: "done", product: json.product, aiFields: json.ai_fields ?? [], error: undefined });
     dbDelete(item.id);
   } catch (e) {
+    controllers.delete(item.id);
+    if (cancelled.has(item.id) || (e instanceof DOMException && e.name === "AbortError")) return; // cancelado por el usuario
     const msg = e instanceof Error ? e.message : "Error inesperado";
     const attempts = item.attempts + 1;
     if (attempts < MAX_ATTEMPTS && /fetch|network|Failed|red/i.test(msg)) {
