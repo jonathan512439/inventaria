@@ -61,6 +61,7 @@ function Review() {
   const [leaving, setLeaving] = useState(false); // animación de salida de la tarjeta confirmada
   const [zoom, setZoom] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [openIn, setOpenIn] = useState<{ id: string; nonce: number } | null>(null);
 
   /** Pide al servidor que elija la subcategoría dentro de una categoría (texto → IA si hace falta). */
   async function autoSubcategory(productId: string, categoryId: string) {
@@ -70,7 +71,11 @@ function Review() {
     setClassifying(false);
     if (!res.ok) return toast("error", json.error || "No se pudo elegir la subcategoría");
     if (json.category_id) setDraft((d) => (d ? { ...d, categoryId: json.category_id! } : d));
-    toast(json.subcategory ? "success" : "info", json.subcategory ? `Subcategoría: ${json.subcategory}` : "Sin subcategoría clara: queda en la categoría general");
+    if (json.subcategory) toast("success", `Subcategoría: ${json.subcategory}`);
+    else {
+      toast("info", "Sin subcategoría clara: elige o crea una");
+      setOpenIn({ id: categoryId, nonce: Date.now() });
+    }
   }
   const types = useMemo(() => categories.filter((c) => !c.parent_id), [categories]);
   const tableView = params.get("view") === "table";
@@ -295,7 +300,24 @@ function Review() {
               onChange={(v) => setDraft({ ...draft, categoryId: v })}
               onCategoriesChange={setCategories}
               emptyLabel="Sin categoría"
+              openIn={openIn}
             />
+            {catOfCurrent && (
+              <p className="mt-1.5 flex flex-wrap items-center gap-x-1 text-xs text-slate-600">
+                {meta.categoria_sugerida && draft.categoryId === current.category_id ? (
+                  <><IconSparkles size={12} className="text-brand-500" /> <span className="font-semibold text-brand-700">La IA eligió:</span></>
+                ) : (
+                  <span className="font-semibold">Elegida:</span>
+                )}
+                <span>{topOfCurrent?.icon ? `${topOfCurrent.icon} ` : ""}{topOfCurrent?.name}</span>
+                {catOfCurrent.parent_id ? (
+                  <span>› <b>{catOfCurrent.name}</b></span>
+                ) : (
+                  <span className="text-amber-700">› sin subcategoría</span>
+                )}
+                <span className="text-slate-400">· toca arriba para cambiar</span>
+              </p>
+            )}
             {draft.categoryId && !categories.find((c) => c.id === draft.categoryId)?.parent_id && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {categories.some((c) => c.parent_id === draft.categoryId) && (

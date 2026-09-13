@@ -69,7 +69,8 @@ export function buildResponseSchema(fields: FieldTemplate[], ctx: PromptContext)
   }
   properties[META_KEYS.categoriaNueva] = {
     type: "STRING",
-    description: "Si ninguna subcategoría existente encaja (o no hay subcategorías), nombre corto de la subcategoría que crearías. Si sí encaja, cadena vacía.",
+    description:
+      "Nombre corto de la subcategoría que le correspondería a este producto cuando NO existe una adecuada: si elegiste una categoría general (sin subcategoría), si ninguna categoría encaja, o si no hay categorías. Si ya elegiste una subcategoría concreta, cadena vacía.",
   };
   order.push(META_KEYS.categoriaNueva);
   if (!ctx.fixedCategoryPath && ctx.catalogs?.length) {
@@ -122,7 +123,7 @@ export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string
   const catLine = ctx.fixedCategoryPath
     ? `El producto pertenece a la subcategoría "${ctx.fixedCategoryPath}".`
     : ctx.categoryPaths.length
-      ? `Elige la subcategoría más adecuada entre las del usuario (campo "${META_KEYS.categoria}"). Si ninguna encaja, usa "${NEW_CATEGORY_OPTION}" y propón un nombre en "${META_KEYS.categoriaNueva}".`
+      ? `Elige la categoría o subcategoría más adecuada entre las del usuario (campo "${META_KEYS.categoria}"; las rutas "A > B" son subcategorías, prefiérelas). Si solo encaja la categoría general, elígela y propón en "${META_KEYS.categoriaNueva}" la subcategoría que faltaría. Usa "${NEW_CATEGORY_OPTION}" solo si el producto claramente no pertenece a ninguna categoría del usuario (prefiere una categoría general existente antes que ninguna) y propón un nombre en "${META_KEYS.categoriaNueva}".`
       : `El usuario aún no tiene subcategorías: propón un nombre corto de subcategoría en "${META_KEYS.categoriaNueva}" (p. ej. "Bebidas", "Herramientas").`;
 
   return [

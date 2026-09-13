@@ -135,7 +135,8 @@ export async function POST(request: Request) {
     }
   }
   const nueva = String(result[META_KEYS.categoriaNueva] ?? "").trim();
-  if (!categoryId && nueva) aiMeta.categoria_nueva = nueva.slice(0, 60);
+  const chosenIsTop = categoryId ? !cats.find((c) => c.id === categoryId)?.parent_id : true;
+  if (nueva && chosenIsTop) aiMeta.categoria_nueva = nueva.slice(0, 60);
   if (!categoryId) {
     const cat = String(result[META_KEYS.catalogo] ?? "").trim();
     const preset = cat && cat !== NO_CATALOG_OPTION ? PRESETS.find((p) => p.name === cat) : undefined;

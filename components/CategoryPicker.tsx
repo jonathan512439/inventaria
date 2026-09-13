@@ -18,13 +18,15 @@ interface Props {
   /** Muestra la opción "Sin categoría / Todas" */
   emptyLabel?: string | null;
   className?: string;
+  /** Cambiar este valor abre el panel directamente en el paso 2 de esa categoría */
+  openIn?: { id: string; nonce: number } | null;
 }
 
 /**
  * Selector de categoría en dos pasos: primero la categoría, luego su subcategoría.
  * Abre un panel (hoja inferior en móvil). Permite crear sobre la marcha.
  */
-export default function CategoryPicker({ categories, value, onChange, onCategoriesChange, allowCreate = true, emptyLabel = null, className = "" }: Props) {
+export default function CategoryPicker({ categories, value, onChange, onCategoriesChange, allowCreate = true, emptyLabel = null, className = "", openIn = null }: Props) {
   const supabase = createClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -46,6 +48,14 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => {
+    if (openIn) {
+      setOpen(true);
+      // tras el efecto de apertura, fijar el paso en la categoría pedida
+      setTimeout(() => setStep(openIn.id), 0);
+    }
+  }, [openIn]);
 
   function choose(id: string | null) {
     onChange(id);
