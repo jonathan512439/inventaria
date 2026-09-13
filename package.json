@@ -1,0 +1,39 @@
+{
+  "name": "inventaria",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "pages:build:win": "vercel build --yes && npx @cloudflare/next-on-pages --skip-build",
+    "preview": "npm run pages:build && wrangler pages dev",
+    "deploy": "npm run pages:build && wrangler pages deploy"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.45.4",
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@cloudflare/next-on-pages": "1.13.15",
+    "@cloudflare/workers-types": "^4.20240909.0",
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.35",
+    "eslint-plugin-next-on-pages": "1.13.15",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.5.2",
+    "vercel": "^37.14.0",
+    "wrangler": "^3.90.0"
+  }
+}

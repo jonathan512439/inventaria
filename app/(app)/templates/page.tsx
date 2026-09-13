@@ -1,0 +1,270 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import type { Category, FieldTemplate, FieldType } from "@/types/database";
+import { categoryPath } from "@/lib/categories";
+import { BASIC_TEMPLATE, getEffectiveFields } from "@/lib/fields";
+import CategorySelect from "@/components/CategorySelect";
+
+const TYPE_LABEL: Record<FieldType, string> = { text: "Texto", number: "Número", select: "Lista" };
+
+export default function TemplatesPage() {
+  const supabase = createClient();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [templates, setTemplates] = useState<FieldTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // A qué categoría pertenecen los campos que se muestran/crean (null = globales)
+  const [scope, setScope] = useState<string | null>(null);
+
+  // formulario nuevo campo
+  const [fName, setFName] = useState("");
+  const [fType, setFType] = useState<FieldType>("text");
+  const [fOptions, setFOptions] = useState("");
+  const [fAi, setFAi] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // edición
+  const [editing, setEditing] = useState<FieldTemplate | null>(null);
+  const [editOptions, setEditOptions] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [c, t] = await Promise.all([
+      supabase.from("categories").select("*"),
+      supabase.from("field_templates").select("*").order("sort_order").order("created_at"),
+    ]);
+    if (c.error) setError(c.error.message);
+    if (t.error) setError(t.error.message);
+    setCategories(c.data ?? []);
+    setTemplates(t.data ?? []);
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const ownFields = useMemo(() => templates.filter((t) => t.category_id === scope), [templates, scope]);
+  const effective = useMemo(() => getEffectiveFields(templates, categories, scope), [templates, categories, scope]);
+  const inherited = effective.filter((t) => t.category_id !== scope);
+
+  function parseOptions(raw: string): string[] | null {
+    const arr = raw.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+    return arr.length ? arr : null;
+  }
+
+  async function addField(e: React.FormEvent) {
+    e.preventDefault();
+    if (!fName.trim()) return;
+    if (fType === "select" && !parseOptions(fOptions)) return setError("Una lista necesita al menos una opción.");
+    setSaving(true);
+    setError(null);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await supabase.from("field_templates").insert({
+      user_id: user!.id,
+      category_id: scope,
+      name: fName.trim(),
+      field_type: fType,
+      options: fType === "select" ? parseOptions(fOptions) : null,
+      is_ai_fillable: fAi,
+      sort_order: ownFields.length,
+    });
+    setSaving(false);
+    if (error) return setError(error.message);
+    setFName("");
+    setFOptions("");
+    load();
+  }
+
+  async function addBasicTemplate() {
+    const existing = new Set(effective.map((t) => t.name.toLowerCase()));
+    const toInsert = BASIC_TEMPLATE.filter((t) => !existing.has(t.name.toLowerCase()));
+    if (!toInsert.length) return setError("Ya tienes todos los campos de la plantilla básica.");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await supabase.from("field_templates").insert(
+      toInsert.map((t, i) => ({ ...t, user_id: user!.id, category_id: scope, sort_order: ownFields.length + i }))
+    );
+    if (error) return setError(error.message);
+    load();
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    const { error } = await supabase
+      .from("field_templates")
+      .update({
+        name: editing.name.trim(),
+        field_type: editing.field_type,
+        options: editing.field_type === "select" ? parseOptions(editOptions) : null,
+        is_ai_fillable: editing.is_ai_fillable,
+      })
+      .eq("id", editing.id);
+    if (error) return setError(error.message);
+    setEditing(null);
+    load();
+  }
+
+  async function toggleAi(t: FieldTemplate) {
+    const { error } = await supabase.from("field_templates").update({ is_ai_fillable: !t.is_ai_fillable }).eq("id", t.id);
+    if (error) return setError(error.message);
+    setTemplates((prev) => prev.map((x) => (x.id === t.id ? { ...x, is_ai_fillable: !t.is_ai_fillable } : x)));
+  }
+
+  async function remove(t: FieldTemplate) {
+    if (!confirm(`¿Eliminar el campo "${t.name}"? Los valores ya guardados en productos no se borran.`)) return;
+    const { error } = await supabase.from("field_templates").delete().eq("id", t.id);
+    if (error) return setError(error.message);
+    load();
+  }
+
+  async function move(t: FieldTemplate, dir: -1 | 1) {
+    const idx = ownFields.findIndex((x) => x.id === t.id);
+    const other = ownFields[idx + dir];
+    if (!other) return;
+    const reordered = [...ownFields];
+    reordered[idx] = other;
+    reordered[idx + dir] = t;
+    await Promise.all(reordered.map((x, i) => supabase.from("field_templates").update({ sort_order: i }).eq("id", x.id)));
+    load();
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold">Campos (plantillas)</h1>
+        <p className="text-sm text-slate-500">
+          Define las columnas de tus productos. Los campos globales aplican a todas las categorías; los de una
+          categoría también aplican a sus subcategorías.
+        </p>
+      </div>
+
+      <div className="card space-y-2">
+        <label className="label" htmlFor="scope">Campos de</label>
+        <CategorySelect id="scope" categories={categories} value={scope} onChange={setScope} emptyLabel="🌐 Globales (todas las categorías)" />
+      </div>
+
+      <form onSubmit={addField} className="card space-y-3">
+        <h2 className="font-medium">Nuevo campo {scope ? `en "${categoryPath(categories, scope)}"` : "global"}</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="fname">Nombre del campo</label>
+            <input id="fname" className="input" placeholder="Ej. precio, color, talla" value={fName} onChange={(e) => setFName(e.target.value)} required />
+          </div>
+          <div>
+            <label className="label" htmlFor="ftype">Tipo</label>
+            <select id="ftype" className="input" value={fType} onChange={(e) => setFType(e.target.value as FieldType)}>
+              <option value="text">Texto</option>
+              <option value="number">Número</option>
+              <option value="select">Lista de opciones</option>
+            </select>
+          </div>
+        </div>
+        {fType === "select" && (
+          <div>
+            <label className="label" htmlFor="fopts">Opciones (separadas por coma)</label>
+            <input id="fopts" className="input" placeholder="rojo, azul, verde" value={fOptions} onChange={(e) => setFOptions(e.target.value)} />
+          </div>
+        )}
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={fAi} onChange={(e) => setFAi(e.target.checked)} />
+          <span>
+            <span className="font-medium">¿La IA debe intentar rellenar este campo desde la foto?</span>
+            <br />
+            <span className="text-slate-500">Activa para nombre, descripción, color… Desactiva para precio, stock, etc.</span>
+          </span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-primary" disabled={saving}>{saving ? "Guardando..." : "Agregar campo"}</button>
+          <button type="button" className="btn-secondary" onClick={addBasicTemplate}>
+            + Plantilla básica
+          </button>
+        </div>
+      </form>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <div className="card p-0">
+        <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">
+          Campos {scope ? "de esta categoría" : "globales"} ({ownFields.length})
+        </div>
+        {loading ? (
+          <p className="p-4 text-sm text-slate-500">Cargando...</p>
+        ) : ownFields.length === 0 ? (
+          <p className="p-4 text-sm text-slate-500">Sin campos propios. Agrega uno arriba o usa la plantilla básica.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {ownFields.map((t, i) => (
+              <li key={t.id} className="px-4 py-2.5">
+                {editing?.id === t.id ? (
+                  <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto]">
+                    <input className="input" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+                    <select className="input" value={editing.field_type} onChange={(e) => setEditing({ ...editing, field_type: e.target.value as FieldType })}>
+                      <option value="text">Texto</option>
+                      <option value="number">Número</option>
+                      <option value="select">Lista</option>
+                    </select>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={editing.is_ai_fillable} onChange={(e) => setEditing({ ...editing, is_ai_fillable: e.target.checked })} />
+                      IA
+                    </label>
+                    {editing.field_type === "select" && (
+                      <input className="input sm:col-span-3" placeholder="opciones separadas por coma" value={editOptions} onChange={(e) => setEditOptions(e.target.value)} />
+                    )}
+                    <div className="flex gap-2 sm:col-span-3">
+                      <button className="btn-primary px-3 py-1.5" onClick={saveEdit}>Guardar</button>
+                      <button className="btn-secondary px-3 py-1.5" onClick={() => setEditing(null)}>Cancelar</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-col">
+                      <button className="btn-ghost h-5 px-1 py-0 text-[10px]" disabled={i === 0} onClick={() => move(t, -1)}>▲</button>
+                      <button className="btn-ghost h-5 px-1 py-0 text-[10px]" disabled={i === ownFields.length - 1} onClick={() => move(t, 1)}>▼</button>
+                    </div>
+                    <span className="flex-1 text-sm font-medium">{t.name}</span>
+                    <span className="badge bg-slate-100 text-slate-600">{TYPE_LABEL[t.field_type]}</span>
+                    {t.options && <span className="hidden text-xs text-slate-400 sm:inline">{t.options.join(", ")}</span>}
+                    <button
+                      onClick={() => toggleAi(t)}
+                      className={`badge ${t.is_ai_fillable ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-500"}`}
+                      title="Alternar relleno por IA"
+                    >
+                      {t.is_ai_fillable ? "✨ IA" : "manual"}
+                    </button>
+                    <button className="btn-ghost px-2 py-1 text-xs" onClick={() => { setEditing(t); setEditOptions(t.options?.join(", ") ?? ""); }}>Editar</button>
+                    <button className="btn-ghost px-2 py-1 text-xs text-red-600" onClick={() => remove(t)}>Eliminar</button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {scope && inherited.length > 0 && (
+        <div className="card p-0">
+          <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600">
+            Campos heredados ({inherited.length})
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {inherited.map((t) => (
+              <li key={t.id} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-600">
+                <span className="flex-1">{t.name}</span>
+                <span className="badge bg-slate-100">{TYPE_LABEL[t.field_type]}</span>
+                <span className="badge bg-slate-100">{t.is_ai_fillable ? "✨ IA" : "manual"}</span>
+                <span className="text-xs text-slate-400">{t.category_id ? categoryPath(categories, t.category_id) : "global"}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
