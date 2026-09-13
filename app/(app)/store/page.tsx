@@ -10,7 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import { IconArrowLeft, IconChevronRight, IconPlus, IconSparkles, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 
 /**
- * "Mi tienda": los rubros (tipos de producto) con sus secciones.
+ * "Mi tienda": las categorías (tipos de producto) con sus subcategorías.
  * Reemplaza a la gestión manual de categorías/campos para el usuario común.
  */
 export default function StorePage() {
@@ -54,7 +54,7 @@ export default function StorePage() {
     const { error } = await supabase.from("categories").insert({ user_id: user!.id, name: newSection.name.trim(), parent_id: newSection.typeId });
     if (error) return toast("error", error.message);
     setNewSection(null);
-    toast("success", "Sección agregada");
+    toast("success", "Subcategoría agregada");
     load();
   }
 
@@ -69,8 +69,8 @@ export default function StorePage() {
   async function remove(c: Category, isType: boolean) {
     const n = isType ? countOf(c.id) : (counts.get(c.id) ?? 0);
     const msg = isType
-      ? `¿Eliminar el rubro "${c.name}" con todas sus secciones?${n ? ` Sus ${n} productos quedarán sin sección.` : ""}`
-      : `¿Eliminar la sección "${c.name}"?${n ? ` Sus ${n} productos quedarán sin sección.` : ""}`;
+      ? `¿Eliminar la categoría "${c.name}" con todas sus subcategorías?${n ? ` Sus ${n} productos quedarán sin categoría.` : ""}`
+      : `¿Eliminar la subcategoría "${c.name}"?${n ? ` Sus ${n} productos quedarán sin categoría.` : ""}`;
     if (!confirm(msg)) return;
     const { error } = await supabase.from("categories").delete().eq("id", c.id);
     if (error) return toast("error", error.message);
@@ -82,7 +82,7 @@ export default function StorePage() {
       <header className="animate-in">
         <Link href="/settings" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ajustes</Link>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Mi tienda</h1>
-        <p className="text-sm text-slate-500">Lo que vendes, organizado en rubros y secciones. La IA usa esto para ordenar cada foto.</p>
+        <p className="text-sm text-slate-500">Lo que vendes, organizado en categorías y subcategorías. La IA usa esto para ordenar cada foto.</p>
       </header>
 
       {loading ? (
@@ -92,8 +92,8 @@ export default function StorePage() {
           {types.length === 0 && !adding && (
             <div className="animate-in card bg-gradient-to-br from-brand-600 to-violet-600 text-white ring-0">
               <p className="flex items-center gap-2 text-lg font-semibold"><IconSparkles className="text-amber-300" /> Empieza eligiendo qué vendes</p>
-              <p className="mt-1 text-sm text-white/85">Cada rubro trae sus secciones y datos listos. Puedes elegir varios.</p>
-              <button onClick={() => setAdding(true)} className="btn mt-4 w-full bg-white text-brand-700 hover:bg-brand-50">Elegir mi rubro</button>
+              <p className="mt-1 text-sm text-white/85">Cada categoría trae sus subcategorías y datos listos. Puedes elegir varias.</p>
+              <button onClick={() => setAdding(true)} className="btn mt-4 w-full bg-white text-brand-700 hover:bg-brand-50">Elegir mis categorías</button>
             </div>
           )}
 
@@ -116,11 +116,11 @@ export default function StorePage() {
                     ) : (
                       <>
                         <button className="block truncate text-left text-lg font-bold text-ink hover:text-brand-700" onClick={() => setRenaming({ id: t.id, name: t.name })} title="Cambiar nombre">{t.name}</button>
-                        <p className="text-xs text-slate-500">{secs.length} secciones · {countOf(t.id)} productos</p>
+                        <p className="text-xs text-slate-500">{secs.length} subcategorías · {countOf(t.id)} productos</p>
                       </>
                     )}
                   </div>
-                  <button className="btn-ghost btn-sm text-rose-600" onClick={() => remove(t, true)} title="Eliminar rubro"><IconTrash size={16} /></button>
+                  <button className="btn-ghost btn-sm text-rose-600" onClick={() => remove(t, true)} title="Eliminar categoría"><IconTrash size={16} /></button>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
@@ -132,16 +132,16 @@ export default function StorePage() {
                         <button onClick={() => setRenaming({ id: s.id, name: s.name })} title="Cambiar nombre">{s.name}</button>
                       )}
                       {counts.get(s.id) ? <span className="text-xs text-slate-400">{counts.get(s.id)}</span> : null}
-                      <button onClick={() => remove(s, false)} className="rounded-full p-0.5 text-slate-300 hover:bg-rose-50 hover:text-rose-600" title="Eliminar sección"><IconX size={12} /></button>
+                      <button onClick={() => remove(s, false)} className="rounded-full p-0.5 text-slate-300 hover:bg-rose-50 hover:text-rose-600" title="Eliminar subcategoría"><IconX size={12} /></button>
                     </span>
                   ))}
                   {newSection?.typeId === t.id ? (
                     <span className="chip border-brand-400 gap-1 pr-1.5">
-                      <input className="w-32 bg-transparent outline-none" placeholder="Nombre de la sección" value={newSection.name} autoFocus onChange={(e) => setNewSection({ ...newSection, name: e.target.value })} onKeyDown={(e) => (e.key === "Enter" ? addSection() : e.key === "Escape" ? setNewSection(null) : null)} />
+                      <input className="w-32 bg-transparent outline-none" placeholder="Nombre de la subcategoría" value={newSection.name} autoFocus onChange={(e) => setNewSection({ ...newSection, name: e.target.value })} onKeyDown={(e) => (e.key === "Enter" ? addSection() : e.key === "Escape" ? setNewSection(null) : null)} />
                       <button onClick={addSection} className="rounded-full bg-brand-600 p-0.5 text-white"><IconPlus size={12} /></button>
                     </span>
                   ) : (
-                    <button onClick={() => setNewSection({ typeId: t.id, name: "" })} className="chip border-dashed text-brand-700"><IconPlus size={14} /> Sección</button>
+                    <button onClick={() => setNewSection({ typeId: t.id, name: "" })} className="chip border-dashed text-brand-700"><IconPlus size={14} /> Subcategoría</button>
                   )}
                 </div>
 
@@ -159,7 +159,7 @@ export default function StorePage() {
           {adding ? (
             <div className="animate-in card space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="font-bold">Agregar rubro</h2>
+                <h2 className="font-bold">Agregar categoría</h2>
                 <button className="btn-ghost btn-sm" onClick={() => setAdding(false)}><IconX size={16} /></button>
               </div>
               <PresetPicker
@@ -174,13 +174,13 @@ export default function StorePage() {
             </div>
           ) : (
             types.length > 0 && (
-              <button onClick={() => setAdding(true)} className="btn-secondary w-full"><IconPlus size={18} /> Agregar rubro</button>
+              <button onClick={() => setAdding(true)} className="btn-secondary w-full"><IconPlus size={18} /> Agregar categoría</button>
             )
           )}
 
           <p className="text-center text-xs text-slate-400">
             ¿Necesitas algo más detallado?{" "}
-            <Link href="/categories" className="underline">Secciones avanzadas</Link> · <Link href="/templates" className="underline">Datos avanzados</Link>
+            <Link href="/categories" className="underline">Subcategorías avanzadas</Link> · <Link href="/templates" className="underline">Datos avanzados</Link>
           </p>
         </>
       )}

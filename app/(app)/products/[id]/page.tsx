@@ -124,8 +124,8 @@ export default function ProductDetailPage() {
 
         <div className="animate-in card space-y-4">
           <div>
-            <label className="label">Sección</label>
-            <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} emptyLabel="— Sin sección —" />
+            <label className="label">Categoría</label>
+            <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} emptyLabel="— Sin categoría —" />
           </div>
 
           {fields.map((f) => (

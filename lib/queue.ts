@@ -128,6 +128,12 @@ export function removeItem(id: string) {
   set({ items: state.items.filter((i) => i.id !== id) });
 }
 
+/** Quita la miniatura del producto ya revisado/confirmado. */
+export function removeByProductId(productId: string) {
+  const it = state.items.find((i) => i.product?.id === productId);
+  if (it) removeItem(it.id);
+}
+
 /** Quita de la lista los que ya terminaron bien. */
 export function clearDone() {
   state.items.filter((i) => i.status === "done").forEach((i) => URL.revokeObjectURL(i.previewUrl));

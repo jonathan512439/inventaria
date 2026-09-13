@@ -211,7 +211,7 @@ function Templates() {
 
       <div className="animate-in card p-0">
         <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold">
-          {scope ? "Datos solo de esta sección" : "Datos de todos los productos"} ({ownFields.length})
+          {scope ? "Datos solo de esta subcategoría" : "Datos de todos los productos"} ({ownFields.length})
         </div>
         {loading ? (
           <p className="p-4 text-sm text-slate-500">Cargando...</p>

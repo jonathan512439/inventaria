@@ -1,7 +1,7 @@
 import type { FieldType } from "@/types/database";
 
 /**
- * Rubros preconfigurados: cada uno trae sus secciones ("estantes") y los datos que se guardan
+ * Categorías preconfigurados: cada uno trae sus subcategorías ("estantes") y los datos que se guardan
  * por producto, ya marcados según los llena la IA desde la foto o el usuario.
  */
 export interface PresetField {
@@ -21,7 +21,7 @@ export interface Preset {
   fields: PresetField[];
 }
 
-/** Datos comunes a todos los rubros (primero los que llena la IA, luego los del usuario). */
+/** Datos comunes a todos las categorías (primero los que llena la IA, luego los del usuario). */
 const BASE_AI: PresetField[] = [
   { name: "nombre", field_type: "text", is_ai_fillable: true },
   { name: "marca", field_type: "text", is_ai_fillable: true },

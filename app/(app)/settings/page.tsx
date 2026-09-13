@@ -68,7 +68,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="animate-in card divide-y divide-slate-100 p-0">
-        <Row href="/store" icon={<IconFolder />} title="Mi tienda" subtitle={counts ? `${counts.types} rubro${counts.types === 1 ? "" : "s"} · ${counts.sections} secciones · qué vendes y cómo se organiza` : ""} />
+        <Row href="/store" icon={<IconFolder />} title="Mi tienda" subtitle={counts ? `${counts.types} categoría${counts.types === 1 ? "" : "s"} · ${counts.sections} subcategorías · qué vendes y cómo se organiza` : ""} />
         <Row href="/export" icon={<IconDownload />} title="Exportar a Excel" subtitle="Descarga tu inventario" />
         <Row href="/dashboard#guia" icon={<IconList />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" />
       </section>

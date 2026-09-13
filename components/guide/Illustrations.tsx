@@ -22,7 +22,7 @@ const Phone = ({ children }: { children: React.ReactNode }) => (
   </svg>
 );
 
-/** Paso 1: elegir rubros (tarjetas, una marcada) */
+/** Paso 1: elegir categorías (tarjetas, una marcada) */
 export const IllustrationChoose = () => (
   <Phone>
     <text x="24" y="38" fontSize="9" fontWeight="700" fill="#0f172a">¿Qué vendes?</text>

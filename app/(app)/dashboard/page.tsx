@@ -95,7 +95,7 @@ export default function DashboardPage() {
         </Link>
 
         <BigLink href="/review" icon={<IconCheckCircle size={28} />} title="Revisar pendientes" subtitle={stats.pending ? "Confirma precio y stock" : "Todo revisado"} count={stats.pending} tone="amber" />
-        <BigLink href="/products" icon={<IconBox size={28} />} title="Mi inventario" subtitle={`${stats.types} rubro${stats.types === 1 ? "" : "s"}`} count={stats.confirmed} tone="emerald" />
+        <BigLink href="/products" icon={<IconBox size={28} />} title="Mi inventario" subtitle={`${stats.types} categoría${stats.types === 1 ? "" : "s"}`} count={stats.confirmed} tone="emerald" />
       </div>
 
       <div className="flex justify-center gap-4 text-sm">

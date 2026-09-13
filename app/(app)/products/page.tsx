@@ -78,7 +78,7 @@ export default function ProductsPage() {
         <input className="input pl-11" placeholder="Buscar por nombre, marca, código…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
-      {/* Secciones como chips */}
+      {/* Subcategorías como chips */}
       {roots.length > 0 && (
         <div className="no-scrollbar animate-in -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0">
           <button onClick={() => setFilter(null)} className={`chip shrink-0 ${filter === null ? "chip-active" : ""}`}>

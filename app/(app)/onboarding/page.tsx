@@ -46,7 +46,7 @@ export default function OnboardingPage() {
           <div>
             <p className="text-sm font-semibold text-brand-600">Paso 2 de 3</p>
             <h1 className="text-2xl font-bold tracking-tight text-ink">¿Qué vendes?</h1>
-            <p className="text-sm text-slate-500">Toca uno o varios. Cada uno trae sus secciones y datos listos.</p>
+            <p className="text-sm text-slate-500">Toca uno o varios. Cada uno trae sus subcategorías y datos listos.</p>
           </div>
           <PresetPicker
             businessName={business}
@@ -78,7 +78,7 @@ export default function OnboardingPage() {
             <p className="text-sm font-semibold text-brand-600">Paso 3 de 3</p>
             <h1 className="text-2xl font-bold tracking-tight text-ink">¡Listo{business ? `, ${business}` : ""}!</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Tu inventario ya tiene {types.length === 1 ? "el rubro" : "los rubros"} <b>{types.join(", ")}</b> con sus secciones. Ahora toma la primera foto.
+              Tu inventario ya tiene {types.length === 1 ? "la categoría" : "las categorías"} <b>{types.join(", ")}</b> con sus subcategorías. Ahora toma la primera foto.
             </p>
           </div>
           <button onClick={() => router.replace("/capture")} className="btn-primary btn-lg w-full">

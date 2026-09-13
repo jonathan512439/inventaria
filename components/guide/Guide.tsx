@@ -29,21 +29,21 @@ const STEPS: Step[] = [
   {
     n: 1,
     title: "Elige qué vendes",
-    goal: "Tu inventario queda organizado en secciones, sin crear nada a mano.",
+    goal: "Tu inventario queda organizado en categorías y subcategorías, sin crear nada a mano.",
     href: "/store",
-    cta: "Elegir mi rubro",
+    cta: "Elegir mis categorías",
     Illustration: IllustrationChoose,
     instructions: [
       "Toca **Ajustes → Mi tienda** (o el botón de abajo).",
-      "Marca uno o varios rubros: **Librería**, **Ropa**, **Bebidas**… Si no está el tuyo, toca **Otro** y escríbelo en una frase.",
-      "Toca **Preparar mi inventario**. Listo: ya tienes secciones y datos.",
+      "Marca una o varias categorías: **Librería**, **Ropa**, **Bebidas**… Si no está la tuya, toca **Otro** y escríbelo en una frase.",
+      "Toca **Preparar mi inventario**. Listo: ya tienes subcategorías y datos.",
     ],
-    tip: "Un negocio puede tener varios rubros a la vez. Todo queda en un solo inventario.",
+    tip: "Un negocio puede tener varias categorías a la vez. Todo queda en un solo inventario.",
   },
   {
     n: 2,
     title: "Toma fotos de tus productos",
-    goal: "La IA reconoce cada producto, lo describe y lo pone en su sección.",
+    goal: "La IA reconoce cada producto, lo describe y lo pone en su subcategoría.",
     href: "/capture",
     cta: "Agregar productos",
     Illustration: IllustrationCapture,
@@ -77,9 +77,9 @@ const STEPS: Step[] = [
     cta: "Ver mi inventario",
     Illustration: IllustrationInventory,
     instructions: [
-      "Toca **Inventario** (abajo). Busca por nombre o marca, o filtra por sección con los botones de arriba.",
-      "Toca un producto para editarlo (precio, stock, sección, foto).",
-      "Para el Excel: **Inventario → Excel** o **Ajustes → Exportar**. Elige todo o una sección y toca **Descargar**.",
+      "Toca **Inventario** (abajo). Busca por nombre o marca, o filtra por categoría con los botones de arriba.",
+      "Toca un producto para editarlo (precio, stock, subcategoría, foto).",
+      "Para el Excel: **Inventario → Excel** o **Ajustes → Exportar**. Elige todo o una categoría y toca **Descargar**.",
     ],
   },
 ];
@@ -88,9 +88,9 @@ const STEPS: Step[] = [
 const TASKS: Array<{ q: string; href: string; steps: string[] }> = [
   { q: "Agregar un producto nuevo", href: "/capture", steps: ["Toca **Agregar** (botón morado).", "Toca **Cámara** y fotografía el producto.", "Ve a **Revisar**, pon precio y stock, **Confirmar**."] },
   { q: "Cambiar precio o stock", href: "/products", steps: ["Toca **Inventario** y busca el producto.", "Tócalo y cambia **precio** o **stock**.", "Toca **Guardar**."] },
-  { q: "Corregir un nombre o sección", href: "/products", steps: ["Toca **Inventario**, busca y abre el producto.", "Edita el nombre o elige otra **Sección**.", "Toca **Guardar**."] },
-  { q: "Agregar una sección o rubro", href: "/store", steps: ["Toca **Ajustes → Mi tienda**.", "Para un rubro nuevo: **+ Agregar rubro**. Para una sección: **+ Sección** dentro del rubro.", "Escribe el nombre y confirma."] },
-  { q: "Sacar el inventario en Excel", href: "/export", steps: ["Toca **Ajustes → Exportar** (o **Inventario → Excel**).", "Elige **todo** o una **sección**.", "Toca **Descargar .xlsx**."] },
+  { q: "Corregir un nombre o subcategoría", href: "/products", steps: ["Toca **Inventario**, busca y abre el producto.", "Edita el nombre o elige otra **Subcategoría**.", "Toca **Guardar**."] },
+  { q: "Agregar una subcategoría o categoría", href: "/store", steps: ["Toca **Ajustes → Mi tienda**.", "Para una categoría nueva: **+ Agregar categoría**. Para una subcategoría: **+ Subcategoría** dentro de la categoría.", "Escribe el nombre y confirma."] },
+  { q: "Sacar el inventario en Excel", href: "/export", steps: ["Toca **Ajustes → Exportar** (o **Inventario → Excel**).", "Elige **todo** o una **categoría**.", "Toca **Descargar .xlsx**."] },
   { q: "Eliminar un producto", href: "/products", steps: ["Toca **Inventario**, busca y abre el producto.", "Toca **Eliminar** (abajo a la derecha).", "Confirma. La foto también se borra."] },
 ];
 

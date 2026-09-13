@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { applyDefaults, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
-import { useQueue, queueSummary } from "@/lib/queue";
+import { useQueue, queueSummary, removeByProductId } from "@/lib/queue";
+import { getPreset } from "@/lib/presets";
 import CategorySelect from "@/components/CategorySelect";
 import FieldInput from "@/components/FieldInput";
 import ProductTable from "@/components/ProductTable";
@@ -51,6 +52,7 @@ function Review() {
   const [saving, setSaving] = useState(false);
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [newParent, setNewParent] = useState<string | null>(null);
+  const [settingUp, setSettingUp] = useState(false);
   const types = useMemo(() => categories.filter((c) => !c.parent_id), [categories]);
   const tableView = params.get("view") === "table";
 
@@ -93,6 +95,15 @@ function Review() {
     () => (draft ? getEffectiveFields(templates, categories, draft.categoryId) : []),
     [draft, templates, categories]
   );
+
+  // Precarga la foto del siguiente producto para que el cambio sea inmediato
+  useEffect(() => {
+    const next = products[index + 1];
+    if (next?.image_url) {
+      const img = new Image();
+      img.src = next.image_url;
+    }
+  }, [products, index]);
   const aiFields = fields.filter((f) => f.is_ai_fillable);
   const manualFields = fields.filter((f) => !f.is_ai_fillable);
 
@@ -114,7 +125,9 @@ function Review() {
     if (status === "confirmed") {
       const id = current.id;
       setConfirmedCount((n) => n + 1);
+      removeByProductId(id);
       setProducts((list) => list.filter((p) => p.id !== id));
+      window.scrollTo({ top: 0, behavior: "smooth" });
       toast("success", "Guardado en inventario", {
         label: "Deshacer",
         onClick: async () => {
@@ -149,7 +162,35 @@ function Review() {
     if (error) return toast("error", error.message);
     setCategories((c) => [...c, data]);
     setDraft((d) => (d ? { ...d, categoryId: data.id } : d));
-    toast("success", `Sección "${name}" creada`);
+    toast("success", `Subcategoría "${name}" creada`);
+  }
+
+  /** Agrega un catálogo preconfigurado o crea una categoría nueva con la IA, y asigna el producto. */
+  async function setupAndAssign(body: { presets?: string[]; description?: string }, preferSubName?: string | null) {
+    setSettingUp(true);
+    const res = await fetch("/api/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const json = (await res.json().catch(() => ({}))) as { error?: string; types?: string[] };
+    if (!res.ok) {
+      setSettingUp(false);
+      return toast("error", json.error || "No se pudo crear");
+    }
+    const [{ data: cats }, { data: tpls }] = await Promise.all([
+      supabase.from("categories").select("*"),
+      supabase.from("field_templates").select("*").order("sort_order"),
+    ]);
+    const all = cats ?? [];
+    setCategories(all);
+    setTemplates(tpls ?? []);
+    const typeName = json.types?.[0];
+    const top = all.find((c) => !c.parent_id && c.name.toLowerCase() === typeName?.toLowerCase());
+    let target = top ?? null;
+    if (top && preferSubName) {
+      const sub = all.find((c) => c.parent_id === top.id && c.name.toLowerCase() === preferSubName.toLowerCase());
+      if (sub) target = sub;
+    }
+    if (target) setDraft((d) => (d ? { ...d, categoryId: target!.id } : d));
+    setSettingUp(false);
+    toast("success", `Categoría "${typeName}" lista${target && target !== top ? ` · ${target.name}` : ""}`);
   }
 
   // ---------- Vistas ----------
@@ -186,6 +227,8 @@ function Review() {
 
   const title = productTitle(draft.data);
   const meta = current.ai_meta ?? {};
+  // Nombre para una categoría general nueva: el propuesto por la IA, o la subcategoría sugerida
+  const generalName = meta.categoria_nueva_general || meta.categoria_nueva || null;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -201,28 +244,59 @@ function Review() {
         </div>
 
         <div className="space-y-5 px-5 pb-5">
-          {/* Sección */}
+          {/* Subcategoría */}
           <div>
             <label className="label flex items-center gap-1">
-              <IconSparkles size={14} className="text-brand-500" /> Sección
+              <IconSparkles size={14} className="text-brand-500" /> Categoría
             </label>
-            <CategorySelect categories={categories} value={draft.categoryId} onChange={(v) => setDraft({ ...draft, categoryId: v })} emptyLabel="— Elige una sección —" />
-            {!draft.categoryId && meta.categoria_nueva && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button type="button" onClick={createSuggestedCategory} className="chip border-brand-300 bg-brand-50 text-brand-700">
-                  <IconPlus size={14} /> Crear sección “{meta.categoria_nueva}”
-                </button>
-                {types.length > 1 && (
-                  <select className="input w-auto py-1.5 text-sm" value={newParent ?? types[0]?.id ?? ""} onChange={(e) => setNewParent(e.target.value)}>
-                    {types.map((t) => (
-                      <option key={t.id} value={t.id}>en {t.icon ? `${t.icon} ` : ""}{t.name}</option>
-                    ))}
-                  </select>
+            <CategorySelect categories={categories} value={draft.categoryId} onChange={(v) => setDraft({ ...draft, categoryId: v })} emptyLabel="— Elige categoría o subcategoría —" />
+
+            {!draft.categoryId && (meta.catalogo_sugerido || meta.categoria_nueva_general || meta.categoria_nueva) && (
+              <div className="mt-2 space-y-2 rounded-2xl border border-brand-200 bg-brand-50/60 p-3">
+                <p className="text-xs font-semibold text-brand-800">
+                  <IconSparkles size={12} className="mr-1 inline" />
+                  Este producto no encaja en tus categorías. Sugerencias:
+                </p>
+                {meta.catalogo_sugerido && getPreset(meta.catalogo_sugerido) && (
+                  <button
+                    type="button"
+                    disabled={settingUp}
+                    onClick={() => setupAndAssign({ presets: [meta.catalogo_sugerido!] }, meta.categoria_nueva)}
+                    className="btn-primary btn-sm w-full justify-start"
+                  >
+                    {settingUp ? <Spinner size={14} /> : <IconPlus size={14} />}
+                    Agregar catálogo {getPreset(meta.catalogo_sugerido)!.icon} {getPreset(meta.catalogo_sugerido)!.name}
+                    <span className="ml-auto text-[10px] font-normal opacity-80">listo para usar</span>
+                  </button>
+                )}
+                {generalName && (
+                  <button
+                    type="button"
+                    disabled={settingUp}
+                    onClick={() => setupAndAssign({ description: `${generalName}. Ejemplo de producto: ${title || meta.etiqueta || ""}` }, meta.categoria_nueva)}
+                    className="btn-secondary btn-sm w-full justify-start"
+                  >
+                    {settingUp ? <Spinner size={14} /> : <IconSparkles size={14} className="text-brand-600" />}
+                    Crear categoría “{generalName}” con la IA
+                    <span className="ml-auto text-[10px] font-normal text-slate-500">subcategorías + datos</span>
+                  </button>
+                )}
+                {meta.categoria_nueva && types.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" disabled={settingUp} onClick={createSuggestedCategory} className="chip border-brand-300 bg-white text-brand-700">
+                      <IconPlus size={14} /> Subcategoría “{meta.categoria_nueva}”
+                    </button>
+                    <select className="input w-auto py-1.5 text-sm" value={newParent ?? types[0]?.id ?? ""} onChange={(e) => setNewParent(e.target.value)}>
+                      {types.map((t) => (
+                        <option key={t.id} value={t.id}>en {t.icon ? `${t.icon} ` : ""}{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
             )}
             {!draft.categoryId && fields.length === 0 && (
-              <p className="mt-2 text-xs text-slate-500">Elige la sección para ver y completar los datos del producto.</p>
+              <p className="mt-2 text-xs text-slate-500">Elige la categoría para ver y completar los datos del producto.</p>
             )}
           </div>
 
@@ -266,7 +340,7 @@ function Review() {
 
           {fields.length === 0 && (
             <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">
-              Esta sección aún no tiene datos definidos.{" "}
+              Esta subcategoría aún no tiene datos definidos.{" "}
               <Link href="/templates" className="font-semibold underline">Definir datos</Link>
             </p>
           )}

@@ -13,7 +13,7 @@ interface Props {
   onDone: (result: { types: string[] }) => void;
 }
 
-/** Elegir uno o varios rubros preconfigurados, o describir el negocio para que la IA lo arme. */
+/** Elegir una o varias categorías preconfiguradas, o describir el negocio para que la IA lo arme. */
 export default function PresetPicker({ existingNames = [], businessName, submitLabel = "Continuar", onDone }: Props) {
   const toast = useToast();
   const existing = new Set(existingNames.map((n) => n.toLowerCase()));
@@ -108,7 +108,7 @@ export default function PresetPicker({ existingNames = [], businessName, submitL
       <button type="button" onClick={submit} disabled={!canSubmit || loading} className="btn-primary btn-lg w-full">
         {loading ? (
           <>
-            <Spinner /> {description.trim() ? "La IA está armando tu rubro…" : "Preparando…"}
+            <Spinner /> {description.trim() ? "La IA está armando tu categoría…" : "Preparando…"}
           </>
         ) : (
           submitLabel

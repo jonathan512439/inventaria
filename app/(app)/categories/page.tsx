@@ -74,8 +74,8 @@ export default function CategoriesPage() {
     const descendants = getDescendantIds(categories, c.id).length - 1;
     const msg =
       `¿Eliminar "${c.name}"` +
-      (descendants > 0 ? ` y sus ${descendants} subsección(es)` : "") +
-      `? Sus productos quedarán sin sección.`;
+      (descendants > 0 ? ` y sus ${descendants} subcategoría(s)` : "") +
+      `? Sus productos quedarán sin categoría.`;
     if (!confirm(msg)) return;
     const { error } = await supabase.from("categories").delete().eq("id", c.id);
     if (error) return setError(error.message);
@@ -88,8 +88,8 @@ export default function CategoriesPage() {
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="animate-in">
         <Link href="/store" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi tienda</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Secciones (avanzado)</h1>
-        <p className="text-sm text-slate-500">Árbol completo de rubros y secciones. Para lo habitual usa <Link href="/store" className="underline">Mi tienda</Link>.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Subcategorías (avanzado)</h1>
+        <p className="text-sm text-slate-500">Árbol completo de categorías y subcategorías. Para lo habitual usa <Link href="/store" className="underline">Mi tienda</Link>.</p>
       </div>
 
       <form onSubmit={create} className="animate-in card grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
@@ -99,7 +99,7 @@ export default function CategoriesPage() {
         </div>
         <div>
           <label className="label" htmlFor="parent">Dentro de (opcional)</label>
-          <CategorySelect id="parent" categories={categories} value={parentId} onChange={setParentId} emptyLabel="— Sección principal —" />
+          <CategorySelect id="parent" categories={categories} value={parentId} onChange={setParentId} emptyLabel="— Categoría principal —" />
         </div>
         <div className="flex items-end">
           <button className="btn-primary w-full" disabled={saving}>{saving ? "Guardando..." : "Agregar"}</button>
@@ -112,7 +112,7 @@ export default function CategoriesPage() {
         {loading ? (
           <p className="p-4 text-sm text-slate-500">Cargando...</p>
         ) : tree.length === 0 ? (
-          <p className="p-4 text-sm text-slate-500">Aún no tienes secciones. Crea la primera aquí, o deja que la IA las proponga al tomar fotos.</p>
+          <p className="p-4 text-sm text-slate-500">Aún no tienes subcategorías. Crea la primera aquí, o deja que la IA las proponga al tomar fotos.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
             {tree.map((n) => (
@@ -165,7 +165,7 @@ function TreeItem(props: ItemProps) {
               categories={categories}
               value={props.editParent}
               onChange={props.setEditParent}
-              emptyLabel="— Sección principal —"
+              emptyLabel="— Categoría principal —"
               excludeIds={getDescendantIds(categories, node.id)}
               className="input sm:max-w-xs"
             />

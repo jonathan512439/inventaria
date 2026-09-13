@@ -63,7 +63,7 @@ export default function CapturePage() {
       {categories.length === 0 && (
         <Link href="/store" className="animate-in flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           <IconSparkles size={20} className="shrink-0 text-amber-600" />
-          <span className="flex-1">Primero elige <b>qué vendes</b> para que la IA ordene tus fotos en secciones. Toma 30 segundos.</span>
+          <span className="flex-1">Primero elige <b>qué vendes</b> para que la IA ordene tus fotos en subcategorías. Toma 30 segundos.</span>
           <span className="font-semibold">Elegir →</span>
         </Link>
       )}
@@ -86,9 +86,9 @@ export default function CapturePage() {
         </button>
       </div>
 
-      {/* Sección: automática por defecto */}
+      {/* Subcategoría: automática por defecto */}
       <div className="animate-in flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-slate-500">Sección:</span>
+        <span className="text-slate-500">Subcategoría:</span>
         {!showCategory ? (
           <button type="button" onClick={() => setShowCategory(true)} className="chip">
             <IconSparkles size={14} className="text-brand-600" />

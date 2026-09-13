@@ -8,8 +8,10 @@ import {
   GeminiError,
   META_KEYS,
   NEW_CATEGORY_OPTION,
+  NO_CATALOG_OPTION,
   UNKNOWN_OPTION,
 } from "@/lib/gemini";
+import { PRESETS } from "@/lib/presets";
 import { getEffectiveFields, coerceValue, applyDefaults } from "@/lib/fields";
 import { categoryPath } from "@/lib/categories";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
@@ -28,7 +30,7 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/** Unión de campos IA de todas las secciones (sin repetir nombre) para una sola llamada a Gemini. */
+/** Unión de campos IA de todas las subcategorías (sin repetir nombre) para una sola llamada a Gemini. */
 function unionAiFields(templates: FieldTemplate[], categories: Category[]): FieldTemplate[] {
   const seen = new Map<string, FieldTemplate>();
   const scopes: (string | null)[] = [null, ...categories.map((c) => c.id)];
@@ -45,7 +47,7 @@ function unionAiFields(templates: FieldTemplate[], categories: Category[]): Fiel
 
 /**
  * POST /api/analyze  (multipart/form-data: image, category_id?)
- * 1. Verifica el usuario · 2. Sube la imagen · 3. Gemini elige sección + rellena campos + lee etiqueta
+ * 1. Verifica el usuario · 2. Sube la imagen · 3. Gemini elige subcategoría + rellena campos + lee etiqueta
  * 4. Aplica valores por defecto · 5. Crea el producto como pendiente de revisar
  */
 export async function POST(request: Request) {
@@ -77,7 +79,7 @@ export async function POST(request: Request) {
   const cats = categories ?? [];
   const tpls = templates ?? [];
   if (fixedCategoryId && !cats.some((c) => c.id === fixedCategoryId)) {
-    return NextResponse.json({ error: "Sección no encontrada" }, { status: 404 });
+    return NextResponse.json({ error: "Subcategoría no encontrada" }, { status: 404 });
   }
 
   // 2. Subir imagen
@@ -98,7 +100,9 @@ export async function POST(request: Request) {
   const aiFields = fixedCategoryId
     ? getEffectiveFields(tpls, cats, fixedCategoryId).filter((f) => f.is_ai_fillable)
     : unionAiFields(tpls, cats);
-  const ctx = { categoryPaths: Array.from(idByPath.keys()), fixedCategoryPath: fixedCategoryId ? pathById.get(fixedCategoryId) : null };
+  const topNames = new Set(cats.filter((c) => !c.parent_id).map((c) => c.name.toLowerCase()));
+  const catalogs = PRESETS.filter((p) => !topNames.has(p.name.toLowerCase())).map((p) => ({ name: p.name, description: p.description }));
+  const ctx = { categoryPaths: Array.from(idByPath.keys()), fixedCategoryPath: fixedCategoryId ? pathById.get(fixedCategoryId) : null, catalogs };
 
   let categoryId: string | null = fixedCategoryId;
   const aiMeta: AiMeta = { modelo: process.env.GEMINI_MODEL || null };
@@ -122,7 +126,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error analizando la imagen" }, { status: e instanceof GeminiError ? e.status : 500 });
   }
 
-  // Sección elegida por la IA
+  // Subcategoría elegida por la IA
   if (!categoryId) {
     const chosen = String(result[META_KEYS.categoria] ?? "");
     if (chosen && chosen !== NEW_CATEGORY_OPTION && idByPath.has(chosen)) {
@@ -132,11 +136,18 @@ export async function POST(request: Request) {
   }
   const nueva = String(result[META_KEYS.categoriaNueva] ?? "").trim();
   if (!categoryId && nueva) aiMeta.categoria_nueva = nueva.slice(0, 60);
+  if (!categoryId) {
+    const cat = String(result[META_KEYS.catalogo] ?? "").trim();
+    const preset = cat && cat !== NO_CATALOG_OPTION ? PRESETS.find((p) => p.name === cat) : undefined;
+    if (preset) aiMeta.catalogo_sugerido = preset.id;
+    const general = String(result[META_KEYS.categoriaGeneral] ?? "").trim();
+    if (general) aiMeta.categoria_nueva_general = general.slice(0, 60);
+  }
   const etiqueta = String(result[META_KEYS.etiqueta] ?? "").trim();
   if (etiqueta) aiMeta.etiqueta = etiqueta.slice(0, 500);
 
-  // 4. Datos: guardamos TODO lo que la IA devolvió (así no se pierde si el usuario cambia la sección)
-  //    y completamos los campos de la sección final con sus valores por defecto.
+  // 4. Datos: guardamos TODO lo que la IA devolvió (así no se pierde si el usuario cambia la subcategoría)
+  //    y completamos los campos de la subcategoría final con sus valores por defecto.
   const data: ProductData = {};
   const NA = /^(no aplica|n\/a|na|no determinado|desconocido|ninguno|ninguna|-|—)$/i;
   aiFields.forEach((f) => {

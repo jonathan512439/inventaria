@@ -64,12 +64,12 @@ export default function ExportPage() {
 
       <div className="animate-in card space-y-4">
         <div>
-          <label className="label" htmlFor="cat">Sección</label>
-          <CategorySelect id="cat" categories={categories} value={categoryId} onChange={setCategoryId} emptyLabel="Todas las secciones" />
+          <label className="label" htmlFor="cat">Categoría</label>
+          <CategorySelect id="cat" categories={categories} value={categoryId} onChange={setCategoryId} emptyLabel="Todas las subcategorías" />
           {categoryId && (
             <label className="mt-2 flex items-center gap-2 text-sm">
               <input type="checkbox" checked={includeSub} onChange={(e) => setIncludeSub(e.target.checked)} />
-              Incluir subsecciones
+              Incluir subcategorías
             </label>
           )}
         </div>
@@ -93,7 +93,7 @@ export default function ExportPage() {
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" className="mt-0.5" checked={sheetPerCategory} onChange={(e) => setSheetPerCategory(e.target.checked)} />
           <span>
-            Una hoja por sección
+            Una hoja por subcategoría
             <br />
             <span className="text-slate-500">Si no, todo va en una sola hoja.</span>
           </span>

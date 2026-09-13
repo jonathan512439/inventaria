@@ -34,17 +34,24 @@ interface GeminiSchema {
 export const META_KEYS = {
   categoria: "__categoria",
   categoriaNueva: "__categoria_nueva",
+  catalogo: "__catalogo_sugerido",
+  categoriaGeneral: "__categoria_general_nueva",
   etiqueta: "__etiqueta",
 } as const;
+
+/** Opción cuando ningún catálogo preconfigurado sirve. */
+export const NO_CATALOG_OPTION = "ninguno";
 
 /** Opción de categoría cuando ninguna de las existentes encaja. */
 export const NEW_CATEGORY_OPTION = "__ninguna_encaja";
 
 export interface PromptContext {
-  /** Rutas de las secciones del usuario, p. ej. "Ropa > Camisas" */
+  /** Rutas de las categorías/subcategorías del usuario, p. ej. "Ropa > Camisas" */
   categoryPaths: string[];
-  /** Si el usuario fijó una sección manualmente, su ruta */
+  /** Si el usuario fijó una categoría manualmente, su ruta */
   fixedCategoryPath?: string | null;
+  /** Catálogos preconfigurados disponibles (nombre → descripción) que el usuario aún no tiene */
+  catalogs?: Array<{ name: string; description: string }>;
 }
 
 /** Construye el JSON Schema dinámico: campos is_ai_fillable + categoría + texto de etiqueta. */
@@ -56,15 +63,28 @@ export function buildResponseSchema(fields: FieldTemplate[], ctx: PromptContext)
     properties[META_KEYS.categoria] = {
       type: "STRING",
       enum: [...ctx.categoryPaths, NEW_CATEGORY_OPTION],
-      description: `Sección del inventario del usuario donde va este producto. "${NEW_CATEGORY_OPTION}" si ninguna encaja.`,
+      description: `Subcategoría del inventario del usuario donde va este producto. "${NEW_CATEGORY_OPTION}" si ninguna encaja.`,
     };
     order.push(META_KEYS.categoria);
   }
   properties[META_KEYS.categoriaNueva] = {
     type: "STRING",
-    description: "Si ninguna sección existente encaja (o no hay secciones), nombre corto de la sección que crearías. Si sí encaja, cadena vacía.",
+    description: "Si ninguna subcategoría existente encaja (o no hay subcategorías), nombre corto de la subcategoría que crearías. Si sí encaja, cadena vacía.",
   };
   order.push(META_KEYS.categoriaNueva);
+  if (!ctx.fixedCategoryPath && ctx.catalogs?.length) {
+    properties[META_KEYS.catalogo] = {
+      type: "STRING",
+      enum: [...ctx.catalogs.map((c) => c.name), NO_CATALOG_OPTION],
+      description: `Solo si ninguna categoría del usuario encaja: catálogo preconfigurado que le serviría para este producto, o "${NO_CATALOG_OPTION}".`,
+    };
+    order.push(META_KEYS.catalogo);
+    properties[META_KEYS.categoriaGeneral] = {
+      type: "STRING",
+      description: "Solo si ninguna categoría del usuario ni ningún catálogo encaja: nombre corto de una categoría general nueva (p. ej. 'Óptica'). Si no, cadena vacía.",
+    };
+    order.push(META_KEYS.categoriaGeneral);
+  }
   properties[META_KEYS.etiqueta] = {
     type: "STRING",
     description: "Todo el texto legible en el producto/etiqueta/empaque: marca, modelo, talla, código de barras o SKU, precio impreso, contenido. Cadena vacía si no hay texto.",
@@ -96,11 +116,14 @@ export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string
     })
     .join("\n");
 
+  const catalogLine = ctx.catalogs?.length
+    ? `Catálogos preconfigurados disponibles: ${ctx.catalogs.map((c) => `${c.name} (${c.description})`).join("; ")}.`
+    : "";
   const catLine = ctx.fixedCategoryPath
-    ? `El producto pertenece a la sección "${ctx.fixedCategoryPath}".`
+    ? `El producto pertenece a la subcategoría "${ctx.fixedCategoryPath}".`
     : ctx.categoryPaths.length
-      ? `Elige la sección más adecuada entre las del usuario (campo "${META_KEYS.categoria}"). Si ninguna encaja, usa "${NEW_CATEGORY_OPTION}" y propón un nombre en "${META_KEYS.categoriaNueva}".`
-      : `El usuario aún no tiene secciones: propón un nombre corto de sección en "${META_KEYS.categoriaNueva}" (p. ej. "Bebidas", "Herramientas").`;
+      ? `Elige la subcategoría más adecuada entre las del usuario (campo "${META_KEYS.categoria}"). Si ninguna encaja, usa "${NEW_CATEGORY_OPTION}" y propón un nombre en "${META_KEYS.categoriaNueva}".`
+      : `El usuario aún no tiene subcategorías: propón un nombre corto de subcategoría en "${META_KEYS.categoriaNueva}" (p. ej. "Bebidas", "Herramientas").`;
 
   return [
     "Eres un asistente de inventario para una tienda. Analiza la foto de este producto.",
@@ -112,6 +135,7 @@ export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string
     "Si un campo pertenece a otro tipo de producto y no tiene sentido para este (p. ej. talla_casco en una bebida), déjalo vacío; nunca escribas 'No aplica'.",
     'Para "nombre" usa un nombre comercial corto y útil para buscar (marca + producto + variante, máx. 8 palabras). Para "descripcion" 1-2 frases concretas.',
     catLine,
+    catalogLine,
     `Campos a completar:\n${fieldList}`,
   ].join("\n");
 }
@@ -207,7 +231,7 @@ export async function analyzeImage({ imageBase64, mimeType, prompt, schema }: An
 }
 
 // ---------------------------------------------------------------------
-// Generación de un rubro (tipo de producto) a partir de una descripción en texto
+// Generación de una categoría (tipo de producto) a partir de una descripción en texto
 // ---------------------------------------------------------------------
 
 export interface GeneratedPreset {
@@ -220,17 +244,17 @@ export interface GeneratedPreset {
 const PRESET_SCHEMA = {
   type: "OBJECT",
   properties: {
-    name: { type: "STRING", description: "Nombre corto del tipo de producto o rubro, en español (máx. 4 palabras)." },
+    name: { type: "STRING", description: "Nombre corto del tipo de producto o categoría, en español (máx. 4 palabras)." },
     icon: { type: "STRING", description: "Un solo emoji representativo." },
     sections: {
       type: "ARRAY",
-      description: "Entre 5 y 9 secciones (estantes) típicas de ese rubro, nombres cortos en español.",
+      description: "Entre 5 y 9 subcategorías (estantes) típicas de esa categoría, nombres cortos en español.",
       items: { type: "STRING" },
     },
     fields: {
       type: "ARRAY",
       description:
-        "Entre 2 y 4 datos ESPECÍFICOS del rubro que valga la pena guardar por producto (no incluir nombre, marca, descripcion, precio ni stock: ya existen). Nombres en minúsculas con guion_bajo.",
+        "Entre 2 y 4 datos ESPECÍFICOS de la categoría que valga la pena guardar por producto (no incluir nombre, marca, descripcion, precio ni stock: ya existen). Nombres en minúsculas con guion_bajo.",
       items: {
         type: "OBJECT",
         properties: {
@@ -246,7 +270,7 @@ const PRESET_SCHEMA = {
   required: ["name", "icon", "sections", "fields"],
 };
 
-/** Pide a Gemini un rubro completo (secciones + datos) a partir de "vendo repuestos de moto y aceites". */
+/** Pide a Gemini una categoría completa (subcategorías + datos) a partir de "vendo repuestos de moto y aceites". */
 export async function generatePreset(description: string): Promise<GeneratedPreset> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new GeminiError(500, "Falta GEMINI_API_KEY en el entorno del servidor");
@@ -262,7 +286,7 @@ export async function generatePreset(description: string): Promise<GeneratedPres
             {
               text:
                 `Un pequeño negocio describe lo que vende: "${description.slice(0, 300)}".\n` +
-                `Diseña cómo organizaría su inventario: nombre del rubro, un emoji, las secciones (estantes) y 2-4 datos específicos por producto. Todo en español, breve y práctico.`,
+                `Diseña cómo organizaría su inventario: nombre de la categoría, un emoji, las subcategorías (estantes) y 2-4 datos específicos por producto. Todo en español, breve y práctico.`,
             },
           ],
         },

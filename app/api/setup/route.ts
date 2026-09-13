@@ -7,7 +7,7 @@ export const runtime = "edge";
 
 interface Body {
   presets?: string[]; // ids de lib/presets
-  description?: string; // "vendo repuestos de moto" → la IA genera el rubro
+  description?: string; // "vendo repuestos de moto" → la IA genera la categoría
   business_name?: string;
   onboarded?: boolean;
 }
@@ -21,8 +21,8 @@ interface TypeSpec {
 
 /**
  * POST /api/setup
- * Crea tipos de producto (categoría de nivel superior + secciones hijas + datos asociados)
- * a partir de rubros preconfigurados y/o una descripción en texto. Idempotente por nombre.
+ * Crea tipos de producto (categoría de nivel superior + subcategorías hijas + datos asociados)
+ * a partir de categorías preconfiguradas y/o una descripción en texto. Idempotente por nombre.
  */
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       });
     } catch (e) {
       const status = e instanceof GeminiError ? e.status : 500;
-      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo generar el rubro" }, { status });
+      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo generar la categoría" }, { status });
     }
   }
 
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       created.push(spec.name);
     }
 
-    // Secciones hijas que falten
+    // Subcategorías hijas que falten
     const existingChildren = new Set((cats ?? []).filter((c) => c.parent_id === top!.id).map((c) => c.name.toLowerCase()));
     const newSections = spec.sections.filter((s) => !existingChildren.has(s.toLowerCase()));
     if (newSections.length) {
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Datos del tipo (se heredan a sus secciones). No duplicar los que ya existen globales o en el tipo.
+    // Datos del tipo (se heredan a sus subcategorías). No duplicar los que ya existen globales o en el tipo.
     const existingNames = new Set(
       (tpls ?? []).filter((t) => t.category_id === null || t.category_id === top!.id).map((t) => t.name.toLowerCase())
     );

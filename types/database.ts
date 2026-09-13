@@ -36,7 +36,9 @@ export type ProductData = Record<string, string | number | null>;
 /** Lo que la IA dedujo además de los campos: sugerencias y texto leído en la etiqueta. */
 export type AiMeta = {
   categoria_sugerida?: string | null; // ruta "Ropa > Camisas" elegida por la IA
-  categoria_nueva?: string | null; // nombre propuesto si ninguna sección encaja
+  categoria_nueva?: string | null; // subcategoría propuesta si ninguna existente encaja
+  catalogo_sugerido?: string | null; // id de un catálogo preconfigurado (lib/presets) que le serviría al usuario
+  categoria_nueva_general?: string | null; // nombre de una categoría (nivel superior) nueva si ningún catálogo encaja
   etiqueta?: string | null; // texto visible: marca, modelo, código, precio impreso
   modelo?: string | null; // modelo de Gemini usado
 };

@@ -14,7 +14,10 @@ interface Props {
   id?: string;
 }
 
-/** Select con indentación por nivel (Ropa / — Camisas / —— Manga larga). */
+/**
+ * Selector de categoría / subcategoría.
+ * Cada categoría es un grupo; dentro, la opción "Toda la categoría" y sus subcategorías.
+ */
 export default function CategorySelect({
   categories,
   value,
@@ -25,15 +28,24 @@ export default function CategorySelect({
   className = "input",
   id,
 }: Props) {
-  const flat = flattenTree(buildTree(categories)).filter((c) => !excludeIds.includes(c.id));
+  const roots = buildTree(categories).filter((c) => !excludeIds.includes(c.id));
   return (
     <select id={id} className={className} value={value ?? ""} onChange={(e) => onChange(e.target.value || null)}>
       {allowEmpty && <option value="">{emptyLabel}</option>}
-      {flat.map((c) => (
-        <option key={c.id} value={c.id}>
-          {"—".repeat(c.depth)} {c.name}
-        </option>
-      ))}
+      {roots.map((root) => {
+        const subs = flattenTree(root.children).filter((c) => !excludeIds.includes(c.id));
+        const label = `${root.icon ? root.icon + " " : ""}${root.name}`;
+        return (
+          <optgroup key={root.id} label={label}>
+            <option value={root.id}>{root.name} (toda la categoría)</option>
+            {subs.map((c) => (
+              <option key={c.id} value={c.id}>
+                {"  ".repeat(c.depth)}↳ {c.name}
+              </option>
+            ))}
+          </optgroup>
+        );
+      })}
     </select>
   );
 }
