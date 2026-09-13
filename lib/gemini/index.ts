@@ -30,12 +30,50 @@ interface GeminiSchema {
   propertyOrdering?: string[];
 }
 
-/** Construye el JSON Schema dinámico a partir de los campos is_ai_fillable. */
-export function buildResponseSchema(fields: FieldTemplate[]): GeminiSchema {
+/** Claves reservadas que la IA devuelve además de los campos del usuario. */
+export const META_KEYS = {
+  categoria: "__categoria",
+  categoriaNueva: "__categoria_nueva",
+  etiqueta: "__etiqueta",
+} as const;
+
+/** Opción de categoría cuando ninguna de las existentes encaja. */
+export const NEW_CATEGORY_OPTION = "__ninguna_encaja";
+
+export interface PromptContext {
+  /** Rutas de las secciones del usuario, p. ej. "Ropa > Camisas" */
+  categoryPaths: string[];
+  /** Si el usuario fijó una sección manualmente, su ruta */
+  fixedCategoryPath?: string | null;
+}
+
+/** Construye el JSON Schema dinámico: campos is_ai_fillable + categoría + texto de etiqueta. */
+export function buildResponseSchema(fields: FieldTemplate[], ctx: PromptContext): GeminiSchema {
   const properties: Record<string, GeminiSchema> = {};
+  const order: string[] = [];
+
+  if (!ctx.fixedCategoryPath && ctx.categoryPaths.length) {
+    properties[META_KEYS.categoria] = {
+      type: "STRING",
+      enum: [...ctx.categoryPaths, NEW_CATEGORY_OPTION],
+      description: `Sección del inventario del usuario donde va este producto. "${NEW_CATEGORY_OPTION}" si ninguna encaja.`,
+    };
+    order.push(META_KEYS.categoria);
+  }
+  properties[META_KEYS.categoriaNueva] = {
+    type: "STRING",
+    description: "Si ninguna sección existente encaja (o no hay secciones), nombre corto de la sección que crearías. Si sí encaja, cadena vacía.",
+  };
+  order.push(META_KEYS.categoriaNueva);
+  properties[META_KEYS.etiqueta] = {
+    type: "STRING",
+    description: "Todo el texto legible en el producto/etiqueta/empaque: marca, modelo, talla, código de barras o SKU, precio impreso, contenido. Cadena vacía si no hay texto.",
+  };
+  order.push(META_KEYS.etiqueta);
+
   for (const f of fields) {
     if (f.field_type === "number") {
-      properties[f.name] = { type: "NUMBER", nullable: true, description: `Valor numérico de "${f.name}". null si no se puede determinar.` };
+      properties[f.name] = { type: "NUMBER", nullable: true, description: `Valor numérico de "${f.name}" solo si es visible/legible en la imagen. null si no.` };
     } else if (f.field_type === "select" && f.options?.length) {
       properties[f.name] = {
         type: "STRING",
@@ -45,16 +83,12 @@ export function buildResponseSchema(fields: FieldTemplate[]): GeminiSchema {
     } else {
       properties[f.name] = { type: "STRING", description: `Valor de "${f.name}" en español. Cadena vacía si no se puede determinar.` };
     }
+    order.push(f.name);
   }
-  return {
-    type: "OBJECT",
-    properties,
-    required: fields.map((f) => f.name),
-    propertyOrdering: fields.map((f) => f.name),
-  };
+  return { type: "OBJECT", properties, required: order, propertyOrdering: order };
 }
 
-export function buildPrompt(fields: FieldTemplate[], context: { categoryPath: string; categoryOptions: string[] }): string {
+export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string {
   const fieldList = fields
     .map((f) => {
       const type = f.field_type === "number" ? "número" : f.field_type === "select" ? `una de: ${f.options?.join(" | ")}` : "texto";
@@ -62,18 +96,22 @@ export function buildPrompt(fields: FieldTemplate[], context: { categoryPath: st
     })
     .join("\n");
 
-  const catHint = context.categoryOptions.length
-    ? `\nSi existe un campo de categoría sugerida, elige preferentemente una de estas categorías del usuario: ${context.categoryOptions.join(", ")}.`
-    : "";
+  const catLine = ctx.fixedCategoryPath
+    ? `El producto pertenece a la sección "${ctx.fixedCategoryPath}".`
+    : ctx.categoryPaths.length
+      ? `Elige la sección más adecuada entre las del usuario (campo "${META_KEYS.categoria}"). Si ninguna encaja, usa "${NEW_CATEGORY_OPTION}" y propón un nombre en "${META_KEYS.categoriaNueva}".`
+      : `El usuario aún no tiene secciones: propón un nombre corto de sección en "${META_KEYS.categoriaNueva}" (p. ej. "Bebidas", "Herramientas").`;
 
-  return (
-    `Analiza la foto de este producto. El usuario lo está registrando en la categoría "${context.categoryPath}".\n` +
-    `Devuelve SOLO un JSON que siga exactamente el schema dado, en español, con tus mejores estimaciones visuales.\n` +
-    `Si no puedes determinar un campo con confianza razonable, usa cadena vacía (null en campos numéricos, "${UNKNOWN_OPTION}" en listas).\n` +
-    `No inventes precios, stock ni datos que no sean visibles en la imagen.\n` +
-    `Para "nombre" usa un nombre comercial corto (máx. 8 palabras). Para "descripcion" usa 1-2 frases concretas.\n` +
-    `Campos a completar:\n${fieldList}${catHint}`
-  );
+  return [
+    "Eres un asistente de inventario para una tienda. Analiza la foto de este producto.",
+    "Devuelve SOLO un JSON que siga exactamente el schema dado, en español, con tus mejores estimaciones visuales.",
+    `Si no puedes determinar un campo con confianza razonable, usa cadena vacía (null en campos numéricos, "${UNKNOWN_OPTION}" en listas).`,
+    "Lee con cuidado cualquier texto impreso (marca, modelo, talla, código, precio) y úsalo: es más fiable que adivinar.",
+    "No inventes precios ni stock: solo si están impresos y legibles.",
+    'Para "nombre" usa un nombre comercial corto y útil para buscar (marca + producto + variante, máx. 8 palabras). Para "descripcion" 1-2 frases concretas.',
+    catLine,
+    `Campos a completar:\n${fieldList}`,
+  ].join("\n");
 }
 
 interface AnalyzeArgs {

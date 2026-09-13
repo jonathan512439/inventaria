@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, FieldType } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
-import { BASIC_TEMPLATE, getEffectiveFields } from "@/lib/fields";
+import { BASIC_TEMPLATE, fieldLabel, getEffectiveFields } from "@/lib/fields";
 import CategorySelect from "@/components/CategorySelect";
+import Link from "next/link";
+import { IconArrowLeft, IconSparkles } from "@/components/ui/Icons";
 
-const TYPE_LABEL: Record<FieldType, string> = { text: "Texto", number: "Número", select: "Lista" };
+const TYPE_LABEL: Record<FieldType, string> = { text: "Texto", number: "Número", select: "Opciones" };
 
 export default function TemplatesPage() {
   const supabase = createClient();
@@ -24,6 +26,7 @@ export default function TemplatesPage() {
   const [fType, setFType] = useState<FieldType>("text");
   const [fOptions, setFOptions] = useState("");
   const [fAi, setFAi] = useState(true);
+  const [fDefault, setFDefault] = useState("");
   const [saving, setSaving] = useState(false);
 
   // edición
@@ -72,19 +75,21 @@ export default function TemplatesPage() {
       field_type: fType,
       options: fType === "select" ? parseOptions(fOptions) : null,
       is_ai_fillable: fAi,
+      default_value: fDefault.trim() || null,
       sort_order: ownFields.length,
     });
     setSaving(false);
     if (error) return setError(error.message);
     setFName("");
     setFOptions("");
+    setFDefault("");
     load();
   }
 
   async function addBasicTemplate() {
     const existing = new Set(effective.map((t) => t.name.toLowerCase()));
     const toInsert = BASIC_TEMPLATE.filter((t) => !existing.has(t.name.toLowerCase()));
-    if (!toInsert.length) return setError("Ya tienes todos los campos de la plantilla básica.");
+    if (!toInsert.length) return setError("Ya tienes todos los datos de la configuración básica.");
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -104,6 +109,7 @@ export default function TemplatesPage() {
         field_type: editing.field_type,
         options: editing.field_type === "select" ? parseOptions(editOptions) : null,
         is_ai_fillable: editing.is_ai_fillable,
+        default_value: editing.default_value?.trim() || null,
       })
       .eq("id", editing.id);
     if (error) return setError(error.message);
@@ -118,7 +124,7 @@ export default function TemplatesPage() {
   }
 
   async function remove(t: FieldTemplate) {
-    if (!confirm(`¿Eliminar el campo "${t.name}"? Los valores ya guardados en productos no se borran.`)) return;
+    if (!confirm(`¿Eliminar "${t.name}"? Lo ya guardado en tus productos no se borra.`)) return;
     const { error } = await supabase.from("field_templates").delete().eq("id", t.id);
     if (error) return setError(error.message);
     load();
@@ -136,68 +142,71 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Campos (plantillas)</h1>
-        <p className="text-sm text-slate-500">
-          Define las columnas de tus productos. Los campos globales aplican a todas las categorías; los de una
-          categoría también aplican a sus subcategorías.
-        </p>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <div className="animate-in">
+        <Link href="/settings" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ajustes</Link>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Datos de mis productos</h1>
+        <p className="text-sm text-slate-500">Qué información guardas de cada producto y cuál llena la IA desde la foto.</p>
       </div>
 
-      <div className="card space-y-2">
-        <label className="label" htmlFor="scope">Campos de</label>
-        <CategorySelect id="scope" categories={categories} value={scope} onChange={setScope} emptyLabel="🌐 Globales (todas las categorías)" />
+      <div className="animate-in card space-y-2">
+        <label className="label" htmlFor="scope">Datos para</label>
+        <CategorySelect id="scope" categories={categories} value={scope} onChange={setScope} emptyLabel="Todos los productos" />
       </div>
 
-      <form onSubmit={addField} className="card space-y-3">
-        <h2 className="font-medium">Nuevo campo {scope ? `en "${categoryPath(categories, scope)}"` : "global"}</h2>
+      <form onSubmit={addField} className="animate-in card space-y-3">
+        <h2 className="font-semibold">Nuevo dato {scope ? `solo para "${categoryPath(categories, scope)}"` : ""}</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="fname">Nombre del campo</label>
-            <input id="fname" className="input" placeholder="Ej. precio, color, talla" value={fName} onChange={(e) => setFName(e.target.value)} required />
+            <label className="label" htmlFor="fname">Nombre</label>
+            <input id="fname" className="input" placeholder="Ej. talla, precio mayorista" value={fName} onChange={(e) => setFName(e.target.value)} required />
           </div>
           <div>
             <label className="label" htmlFor="ftype">Tipo</label>
             <select id="ftype" className="input" value={fType} onChange={(e) => setFType(e.target.value as FieldType)}>
               <option value="text">Texto</option>
               <option value="number">Número</option>
-              <option value="select">Lista de opciones</option>
+              <option value="select">Opciones</option>
             </select>
           </div>
         </div>
+        {!fAi && (
+          <div>
+            <label className="label" htmlFor="fdefault">Valor por defecto (opcional)</label>
+            <input id="fdefault" className="input" placeholder={fType === "number" ? "Ej. 1" : "Ej. Sin marca"} value={fDefault} onChange={(e) => setFDefault(e.target.value)} />
+          </div>
+        )}
         {fType === "select" && (
           <div>
             <label className="label" htmlFor="fopts">Opciones (separadas por coma)</label>
             <input id="fopts" className="input" placeholder="rojo, azul, verde" value={fOptions} onChange={(e) => setFOptions(e.target.value)} />
           </div>
         )}
-        <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" className="mt-0.5" checked={fAi} onChange={(e) => setFAi(e.target.checked)} />
+        <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-brand-50 p-3 text-sm">
+          <input type="checkbox" className="mt-1 h-4 w-4 accent-brand-600" checked={fAi} onChange={(e) => setFAi(e.target.checked)} />
           <span>
-            <span className="font-medium">¿La IA debe intentar rellenar este campo desde la foto?</span>
-            <br />
-            <span className="text-slate-500">Activa para nombre, descripción, color… Desactiva para precio, stock, etc.</span>
+            <span className="flex items-center gap-1 font-semibold text-brand-800"><IconSparkles size={14} /> La IA lo llena desde la foto</span>
+            <span className="text-slate-600">Sí para nombre, color, marca… No para precio o stock.</span>
           </span>
         </label>
         <div className="flex flex-wrap gap-2">
-          <button className="btn-primary" disabled={saving}>{saving ? "Guardando..." : "Agregar campo"}</button>
+          <button className="btn-primary" disabled={saving}>{saving ? "Guardando..." : "Agregar"}</button>
           <button type="button" className="btn-secondary" onClick={addBasicTemplate}>
-            + Plantilla básica
+            Usar configuración básica
           </button>
         </div>
       </form>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="card p-0">
-        <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium">
-          Campos {scope ? "de esta categoría" : "globales"} ({ownFields.length})
+      <div className="animate-in card p-0">
+        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold">
+          {scope ? "Datos solo de esta sección" : "Datos de todos los productos"} ({ownFields.length})
         </div>
         {loading ? (
           <p className="p-4 text-sm text-slate-500">Cargando...</p>
         ) : ownFields.length === 0 ? (
-          <p className="p-4 text-sm text-slate-500">Sin campos propios. Agrega uno arriba o usa la plantilla básica.</p>
+          <p className="p-4 text-sm text-slate-500">Nada todavía. Agrega un dato arriba o usa la configuración básica.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
             {ownFields.map((t, i) => (
@@ -208,12 +217,15 @@ export default function TemplatesPage() {
                     <select className="input" value={editing.field_type} onChange={(e) => setEditing({ ...editing, field_type: e.target.value as FieldType })}>
                       <option value="text">Texto</option>
                       <option value="number">Número</option>
-                      <option value="select">Lista</option>
+                      <option value="select">Opciones</option>
                     </select>
                     <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={editing.is_ai_fillable} onChange={(e) => setEditing({ ...editing, is_ai_fillable: e.target.checked })} />
+                      <input type="checkbox" className="accent-brand-600" checked={editing.is_ai_fillable} onChange={(e) => setEditing({ ...editing, is_ai_fillable: e.target.checked })} />
                       IA
                     </label>
+                    {!editing.is_ai_fillable && (
+                      <input className="input sm:col-span-3" placeholder="Valor por defecto (opcional)" value={editing.default_value ?? ""} onChange={(e) => setEditing({ ...editing, default_value: e.target.value })} />
+                    )}
                     {editing.field_type === "select" && (
                       <input className="input sm:col-span-3" placeholder="opciones separadas por coma" value={editOptions} onChange={(e) => setEditOptions(e.target.value)} />
                     )}
@@ -228,7 +240,7 @@ export default function TemplatesPage() {
                       <button className="btn-ghost h-5 px-1 py-0 text-[10px]" disabled={i === 0} onClick={() => move(t, -1)}>▲</button>
                       <button className="btn-ghost h-5 px-1 py-0 text-[10px]" disabled={i === ownFields.length - 1} onClick={() => move(t, 1)}>▼</button>
                     </div>
-                    <span className="flex-1 text-sm font-medium">{t.name}</span>
+                    <span className="flex-1 text-sm font-medium">{fieldLabel(t.name)}</span>
                     <span className="badge bg-slate-100 text-slate-600">{TYPE_LABEL[t.field_type]}</span>
                     {t.options && <span className="hidden text-xs text-slate-400 sm:inline">{t.options.join(", ")}</span>}
                     <button
@@ -236,8 +248,9 @@ export default function TemplatesPage() {
                       className={`badge ${t.is_ai_fillable ? "bg-brand-50 text-brand-700" : "bg-slate-100 text-slate-500"}`}
                       title="Alternar relleno por IA"
                     >
-                      {t.is_ai_fillable ? "✨ IA" : "manual"}
+                      {t.is_ai_fillable ? "✨ IA" : "tú"}
                     </button>
+                    {t.default_value && <span className="hidden text-xs text-slate-400 sm:inline">por defecto: {t.default_value}</span>}
                     <button className="btn-ghost px-2 py-1 text-xs" onClick={() => { setEditing(t); setEditOptions(t.options?.join(", ") ?? ""); }}>Editar</button>
                     <button className="btn-ghost px-2 py-1 text-xs text-red-600" onClick={() => remove(t)}>Eliminar</button>
                   </div>
@@ -250,16 +263,16 @@ export default function TemplatesPage() {
 
       {scope && inherited.length > 0 && (
         <div className="card p-0">
-          <div className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600">
-            Campos heredados ({inherited.length})
+          <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">
+            También aplican aquí ({inherited.length})
           </div>
           <ul className="divide-y divide-slate-100">
             {inherited.map((t) => (
               <li key={t.id} className="flex items-center gap-2 px-4 py-2 text-sm text-slate-600">
                 <span className="flex-1">{t.name}</span>
                 <span className="badge bg-slate-100">{TYPE_LABEL[t.field_type]}</span>
-                <span className="badge bg-slate-100">{t.is_ai_fillable ? "✨ IA" : "manual"}</span>
-                <span className="text-xs text-slate-400">{t.category_id ? categoryPath(categories, t.category_id) : "global"}</span>
+                <span className="badge bg-slate-100">{t.is_ai_fillable ? "✨ IA" : "tú"}</span>
+                <span className="text-xs text-slate-400">{t.category_id ? categoryPath(categories, t.category_id) : "todos"}</span>
               </li>
             ))}
           </ul>

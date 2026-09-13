@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/types/database";
 import { buildTree, getDescendantIds, type CategoryNode } from "@/lib/categories";
 import CategorySelect from "@/components/CategorySelect";
+import Link from "next/link";
+import { IconArrowLeft } from "@/components/ui/Icons";
 
 export default function CategoriesPage() {
   const supabase = createClient();
@@ -72,8 +74,8 @@ export default function CategoriesPage() {
     const descendants = getDescendantIds(categories, c.id).length - 1;
     const msg =
       `¿Eliminar "${c.name}"` +
-      (descendants > 0 ? ` y sus ${descendants} subcategoría(s)` : "") +
-      `? Los productos de estas categorías quedarán "sin categoría".`;
+      (descendants > 0 ? ` y sus ${descendants} subsección(es)` : "") +
+      `? Sus productos quedarán sin sección.`;
     if (!confirm(msg)) return;
     const { error } = await supabase.from("categories").delete().eq("id", c.id);
     if (error) return setError(error.message);
@@ -83,20 +85,21 @@ export default function CategoriesPage() {
   const tree = buildTree(categories);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Categorías</h1>
-        <p className="text-sm text-slate-500">Organiza tus productos en categorías y subcategorías.</p>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <div className="animate-in">
+        <Link href="/settings" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ajustes</Link>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Secciones</h1>
+        <p className="text-sm text-slate-500">Como los pasillos de tu tienda. La IA elige la sección de cada foto.</p>
       </div>
 
-      <form onSubmit={create} className="card grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+      <form onSubmit={create} className="animate-in card grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <div>
           <label className="label" htmlFor="name">Nombre</label>
-          <input id="name" className="input" placeholder="Ej. Ropa" value={name} onChange={(e) => setName(e.target.value)} required />
+          <input id="name" className="input" placeholder="Ej. Bebidas" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div>
           <label className="label" htmlFor="parent">Dentro de (opcional)</label>
-          <CategorySelect id="parent" categories={categories} value={parentId} onChange={setParentId} emptyLabel="— Categoría raíz —" />
+          <CategorySelect id="parent" categories={categories} value={parentId} onChange={setParentId} emptyLabel="— Sección principal —" />
         </div>
         <div className="flex items-end">
           <button className="btn-primary w-full" disabled={saving}>{saving ? "Guardando..." : "Agregar"}</button>
@@ -105,11 +108,11 @@ export default function CategoriesPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="card p-0">
+      <div className="animate-in card p-0">
         {loading ? (
           <p className="p-4 text-sm text-slate-500">Cargando...</p>
         ) : tree.length === 0 ? (
-          <p className="p-4 text-sm text-slate-500">Aún no tienes categorías. Crea la primera arriba.</p>
+          <p className="p-4 text-sm text-slate-500">Aún no tienes secciones. Crea la primera aquí, o deja que la IA las proponga al tomar fotos.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
             {tree.map((n) => (
@@ -162,7 +165,7 @@ function TreeItem(props: ItemProps) {
               categories={categories}
               value={props.editParent}
               onChange={props.setEditParent}
-              emptyLabel="— Categoría raíz —"
+              emptyLabel="— Sección principal —"
               excludeIds={getDescendantIds(categories, node.id)}
               className="input sm:max-w-xs"
             />

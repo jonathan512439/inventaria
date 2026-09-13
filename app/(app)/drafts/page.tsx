@@ -1,11 +1,5 @@
-import ProductListPage from "@/components/ProductListPage";
+import { redirect } from "next/navigation";
 
 export default function DraftsPage() {
-  return (
-    <ProductListPage
-      mode="draft"
-      title="Borradores"
-      subtitle="Corrige lo que la IA infirió y completa precio, stock, etc. Luego confirma."
-    />
-  );
+  redirect("/review");
 }

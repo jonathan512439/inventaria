@@ -2,121 +2,122 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
+import { IconBox, IconCamera, IconCheckCircle, IconHome, IconSettings } from "./ui/Icons";
 
-const links = [
-  { href: "/dashboard", label: "Inicio", icon: "⌂" },
-  { href: "/capture", label: "Foto", icon: "📷" },
-  { href: "/drafts", label: "Borradores", icon: "📝" },
-  { href: "/products", label: "Productos", icon: "📦" },
-  { href: "/categories", label: "Categorías", icon: "🗂" },
-  { href: "/templates", label: "Campos", icon: "🧩" },
-  { href: "/export", label: "Exportar", icon: "⬇" },
+const items = [
+  { href: "/dashboard", label: "Inicio", Icon: IconHome },
+  { href: "/review", label: "Revisar", Icon: IconCheckCircle },
+  { href: "/capture", label: "Agregar", Icon: IconCamera, primary: true },
+  { href: "/products", label: "Inventario", Icon: IconBox },
+  { href: "/settings", label: "Ajustes", Icon: IconSettings },
 ];
 
-const mobileMain = links.slice(0, 4);
-const mobileMore = links.slice(4);
-
-export default function Nav({ email }: { email: string }) {
+export default function Nav() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [moreOpen, setMoreOpen] = useState(false);
+  const queue = useQueue();
+  const q = queueSummary(queue.items);
+  const [pendingCount, setPendingCount] = useState(0);
 
-  // Cierra el menú "Más" al navegar
+  // Recupera fotos guardadas en el teléfono si la app se cerró a mitad de un lote
   useEffect(() => {
-    setMoreOpen(false);
-  }, [pathname]);
+    hydrateQueue();
+  }, []);
 
-  async function signOut() {
-    await createClient().auth.signOut();
-    router.replace("/login");
-    router.refresh();
-  }
+  // Contador de pendientes de revisar (se refresca al navegar y al terminar análisis)
+  useEffect(() => {
+    createClient()
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "draft")
+      .then(({ count }) => setPendingCount(count ?? 0));
+  }, [pathname, q.done]);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
-  const moreActive = mobileMore.some((l) => isActive(l.href));
+  const reviewBadge = pendingCount;
+  const working = q.queued + q.processing;
 
   return (
     <>
-      {/* Barra superior */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <Link href="/dashboard" className="text-lg font-bold text-brand-700">InventarIA</Link>
-          <nav className="hidden items-center gap-1 md:flex">
-            {links.map((l) => (
+      {/* Escritorio: barra superior */}
+      <header className="sticky top-0 z-30 hidden border-b border-slate-200/70 bg-white/80 backdrop-blur-md md:block">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 text-white shadow-md shadow-brand-500/30">
+              <IconCamera size={18} />
+            </span>
+            <span className="text-lg font-bold tracking-tight text-ink">InventarIA</span>
+          </Link>
+          <nav className="flex items-center gap-1">
+            {items.map(({ href, label, Icon, primary }) => (
               <Link
-                key={l.href}
-                href={l.href}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                  isActive(l.href) ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100"
-                }`}
+                key={href}
+                href={href}
+                className={
+                  primary
+                    ? "btn-primary ml-2 px-4 py-2"
+                    : `relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                        isActive(href) ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100"
+                      }`
+                }
               >
-                {l.label}
+                <Icon size={18} />
+                {label}
+                {href === "/review" && reviewBadge > 0 && <Badge n={reviewBadge} />}
+                {href === "/capture" && working > 0 && <Badge n={working} pulse />}
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-2">
-            <span className="hidden max-w-[160px] truncate text-xs text-slate-500 sm:inline">{email}</span>
-            <button onClick={signOut} className="btn-ghost px-2 py-1 text-xs">Salir</button>
-          </div>
         </div>
       </header>
 
-      {/* Menú "Más" (móvil) */}
-      {moreOpen && (
-        <div className="fixed inset-0 z-30 md:hidden" onClick={() => setMoreOpen(false)}>
-          <div className="absolute inset-0 bg-black/30" />
-          <div
-            className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300" />
-            <div className="grid grid-cols-3 gap-2">
-              {mobileMore.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className={`flex flex-col items-center gap-1 rounded-xl border p-3 text-xs ${
-                    isActive(l.href) ? "border-brand-500 bg-brand-50 text-brand-700" : "border-slate-200 text-slate-700"
+      {/* Móvil: barra inferior con botón central de cámara */}
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/95 backdrop-blur-md md:hidden">
+        <div className="grid grid-cols-5 items-end">
+          {items.map(({ href, label, Icon, primary }) =>
+            primary ? (
+              <Link key={href} href={href} className="relative -mt-6 flex flex-col items-center pb-1.5">
+                <span
+                  className={`grid h-14 w-14 place-items-center rounded-full text-white shadow-float transition active:scale-95 ${
+                    isActive(href) ? "ring-4 ring-brand-200" : ""
                   }`}
+                  style={{ backgroundImage: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
                 >
-                  <span className="text-2xl leading-none">{l.icon}</span>
-                  {l.label}
-                </Link>
-              ))}
-            </div>
-            <p className="mt-4 truncate text-center text-xs text-slate-400">{email}</p>
-            <button onClick={signOut} className="btn-secondary mt-2 w-full">Cerrar sesión</button>
-          </div>
-        </div>
-      )}
-
-      {/* Barra inferior móvil */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
-        <div className="grid grid-cols-5">
-          {mobileMain.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`flex flex-col items-center gap-0.5 py-2 text-[11px] ${
-                isActive(l.href) ? "text-brand-700" : "text-slate-500"
-              }`}
-            >
-              <span className="text-lg leading-none">{l.icon}</span>
-              {l.label}
-            </Link>
-          ))}
-          <button
-            type="button"
-            onClick={() => setMoreOpen((v) => !v)}
-            className={`flex flex-col items-center gap-0.5 py-2 text-[11px] ${moreActive || moreOpen ? "text-brand-700" : "text-slate-500"}`}
-          >
-            <span className="text-lg leading-none">☰</span>
-            Más
-          </button>
+                  <IconCamera size={26} />
+                </span>
+                <span className="mt-1 text-[11px] font-semibold text-brand-700">{label}</span>
+                {working > 0 && <Badge n={working} pulse className="absolute right-1 top-0" />}
+              </Link>
+            ) : (
+              <Link
+                key={href}
+                href={href}
+                className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${
+                  isActive(href) ? "text-brand-700" : "text-slate-500"
+                }`}
+              >
+                <Icon size={22} strokeWidth={isActive(href) ? 2.4 : 2} />
+                {label}
+                {href === "/review" && reviewBadge > 0 && <Badge n={reviewBadge} className="absolute right-3 top-1" />}
+              </Link>
+            )
+          )}
         </div>
       </nav>
     </>
+  );
+}
+
+function Badge({ n, pulse, className = "" }: { n: number; pulse?: boolean; className?: string }) {
+  return (
+    <span
+      className={`grid h-5 min-w-[20px] place-items-center rounded-full px-1 text-[10px] font-bold text-white ${
+        pulse ? "animate-pulse bg-amber-500" : "bg-rose-500"
+      } ${className || "ml-1"}`}
+    >
+      {n > 99 ? "99+" : n}
+    </span>
   );
 }

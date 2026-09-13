@@ -15,12 +15,12 @@ interface ExportArgs {
   sheetPerCategory?: boolean;
 }
 
-const FIXED_COLS = ["Categoría", "Estado", "Foto", "Creado"] as const;
+const FIXED_COLS = ["Sección", "Estado", "Foto", "Creado"] as const;
 
 function rowFor(p: Product, fields: FieldTemplate[], categories: Category[]) {
   const row: Record<string, string | number> = {
-    Categoría: categoryPath(categories, p.category_id),
-    Estado: p.status === "draft" ? "Borrador" : "Confirmado",
+    Sección: categoryPath(categories, p.category_id),
+    Estado: p.status === "draft" ? "Pendiente" : "En inventario",
   };
   fields.forEach((f) => {
     const v = p.data[f.name];
@@ -64,7 +64,7 @@ export function exportToExcel({ products, categories, templates, fileName = "inv
     products.forEach((p) => byCat.set(p.category_id, [...(byCat.get(p.category_id) ?? []), p]));
     byCat.forEach((list, catId) => {
       const fields = getEffectiveFields(templates, categories, catId);
-      addSheet(catId ? (categories.find((c) => c.id === catId)?.name ?? "Categoría") : "Sin categoría", list, fields);
+      addSheet(catId ? (categories.find((c) => c.id === catId)?.name ?? "Sección") : "Sin sección", list, fields);
     });
   } else {
     // Unión de campos de todas las categorías presentes, sin duplicar nombres

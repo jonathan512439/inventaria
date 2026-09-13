@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData, ProductStatus } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
-import { coerceValue, getEffectiveFields } from "@/lib/fields";
+import { coerceValue, fieldLabel, getEffectiveFields } from "@/lib/fields";
 import FieldInput from "./FieldInput";
 
 interface Props {
@@ -88,9 +88,9 @@ export default function ProductTable({ products, categories, templates, mode, on
     return (
       <div className="card text-sm text-slate-500">
         {mode === "draft" ? (
-          <>No hay borradores. <Link href="/capture" className="text-brand-600 underline">Toma una foto</Link> para crear uno.</>
+          <>Nada pendiente. <Link href="/capture" className="text-brand-600 underline">Toma una foto</Link> para empezar.</>
         ) : (
-          <>Aún no hay productos confirmados.</>
+          <>Tu inventario está vacío.</>
         )}
       </div>
     );
@@ -109,12 +109,12 @@ export default function ProductTable({ products, categories, templates, mode, on
                 {categoryPath(categories, catId)} <span className="font-normal text-slate-500">({list.length})</span>
               </h2>
               {dirtyCount > 0 && (
-                <button className="btn-secondary px-3 py-1.5 text-xs" onClick={() => saveAll(list, fields)}>
+                <button className="btn-secondary btn-sm" onClick={() => saveAll(list, fields)}>
                   Guardar cambios ({dirtyCount})
                 </button>
               )}
               {mode === "draft" && (
-                <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => confirm(`¿Confirmar los ${list.length} productos de esta categoría?`) && saveAll(list, fields, "confirmed")}>
+                <button className="btn-success btn-sm" onClick={() => confirm(`¿Pasar los ${list.length} productos de esta sección al inventario?`) && saveAll(list, fields, "confirmed")}>
                   ✓ Confirmar todos
                 </button>
               )}
@@ -122,7 +122,7 @@ export default function ProductTable({ products, categories, templates, mode, on
 
             {fields.length === 0 && (
               <p className="px-4 py-2 text-xs text-amber-700">
-                Esta categoría no tiene campos definidos. <Link href="/templates" className="underline">Definir campos</Link>
+                Esta sección no tiene datos definidos. <Link href="/templates" className="underline">Definir datos</Link>
               </p>
             )}
 
@@ -133,7 +133,7 @@ export default function ProductTable({ products, categories, templates, mode, on
                     <th className="sticky left-0 z-10 bg-slate-50 px-3 py-2">Foto</th>
                     {fields.map((f) => (
                       <th key={f.id} className="px-2 py-2 font-medium">
-                        {f.name} {f.is_ai_fillable && <span title="Rellenado por IA">✨</span>}
+                        {fieldLabel(f.name)} {f.is_ai_fillable && <span title="Lo llena la IA">✨</span>}
                       </th>
                     ))}
                     <th className="px-2 py-2">Acciones</th>
@@ -162,28 +162,28 @@ export default function ProductTable({ products, categories, templates, mode, on
                               value={data[f.name]}
                               onChange={(v) => setValue(p, f, v)}
                               compact
-                              className={`input ${f.field_type === "number" ? "w-24" : f.field_type === "select" ? "w-32" : "w-44"}`}
+                              className={`input rounded-xl ${f.field_type === "number" ? "w-24" : f.field_type === "select" ? "w-32" : "w-44"}`}
                             />
                           </td>
                         ))}
                         <td className="px-2 py-1.5">
                           <div className="flex items-center gap-1">
                             {dirty && (
-                              <button className="btn-secondary px-2 py-1 text-xs" disabled={isBusy} onClick={() => persist(p, fields)}>
+                              <button className="btn-secondary btn-sm" disabled={isBusy} onClick={() => persist(p, fields)}>
                                 Guardar
                               </button>
                             )}
                             {mode === "draft" ? (
-                              <button className="btn-primary px-2 py-1 text-xs" disabled={isBusy} onClick={() => persist(p, fields, "confirmed")}>
+                              <button className="btn-success btn-sm" disabled={isBusy} onClick={() => persist(p, fields, "confirmed")}>
                                 ✓ Confirmar
                               </button>
                             ) : (
-                              <button className="btn-ghost px-2 py-1 text-xs" disabled={isBusy} onClick={() => persist(p, fields, "draft")}>
-                                ↩ Borrador
+                              <button className="btn-ghost btn-sm" disabled={isBusy} onClick={() => persist(p, fields, "draft")}>
+                                ↩ A pendientes
                               </button>
                             )}
-                            <Link href={`/products/${p.id}`} className="btn-ghost px-2 py-1 text-xs">Ver</Link>
-                            <button className="btn-ghost px-2 py-1 text-xs text-red-600" disabled={isBusy} onClick={() => remove(p)}>✕</button>
+                            <Link href={`/products/${p.id}`} className="btn-ghost btn-sm">Ver</Link>
+                            <button className="btn-ghost btn-sm text-rose-600" disabled={isBusy} onClick={() => remove(p)}>✕</button>
                           </div>
                         </td>
                       </tr>

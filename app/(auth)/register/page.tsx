@@ -47,7 +47,7 @@ export default function RegisterPage() {
 
   return (
     <form onSubmit={onSubmit} className="card space-y-4">
-      <h2 className="text-lg font-semibold">Crear cuenta</h2>
+      <h2 className="text-lg font-bold">Crear cuenta</h2>
       <div>
         <label className="label" htmlFor="email">Correo</label>
         <input id="email" type="email" className="input" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />

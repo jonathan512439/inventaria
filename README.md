@@ -28,8 +28,10 @@ MVP SaaS de inventario: el usuario define sus propias columnas por categoría, t
 │   ├── categories.ts      árbol, ancestros, descendientes, ruta "A > B > C"
 │   ├── fields.ts          campos efectivos (globales + categoría + heredados)
 │   ├── image.ts           redimensiona a 800px / JPEG en el navegador
+│   ├── queue.ts           cola de fotos en lote (IndexedDB, ritmo, reintentos 429)
 │   └── export.ts          generación .xlsx
 ├── supabase/migrations.sql   tablas, RLS, trigger de perfil, bucket de fotos
+├── supabase/002_lote_defaults.sql   business_name, default_value, ai_meta, índice GIN
 ├── middleware.ts          refresca sesión y protege rutas
 ├── wrangler.toml          config Cloudflare Pages
 └── .env.example
@@ -82,15 +84,13 @@ npm install
 npm run dev
 ```
 
-Abre <http://localhost:3000>. Flujo de prueba:
+Abre <http://localhost:3000>. Flujo:
 
-1. **Regístrate** → entras al dashboard.
-2. **Categorías**: crea p. ej. `Ropa` y dentro `Camisas`.
-3. **Campos**: con "Globales" seleccionado pulsa **+ Plantilla básica** (nombre, descripcion, color, categoria_sugerida marcados para IA; precio, precio_mayor, precio_compra, stock manuales). Agrega campos propios por categoría si quieres (p. ej. `talla` tipo lista en `Camisas`).
-4. **Foto**: elige categoría, pulsa **Cámara** (en móvil abre la cámara trasera) o **Galería**, luego **Analizar**. La foto se redimensiona a 800px, se sube a Storage y Gemini rellena los campos ✨.
-5. **Borradores**: corrige los valores de la IA, completa precio/stock, **Confirmar** (por fila o toda la categoría).
-6. **Productos**: inventario confirmado, editable en tabla o en detalle.
-7. **Exportar**: elige categoría (con/sin subcategorías), estado y descarga el `.xlsx`.
+1. **Regístrate** → Ajustes → **Usar la configuración básica** (nombre, descripción, marca, color, precio, precio de compra, stock).
+2. **Agregar productos**: cámara (foto tras foto) o galería (varias a la vez). La cola procesa en segundo plano respetando el límite de Gemini; sobrevive a recargas (IndexedDB).
+3. La IA elige la **sección** (o propone una nueva), rellena los datos marcados como IA y lee el texto de la etiqueta.
+4. **Revisar pendientes**: una tarjeta por producto, completa precio/stock → **Confirmar y siguiente** (con Deshacer). En escritorio también hay vista de tabla.
+5. **Mi inventario**: búsqueda, chips por sección, tarjetas o tabla. **Exportar** a Excel.
 
 Comprobaciones útiles:
 

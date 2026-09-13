@@ -6,9 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
-import { coerceValue, getEffectiveFields } from "@/lib/fields";
+import { coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import CategorySelect from "@/components/CategorySelect";
 import FieldInput from "@/components/FieldInput";
+import { IconArrowLeft, IconSparkles, IconTag } from "@/components/ui/Icons";
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -62,7 +63,7 @@ export default function ProductDetailPage() {
     setSaving(false);
     if (error) return setError(error.message);
     if (status === "confirmed") router.push("/products");
-    else if (status === "draft") router.push("/drafts");
+    else if (status === "draft") router.push("/review");
     else load();
   }
 
@@ -74,7 +75,7 @@ export default function ProductDetailPage() {
     }
     const { error } = await supabase.from("products").delete().eq("id", product.id);
     if (error) return setError(error.message);
-    router.push(product.status === "draft" ? "/drafts" : "/products");
+    router.push(product.status === "draft" ? "/review" : "/products");
   }
 
   if (loading) return <p className="text-sm text-slate-500">Cargando...</p>;
@@ -88,39 +89,49 @@ export default function ProductDetailPage() {
   const isDraft = product.status === "draft";
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="mx-auto max-w-4xl space-y-5">
+      <div className="animate-in flex flex-wrap items-center justify-between gap-2">
         <div>
-          <Link href={isDraft ? "/drafts" : "/products"} className="text-sm text-slate-500 hover:underline">← Volver</Link>
-          <h1 className="text-xl font-semibold">{String(data.nombre || data.name || "Producto")}</h1>
+          <Link href={isDraft ? "/review" : "/products"} className="mb-1 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700">
+            <IconArrowLeft size={16} /> {isDraft ? "Pendientes" : "Inventario"}
+          </Link>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">{productTitle(data) || "Producto"}</h1>
           <p className="text-xs text-slate-500">
-            {categoryPath(categories, product.category_id)} · {new Date(product.created_at).toLocaleString("es")}
+            {categoryPath(categories, product.category_id)} · {new Date(product.created_at).toLocaleDateString("es")}
           </p>
         </div>
-        <span className={`badge ${isDraft ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}>
-          {isDraft ? "Borrador" : "Confirmado"}
+        <span className={`badge ${isDraft ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+          {isDraft ? "Pendiente" : "En inventario"}
         </span>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-[320px_1fr]">
-        <div className="card p-2">
-          {product.image_url ? (
-            <img src={product.image_url} alt="" className="w-full rounded-lg object-contain" />
-          ) : (
-            <div className="flex h-48 items-center justify-center text-sm text-slate-400">Sin foto</div>
+      <div className="grid gap-5 md:grid-cols-[340px_1fr]">
+        <div className="animate-in space-y-3">
+          <div className="card overflow-hidden p-0">
+            {product.image_url ? (
+              <img src={product.image_url} alt="" className="w-full object-contain" />
+            ) : (
+              <div className="flex h-48 items-center justify-center text-sm text-slate-400">Sin foto</div>
+            )}
+          </div>
+          {product.ai_meta?.etiqueta && (
+            <div className="flex gap-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+              <IconTag size={16} className="mt-0.5 shrink-0 text-slate-400" />
+              <p><span className="font-semibold text-slate-700">En la etiqueta se lee:</span> {product.ai_meta.etiqueta}</p>
+            </div>
           )}
         </div>
 
-        <div className="card space-y-4">
+        <div className="animate-in card space-y-4">
           <div>
-            <label className="label">Categoría</label>
-            <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} />
+            <label className="label">Sección</label>
+            <CategorySelect categories={categories} value={categoryId} onChange={setCategoryId} emptyLabel="— Sin sección —" />
           </div>
 
           {fields.map((f) => (
             <div key={f.id}>
-              <label className="label">
-                {f.name} {f.is_ai_fillable && <span className="text-xs text-brand-600">✨ IA</span>}
+              <label className="label flex items-center gap-1">
+                {fieldLabel(f.name)} {f.is_ai_fillable && <IconSparkles size={12} className="text-brand-500" />}
               </label>
               <FieldInput field={f} value={data[f.name]} onChange={(v) => setData({ ...data, [f.name]: v })} />
             </div>
@@ -142,11 +153,11 @@ export default function ProductDetailPage() {
           <div className="flex flex-wrap gap-2 pt-2">
             <button className="btn-secondary" onClick={() => save()} disabled={saving}>Guardar</button>
             {isDraft ? (
-              <button className="btn-primary" onClick={() => save("confirmed")} disabled={saving}>✓ Guardar y confirmar</button>
+              <button className="btn-success" onClick={() => save("confirmed")} disabled={saving}>✓ Guardar en inventario</button>
             ) : (
-              <button className="btn-ghost" onClick={() => save("draft")} disabled={saving}>↩ Volver a borrador</button>
+              <button className="btn-ghost" onClick={() => save("draft")} disabled={saving}>↩ Pasar a pendientes</button>
             )}
-            <button className="btn-ghost text-red-600" onClick={remove} disabled={saving}>Eliminar</button>
+            <button className="btn-danger ml-auto" onClick={remove} disabled={saving}>Eliminar</button>
           </div>
         </div>
       </div>

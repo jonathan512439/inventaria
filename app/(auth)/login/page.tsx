@@ -36,7 +36,7 @@ function LoginForm() {
 
   return (
     <form onSubmit={onSubmit} className="card space-y-4">
-      <h2 className="text-lg font-semibold">Iniciar sesión</h2>
+      <h2 className="text-lg font-bold">Iniciar sesión</h2>
       {params.get("registered") && (
         <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
           Cuenta creada. Te enviamos un correo: abre el enlace de confirmación (desde cualquier dispositivo) y entrarás

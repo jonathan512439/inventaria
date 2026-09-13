@@ -56,35 +56,35 @@ export default function ExportPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">Exportar a Excel</h1>
-        <p className="text-sm text-slate-500">Genera un .xlsx con las columnas que definiste. Se crea en tu dispositivo.</p>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <div className="animate-in">
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Exportar a Excel</h1>
+        <p className="text-sm text-slate-500">Descarga tu inventario como archivo .xlsx.</p>
       </div>
 
-      <div className="card space-y-4">
+      <div className="animate-in card space-y-4">
         <div>
-          <label className="label" htmlFor="cat">Categoría</label>
-          <CategorySelect id="cat" categories={categories} value={categoryId} onChange={setCategoryId} emptyLabel="Todas las categorías" />
+          <label className="label" htmlFor="cat">Sección</label>
+          <CategorySelect id="cat" categories={categories} value={categoryId} onChange={setCategoryId} emptyLabel="Todas las secciones" />
           {categoryId && (
             <label className="mt-2 flex items-center gap-2 text-sm">
               <input type="checkbox" checked={includeSub} onChange={(e) => setIncludeSub(e.target.checked)} />
-              Incluir subcategorías
+              Incluir subsecciones
             </label>
           )}
         </div>
 
         <div>
-          <label className="label">Estado</label>
+          <label className="label">Qué exportar</label>
           <div className="flex flex-wrap gap-2">
             {(["confirmed", "draft", "all"] as StatusFilter[]).map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setStatus(s)}
-                className={`btn px-3 py-1.5 text-xs ${status === s ? "bg-brand-600 text-white" : "border border-slate-300 bg-white text-slate-700"}`}
+                className={`chip ${status === s ? "chip-active" : ""}`}
               >
-                {s === "confirmed" ? "Confirmados" : s === "draft" ? "Borradores" : "Todos"}
+                {s === "confirmed" ? "En inventario" : s === "draft" ? "Pendientes" : "Todo"}
               </button>
             ))}
           </div>
@@ -93,9 +93,9 @@ export default function ExportPage() {
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" className="mt-0.5" checked={sheetPerCategory} onChange={(e) => setSheetPerCategory(e.target.checked)} />
           <span>
-            Una hoja por categoría
+            Una hoja por sección
             <br />
-            <span className="text-slate-500">Cada hoja lleva exactamente las columnas de su categoría. Si no, se genera una sola hoja con la unión de columnas.</span>
+            <span className="text-slate-500">Si no, todo va en una sola hoja.</span>
           </span>
         </label>
 
