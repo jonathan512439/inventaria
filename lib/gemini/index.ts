@@ -109,6 +109,7 @@ export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string
     "Los campos de texto como nombre, descripcion, marca o color NUNCA deben quedar vacíos si el producto se ve: da siempre tu mejor estimación aunque no estés seguro (el usuario la corregirá).",
     `Deja vacío solo lo que realmente no se puede inferir de la imagen (cadena vacía; null en campos numéricos; "${UNKNOWN_OPTION}" en listas).`,
     "No inventes precios ni stock: solo si están impresos y legibles.",
+    "Si un campo pertenece a otro tipo de producto y no tiene sentido para este (p. ej. talla_casco en una bebida), déjalo vacío; nunca escribas 'No aplica'.",
     'Para "nombre" usa un nombre comercial corto y útil para buscar (marca + producto + variante, máx. 8 palabras). Para "descripcion" 1-2 frases concretas.',
     catLine,
     `Campos a completar:\n${fieldList}`,
@@ -203,4 +204,81 @@ export async function analyzeImage({ imageBase64, mimeType, prompt, schema }: An
     "Se alcanzó el límite de solicitudes de la IA (free tier). Espera un minuto e inténtalo de nuevo. " +
       (lastError?.message ? `Detalle: ${lastError.message}` : "")
   );
+}
+
+// ---------------------------------------------------------------------
+// Generación de un rubro (tipo de producto) a partir de una descripción en texto
+// ---------------------------------------------------------------------
+
+export interface GeneratedPreset {
+  name: string;
+  icon: string;
+  sections: string[];
+  fields: Array<{ name: string; field_type: "text" | "number" | "select"; is_ai_fillable: boolean; options?: string[] }>;
+}
+
+const PRESET_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    name: { type: "STRING", description: "Nombre corto del tipo de producto o rubro, en español (máx. 4 palabras)." },
+    icon: { type: "STRING", description: "Un solo emoji representativo." },
+    sections: {
+      type: "ARRAY",
+      description: "Entre 5 y 9 secciones (estantes) típicas de ese rubro, nombres cortos en español.",
+      items: { type: "STRING" },
+    },
+    fields: {
+      type: "ARRAY",
+      description:
+        "Entre 2 y 4 datos ESPECÍFICOS del rubro que valga la pena guardar por producto (no incluir nombre, marca, descripcion, precio ni stock: ya existen). Nombres en minúsculas con guion_bajo.",
+      items: {
+        type: "OBJECT",
+        properties: {
+          name: { type: "STRING" },
+          field_type: { type: "STRING", enum: ["text", "number", "select"] },
+          is_ai_fillable: { type: "BOOLEAN", description: "true si se puede deducir mirando la foto (color, talla, modelo...); false si lo sabe solo el dueño (fecha de vencimiento, garantía...)." },
+          options: { type: "ARRAY", items: { type: "STRING" }, description: "Solo para select: 3-8 opciones." },
+        },
+        required: ["name", "field_type", "is_ai_fillable"],
+      },
+    },
+  },
+  required: ["name", "icon", "sections", "fields"],
+};
+
+/** Pide a Gemini un rubro completo (secciones + datos) a partir de "vendo repuestos de moto y aceites". */
+export async function generatePreset(description: string): Promise<GeneratedPreset> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new GeminiError(500, "Falta GEMINI_API_KEY en el entorno del servidor");
+  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const res = await fetch(`${API_BASE}/${model}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text:
+                `Un pequeño negocio describe lo que vende: "${description.slice(0, 300)}".\n` +
+                `Diseña cómo organizaría su inventario: nombre del rubro, un emoji, las secciones (estantes) y 2-4 datos específicos por producto. Todo en español, breve y práctico.`,
+            },
+          ],
+        },
+      ],
+      generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: PRESET_SCHEMA },
+    }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new GeminiError(res.status === 429 ? 429 : 502, res.status === 429 ? "La IA está ocupada, intenta en un minuto." : `Error de Gemini (${res.status}) ${t.slice(0, 200)}`);
+  }
+  const json = (await res.json()) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+  const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  try {
+    return JSON.parse(text) as GeneratedPreset;
+  } catch {
+    throw new GeminiError(502, "La IA no devolvió una respuesta válida.");
+  }
 }

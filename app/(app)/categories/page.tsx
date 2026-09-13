@@ -87,9 +87,9 @@ export default function CategoriesPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="animate-in">
-        <Link href="/settings" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ajustes</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Secciones</h1>
-        <p className="text-sm text-slate-500">Como los pasillos de tu tienda. La IA elige la sección de cada foto.</p>
+        <Link href="/store" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi tienda</Link>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Secciones (avanzado)</h1>
+        <p className="text-sm text-slate-500">Árbol completo de rubros y secciones. Para lo habitual usa <Link href="/store" className="underline">Mi tienda</Link>.</p>
       </div>
 
       <form onSubmit={create} className="animate-in card grid gap-3 sm:grid-cols-[1fr_1fr_auto]">

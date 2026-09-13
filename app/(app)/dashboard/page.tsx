@@ -2,19 +2,22 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { queueSummary, useQueue } from "@/lib/queue";
-import { IconBox, IconCamera, IconCheckCircle, IconChevronRight, IconDownload, IconSettings, IconSparkles } from "@/components/ui/Icons";
+import { ProgressCard, StepByStep, computeStates, type GuideProgress } from "@/components/guide/Guide";
+import { IconBox, IconCamera, IconCheckCircle, IconChevronRight, IconDownload, IconSettings, Spinner } from "@/components/ui/Icons";
 
 interface Stats {
   pending: number;
   confirmed: number;
-  categories: number;
+  types: number;
   business: string | null;
-  fields: number;
+  onboarded: boolean;
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const queue = useQueue();
   const q = queueSummary(queue.items);
@@ -22,53 +25,55 @@ export default function DashboardPage() {
   useEffect(() => {
     const supabase = createClient();
     (async () => {
-      const [d, c, cat, f, p] = await Promise.all([
+      const [d, c, t, p] = await Promise.all([
         supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft"),
         supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed"),
-        supabase.from("categories").select("id", { count: "exact", head: true }),
-        supabase.from("field_templates").select("id", { count: "exact", head: true }),
-        supabase.from("profiles").select("business_name").maybeSingle(),
+        supabase.from("categories").select("id", { count: "exact", head: true }).is("parent_id", null),
+        supabase.from("profiles").select("business_name, onboarded_at").maybeSingle(),
       ]);
-      setStats({
+      const s: Stats = {
         pending: d.count ?? 0,
         confirmed: c.count ?? 0,
-        categories: cat.count ?? 0,
-        fields: f.count ?? 0,
+        types: t.count ?? 0,
         business: p.data?.business_name ?? null,
-      });
+        onboarded: !!p.data?.onboarded_at,
+      };
+      // Cuenta nueva sin nada configurado → asistente inicial
+      if (!s.onboarded && s.types === 0 && s.pending + s.confirmed === 0) {
+        router.replace("/onboarding");
+        return;
+      }
+      setStats(s);
     })();
-  }, [q.done]);
+  }, [q.done, router]);
+
+  if (!stats) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Spinner size={28} className="text-brand-500" />
+      </div>
+    );
+  }
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
-  const firstTime = stats && stats.confirmed === 0 && stats.pending === 0 && q.total === 0;
   const working = q.queued + q.processing;
+  const progress: GuideProgress = {
+    hasTypes: stats.types > 0,
+    hasPhotos: stats.pending + stats.confirmed + q.total > 0,
+    hasConfirmed: stats.confirmed > 0,
+    pending: stats.pending,
+  };
+  const allDone = computeStates(progress).every((s) => s === "done");
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <header className="animate-in">
         <p className="text-sm font-medium text-slate-500">{greeting}</p>
-        <h1 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">{stats?.business || "Tu inventario"}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">{stats.business || "Tu inventario"}</h1>
       </header>
 
-      {firstTime && (
-        <div className="animate-in card overflow-hidden bg-gradient-to-br from-brand-600 to-violet-600 text-white ring-0">
-          <div className="flex items-start gap-3">
-            <IconSparkles size={28} className="mt-0.5 shrink-0 text-amber-300" />
-            <div>
-              <p className="text-lg font-semibold">Toma una foto y listo</p>
-              <p className="mt-1 text-sm text-white/85">
-                La IA reconoce el producto, lo describe y elige su sección. Tú solo confirmas el precio.
-              </p>
-            </div>
-          </div>
-          {stats.fields === 0 && (
-            <Link href="/settings" className="mt-4 inline-flex items-center gap-1 rounded-xl bg-white/15 px-3 py-2 text-sm font-semibold hover:bg-white/25">
-              Preparar mi tienda en 1 minuto <IconChevronRight size={16} />
-            </Link>
-          )}
-        </div>
-      )}
+      {!allDone && <ProgressCard progress={progress} />}
 
       {/* Acciones principales */}
       <div className="grid gap-3">
@@ -89,25 +94,11 @@ export default function DashboardPage() {
           <IconChevronRight className="text-white/70 transition group-hover:translate-x-0.5" />
         </Link>
 
-        <BigLink
-          href="/review"
-          icon={<IconCheckCircle size={28} />}
-          title="Revisar pendientes"
-          subtitle={stats ? (stats.pending ? "Confirma precio y stock" : "Todo revisado") : " "}
-          count={stats?.pending}
-          tone="amber"
-        />
-        <BigLink
-          href="/products"
-          icon={<IconBox size={28} />}
-          title="Mi inventario"
-          subtitle={stats ? `${stats.categories} secci${stats.categories === 1 ? "ón" : "ones"}` : " "}
-          count={stats?.confirmed}
-          tone="emerald"
-        />
+        <BigLink href="/review" icon={<IconCheckCircle size={28} />} title="Revisar pendientes" subtitle={stats.pending ? "Confirma precio y stock" : "Todo revisado"} count={stats.pending} tone="amber" />
+        <BigLink href="/products" icon={<IconBox size={28} />} title="Mi inventario" subtitle={`${stats.types} rubro${stats.types === 1 ? "" : "s"}`} count={stats.confirmed} tone="emerald" />
       </div>
 
-      <div className="flex justify-center gap-4 pt-2 text-sm">
+      <div className="flex justify-center gap-4 text-sm">
         <Link href="/export" className="inline-flex items-center gap-1.5 font-medium text-slate-500 hover:text-brand-700">
           <IconDownload size={16} /> Exportar a Excel
         </Link>
@@ -115,29 +106,16 @@ export default function DashboardPage() {
           <IconSettings size={16} /> Ajustes
         </Link>
       </div>
+
+      <div id="guia" className="animate-in scroll-mt-20 pt-2">
+        <StepByStep progress={progress} />
+      </div>
     </div>
   );
 }
 
-function BigLink({
-  href,
-  icon,
-  title,
-  subtitle,
-  count,
-  tone,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  count?: number;
-  tone: "amber" | "emerald";
-}) {
-  const tones = {
-    amber: "bg-amber-100 text-amber-700",
-    emerald: "bg-emerald-100 text-emerald-700",
-  };
+function BigLink({ href, icon, title, subtitle, count, tone }: { href: string; icon: React.ReactNode; title: string; subtitle: string; count?: number; tone: "amber" | "emerald" }) {
+  const tones = { amber: "bg-amber-100 text-amber-700", emerald: "bg-emerald-100 text-emerald-700" };
   return (
     <Link href={href} className="animate-in card group flex items-center gap-4 transition hover:ring-brand-300 active:scale-[0.99]">
       <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${tones[tone]}`}>{icon}</span>

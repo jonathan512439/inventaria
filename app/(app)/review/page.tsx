@@ -50,6 +50,8 @@ function Review() {
   const [draft, setDraft] = useState<{ data: ProductData; categoryId: string | null } | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmedCount, setConfirmedCount] = useState(0);
+  const [newParent, setNewParent] = useState<string | null>(null);
+  const types = useMemo(() => categories.filter((c) => !c.parent_id), [categories]);
   const tableView = params.get("view") === "table";
 
   const load = useCallback(async () => {
@@ -139,10 +141,11 @@ function Review() {
   async function createSuggestedCategory() {
     const name = current?.ai_meta?.categoria_nueva;
     if (!name) return;
+    const parent = newParent ?? types[0]?.id ?? null;
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const { data, error } = await supabase.from("categories").insert({ name, parent_id: null, user_id: user!.id }).select().single();
+    const { data, error } = await supabase.from("categories").insert({ name, parent_id: parent, user_id: user!.id }).select().single();
     if (error) return toast("error", error.message);
     setCategories((c) => [...c, data]);
     setDraft((d) => (d ? { ...d, categoryId: data.id } : d));
@@ -205,9 +208,21 @@ function Review() {
             </label>
             <CategorySelect categories={categories} value={draft.categoryId} onChange={(v) => setDraft({ ...draft, categoryId: v })} emptyLabel="— Elige una sección —" />
             {!draft.categoryId && meta.categoria_nueva && (
-              <button type="button" onClick={createSuggestedCategory} className="chip mt-2 border-brand-300 bg-brand-50 text-brand-700">
-                <IconPlus size={14} /> Crear sección “{meta.categoria_nueva}”
-              </button>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={createSuggestedCategory} className="chip border-brand-300 bg-brand-50 text-brand-700">
+                  <IconPlus size={14} /> Crear sección “{meta.categoria_nueva}”
+                </button>
+                {types.length > 1 && (
+                  <select className="input w-auto py-1.5 text-sm" value={newParent ?? types[0]?.id ?? ""} onChange={(e) => setNewParent(e.target.value)}>
+                    {types.map((t) => (
+                      <option key={t.id} value={t.id}>en {t.icon ? `${t.icon} ` : ""}{t.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
+            {!draft.categoryId && fields.length === 0 && (
+              <p className="mt-2 text-xs text-slate-500">Elige la sección para ver y completar los datos del producto.</p>
             )}
           </div>
 

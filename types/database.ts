@@ -5,6 +5,7 @@ export type Profile = {
   id: string;
   email: string | null;
   business_name: string | null;
+  onboarded_at: string | null;
   created_at: string;
 };
 
@@ -13,6 +14,7 @@ export type Category = {
   user_id: string;
   parent_id: string | null;
   name: string;
+  icon: string | null;
   created_at: string;
 };
 
@@ -63,7 +65,7 @@ export interface Database {
       };
       categories: {
         Row: Category;
-        Insert: Omit<Category, "id" | "created_at"> & { id?: string; created_at?: string };
+        Insert: Omit<Category, "id" | "created_at" | "icon"> & { id?: string; created_at?: string; icon?: string | null };
         Update: Partial<Category>;
         Relationships: [];
       };

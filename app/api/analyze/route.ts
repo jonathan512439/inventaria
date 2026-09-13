@@ -138,9 +138,11 @@ export async function POST(request: Request) {
   // 4. Datos: guardamos TODO lo que la IA devolvió (así no se pierde si el usuario cambia la sección)
   //    y completamos los campos de la sección final con sus valores por defecto.
   const data: ProductData = {};
+  const NA = /^(no aplica|n\/a|na|no determinado|desconocido|ninguno|ninguna|-|—)$/i;
   aiFields.forEach((f) => {
     const v = result[f.name];
-    const val = coerceValue(f, v === UNKNOWN_OPTION ? "" : v);
+    const clean = v === UNKNOWN_OPTION || (typeof v === "string" && NA.test(v.trim())) ? "" : v;
+    const val = coerceValue(f, clean);
     if (val !== "" && val !== null) data[f.name] = val;
   });
   const effective = getEffectiveFields(tpls, cats, categoryId);

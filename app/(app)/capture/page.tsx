@@ -60,6 +60,14 @@ export default function CapturePage() {
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPick(e, true)} />
       <input ref={galleryRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPick(e, false)} />
 
+      {categories.length === 0 && (
+        <Link href="/store" className="animate-in flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <IconSparkles size={20} className="shrink-0 text-amber-600" />
+          <span className="flex-1">Primero elige <b>qué vendes</b> para que la IA ordene tus fotos en secciones. Toma 30 segundos.</span>
+          <span className="font-semibold">Elegir →</span>
+        </Link>
+      )}
+
       {/* Botones de captura */}
       <div className="animate-in grid grid-cols-2 gap-3">
         <button

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, FieldType } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
@@ -12,14 +13,23 @@ import { IconArrowLeft, IconSparkles } from "@/components/ui/Icons";
 const TYPE_LABEL: Record<FieldType, string> = { text: "Texto", number: "Número", select: "Opciones" };
 
 export default function TemplatesPage() {
+  return (
+    <Suspense>
+      <Templates />
+    </Suspense>
+  );
+}
+
+function Templates() {
   const supabase = createClient();
+  const params = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // A qué categoría pertenecen los campos que se muestran/crean (null = globales)
-  const [scope, setScope] = useState<string | null>(null);
+  const [scope, setScope] = useState<string | null>(params.get("scope") || null);
 
   // formulario nuevo campo
   const [fName, setFName] = useState("");
@@ -144,7 +154,7 @@ export default function TemplatesPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="animate-in">
-        <Link href="/settings" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ajustes</Link>
+        <Link href="/store" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi tienda</Link>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Datos de mis productos</h1>
         <p className="text-sm text-slate-500">Qué información guardas de cada producto y cuál llena la IA desde la foto.</p>
       </div>
