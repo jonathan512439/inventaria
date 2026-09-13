@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
-import { IconBox, IconCamera, IconCheckCircle, IconHome, IconSettings } from "./ui/Icons";
+import { enqueue, hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
+import { resizeImage } from "@/lib/image";
+import { IconBox, IconCamera, IconCheckCircle, IconHome, IconImages, IconSettings } from "./ui/Icons";
+import { LogoWordmark } from "./ui/Logo";
 
 const items = [
   { href: "/dashboard", label: "Inicio", Icon: IconHome },
@@ -17,6 +19,41 @@ const items = [
 
 export default function Nav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [quick, setQuick] = useState(false); // menú rápido (mantener pulsado el botón de cámara)
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = useRef(false);
+  const camRef = useRef<HTMLInputElement>(null);
+  const galRef = useRef<HTMLInputElement>(null);
+
+  async function quickPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    setQuick(false);
+    if (!files.length) return;
+    navigator.vibrate?.(12);
+    const blobs: Blob[] = [];
+    for (const f of files) {
+      try {
+        blobs.push(await resizeImage(f));
+      } catch {
+        /* archivo ilegible: se omite */
+      }
+    }
+    if (blobs.length) enqueue(blobs, null);
+    router.push("/capture");
+  }
+  const startPress = () => {
+    longPressed.current = false;
+    pressTimer.current = setTimeout(() => {
+      longPressed.current = true;
+      navigator.vibrate?.(15);
+      setQuick(true);
+    }, 450);
+  };
+  const endPress = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+  };
   const queue = useQueue();
   const q = queueSummary(queue.items);
   const [pendingCount, setPendingCount] = useState(0);
@@ -44,11 +81,8 @@ export default function Nav() {
       {/* Escritorio: barra superior */}
       <header className="sticky top-0 z-30 hidden border-b border-slate-200/70 bg-white/80 backdrop-blur-md md:block">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 text-white shadow-md shadow-brand-500/30">
-              <IconCamera size={18} />
-            </span>
-            <span className="text-lg font-bold tracking-tight text-ink">InventarIA</span>
+          <Link href="/dashboard">
+            <LogoWordmark />
           </Link>
           <nav className="flex items-center gap-1">
             {items.map(({ href, label, Icon, primary }) => (
@@ -73,12 +107,45 @@ export default function Nav() {
         </div>
       </header>
 
+      {/* Entradas ocultas del menú rápido */}
+      <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={quickPick} />
+      <input ref={galRef} type="file" accept="image/*" multiple className="hidden" onChange={quickPick} />
+
+      {/* Menú rápido (mantener pulsado el botón de cámara) */}
+      {quick && (
+        <div className="fixed inset-0 z-40" onClick={() => setQuick(false)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="animate-in absolute inset-x-0 bottom-24 flex justify-center gap-3 px-6" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => camRef.current?.click()} className="btn-primary flex-1 flex-col gap-1 py-4">
+              <IconCamera size={26} /> Cámara
+            </button>
+            <button type="button" onClick={() => galRef.current?.click()} className="btn flex-1 flex-col gap-1 bg-white py-4 text-ink shadow-float">
+              <IconImages size={26} className="text-brand-600" /> Galería
+            </button>
+          </div>
+          <p className="absolute inset-x-0 bottom-[4.5rem] text-center text-xs font-medium text-white/90">Acceso rápido · toca fuera para cerrar</p>
+        </div>
+      )}
+
       {/* Móvil: barra inferior con botón central de cámara */}
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/95 backdrop-blur-md md:hidden">
         <div className="grid grid-cols-5 items-end">
           {items.map(({ href, label, Icon, primary }) =>
             primary ? (
-              <Link key={href} href={href} className="relative -mt-6 flex flex-col items-center pb-1.5">
+              <Link
+                key={href}
+                href={href}
+                className="relative -mt-6 flex flex-col items-center pb-1.5"
+                onPointerDown={startPress}
+                onPointerUp={endPress}
+                onPointerLeave={endPress}
+                onPointerCancel={endPress}
+                onContextMenu={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  if (longPressed.current) e.preventDefault();
+                }}
+                title="Toca: agregar · Mantén pulsado: cámara o galería"
+              >
                 <span
                   className={`grid h-14 w-14 place-items-center rounded-full text-white shadow-float transition active:scale-95 ${
                     isActive(href) ? "ring-4 ring-brand-200" : ""

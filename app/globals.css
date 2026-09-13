@@ -188,3 +188,16 @@
     transform: scale(0.97);
   }
 }
+
+@keyframes toast-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+/* Fotos: fondo suave hasta que carga la imagen */
+.img-fade {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.img-fade.loaded {
+  opacity: 1;
+}

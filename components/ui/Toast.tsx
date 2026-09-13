@@ -31,7 +31,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`animate-in pointer-events-auto flex max-w-md items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium shadow-float ring-1 ${
+            className={`animate-in pointer-events-auto relative flex max-w-md items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium shadow-float ring-1 ${
               t.kind === "success"
                 ? "bg-emerald-600 text-white ring-emerald-700/30"
                 : t.kind === "error"
@@ -41,6 +41,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           >
             {t.kind === "success" ? <IconCheckCircle size={18} /> : t.kind === "error" ? <IconAlert size={18} /> : null}
             <span>{t.text}</span>
+            {t.action && (
+              <span className="absolute inset-x-3 bottom-0 h-0.5 overflow-hidden rounded-full bg-white/25">
+                <span className="block h-full w-full origin-left bg-white/80" style={{ animation: "toast-countdown 6s linear forwards" }} />
+              </span>
+            )}
             {t.action && (
               <button
                 onClick={() => {

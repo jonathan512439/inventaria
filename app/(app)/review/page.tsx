@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -13,6 +13,7 @@ import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import ProductTable from "@/components/ProductTable";
 import { CardSkeleton } from "@/components/ui/Skeleton";
+import Photo from "@/components/ui/Photo";
 import { categoryColor } from "@/lib/colors";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -62,6 +63,36 @@ function Review() {
   const [zoom, setZoom] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [openIn, setOpenIn] = useState<{ id: string; nonce: number } | null>(null);
+  // Gesto: deslizar la tarjeta a la derecha = confirmar, a la izquierda = siguiente
+  const [dragX, setDragX] = useState(0);
+  const drag = useRef<{ x: number; y: number; active: boolean; horizontal: boolean | null }>({ x: 0, y: 0, active: false, horizontal: null });
+  const SWIPE = 110;
+
+  function onPointerDown(e: React.PointerEvent) {
+    const t = e.target as HTMLElement;
+    if (t.closest("input,select,textarea,button,a,[data-no-swipe]")) return;
+    drag.current = { x: e.clientX, y: e.clientY, active: true, horizontal: null };
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    const d = drag.current;
+    if (!d.active) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (d.horizontal === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) d.horizontal = Math.abs(dx) > Math.abs(dy);
+    if (d.horizontal) setDragX(Math.max(-160, Math.min(160, dx)));
+  }
+  function onPointerUp() {
+    const d = drag.current;
+    if (!d.active) return;
+    d.active = false;
+    const dx = dragX;
+    setDragX(0);
+    if (dx > SWIPE) save("confirmed");
+    else if (dx < -SWIPE && index < products.length - 1) {
+      navigator.vibrate?.(8);
+      setIndex((i) => i + 1);
+    }
+  }
 
   /** Pide al servidor que elija la subcategoría dentro de una categoría (texto → IA si hace falta). */
   async function autoSubcategory(productId: string, categoryId: string) {
@@ -273,10 +304,30 @@ function Review() {
     <div className="mx-auto max-w-2xl space-y-4">
       <Header count={products.length} index={index} onToggle={() => router.replace("/review?view=table")} />
 
-      <article key={current.id} className={`card space-y-5 p-0 ${leaving ? "animate-out-left" : "animate-in-right"}`}>
+      <div className="relative">
+        {/* Indicadores del gesto */}
+        {dragX > 30 && (
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-28 items-center justify-center rounded-l-3xl bg-emerald-500/90 text-white" style={{ opacity: Math.min(1, dragX / SWIPE) }}>
+            <span className="flex flex-col items-center text-xs font-bold"><IconCheck size={28} /> Confirmar</span>
+          </div>
+        )}
+        {dragX < -30 && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-28 items-center justify-center rounded-r-3xl bg-slate-700/90 text-white" style={{ opacity: Math.min(1, -dragX / SWIPE) }}>
+            <span className="flex flex-col items-center text-xs font-bold"><IconArrowRight size={28} /> Siguiente</span>
+          </div>
+        )}
+      <article
+        key={current.id}
+        className={`card space-y-5 p-0 ${leaving ? "animate-out-left" : dragX === 0 ? "animate-in-right" : ""}`}
+        style={{ transform: dragX ? `translateX(${dragX}px) rotate(${dragX / 40}deg)` : undefined, transition: dragX ? "none" : "transform 0.2s", touchAction: "pan-y" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         {/* Foto (toca para ampliar) */}
         <button type="button" onClick={() => setZoom(true)} className="relative block aspect-[4/3] w-full overflow-hidden rounded-t-3xl bg-slate-100 text-left">
-          {current.image_url && <img src={current.image_url} alt="" className="h-full w-full object-contain" />}
+          {current.image_url && <Photo src={current.image_url} wrapperClassName="h-full w-full" className="h-full w-full object-contain" />}
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-5 pb-3 pt-10 text-white">
             <p className="truncate text-lg font-bold">{title || "Sin nombre"}</p>
           </div>
@@ -454,6 +505,7 @@ function Review() {
           </div>
         </div>
       </article>
+      </div>
 
       {/* Foto ampliada (pellizca para hacer zoom) */}
       {zoom && current.image_url && (
@@ -475,7 +527,7 @@ function Review() {
         <button className="btn-ghost btn-sm" disabled={index === 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>
           <IconArrowLeft size={16} /> Anterior
         </button>
-        <span className="text-slate-500">{index + 1} de {products.length}</span>
+        <span className="text-slate-500">{index + 1} de {products.length} <span className="hidden text-slate-400 sm:inline">· desliza → confirmar</span></span>
         <button className="btn-ghost btn-sm" disabled={index >= products.length - 1} onClick={() => setIndex((i) => Math.min(products.length - 1, i + 1))}>
           Siguiente <IconArrowRight size={16} />
         </button>

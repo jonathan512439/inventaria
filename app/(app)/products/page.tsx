@@ -9,6 +9,7 @@ import { productTitle } from "@/lib/fields";
 import ProductTable from "@/components/ProductTable";
 import { IconBox, IconCamera, IconChevronRight, IconDownload, IconGrid, IconSearch, IconTable } from "@/components/ui/Icons";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import Photo from "@/components/ui/Photo";
 import { IllustrationCapture } from "@/components/guide/Illustrations";
 import { categoryColor } from "@/lib/colors";
 
@@ -124,7 +125,7 @@ export default function ProductsPage() {
                 <li key={p.id}>
                   <Link href={`/products/${p.id}`} className="card press group flex items-center gap-3 p-3 transition hover:ring-brand-300" style={{ borderLeft: `4px solid ${col.dot}` }}>
                     {p.image_url ? (
-                      <img src={p.image_url} alt="" loading="lazy" className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
+                      <Photo src={p.image_url} loading="lazy" wrapperClassName="h-16 w-16 shrink-0 rounded-2xl" className="h-16 w-16 object-cover" />
                     ) : (
                       <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-400"><IconBox /></span>
                     )}
