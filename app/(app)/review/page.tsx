@@ -12,6 +12,8 @@ import { getPreset } from "@/lib/presets";
 import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import ProductTable from "@/components/ProductTable";
+import { CardSkeleton } from "@/components/ui/Skeleton";
+import { categoryColor } from "@/lib/colors";
 import { useToast } from "@/components/ui/Toast";
 import {
   IconArrowLeft,
@@ -19,11 +21,13 @@ import {
   IconCamera,
   IconCheck,
   IconCheckCircle,
+  IconChevronRight,
   IconPlus,
   IconSparkles,
   IconTable,
   IconTag,
   IconTrash,
+  IconX,
   Spinner,
 } from "@/components/ui/Icons";
 
@@ -54,6 +58,9 @@ function Review() {
   const [newParent, setNewParent] = useState<string | null>(null);
   const [settingUp, setSettingUp] = useState(false);
   const [classifying, setClassifying] = useState(false);
+  const [leaving, setLeaving] = useState(false); // animación de salida de la tarjeta confirmada
+  const [zoom, setZoom] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   /** Pide al servidor que elija la subcategoría dentro de una categoría (texto → IA si hace falta). */
   async function autoSubcategory(productId: string, categoryId: string) {
@@ -136,6 +143,11 @@ function Review() {
     if (error) return toast("error", error.message);
     if (status === "confirmed") {
       const id = current.id;
+      navigator.vibrate?.(20);
+      setLeaving(true);
+      await new Promise((r) => setTimeout(r, 260));
+      setLeaving(false);
+      setMoreOpen(false);
       setConfirmedCount((n) => n + 1);
       removeByProductId(id);
       setProducts((list) => list.filter((p) => p.id !== id));
@@ -204,7 +216,13 @@ function Review() {
   }
 
   // ---------- Vistas ----------
-  if (loading) return <Centered><Spinner size={28} className="text-brand-500" /></Centered>;
+  if (loading)
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Header count={0} onToggle={() => {}} />
+        <CardSkeleton />
+      </div>
+    );
 
   if (tableView) {
     return (
@@ -237,6 +255,12 @@ function Review() {
 
   const title = productTitle(draft.data);
   const meta = current.ai_meta ?? {};
+  const nameField = fields.find((f) => /^(nombre|name|producto|titulo)$/i.test(f.name)) ?? null;
+  const keyFields = manualFields.filter((f) => f.field_type === "number" && /^(precio|price|stock|cantidad|existencias)$/i.test(f.name));
+  const otherFields = fields.filter((f) => f !== nameField && !keyFields.includes(f));
+  const catOfCurrent = draft.categoryId ? categories.find((c) => c.id === draft.categoryId) ?? null : null;
+  const topOfCurrent = catOfCurrent?.parent_id ? categories.find((c) => c.id === catOfCurrent.parent_id) ?? catOfCurrent : catOfCurrent;
+  const catColor = categoryColor(topOfCurrent?.name);
   // Nombre para una categoría general nueva: el propuesto por la IA, o la subcategoría sugerida
   const generalName = meta.categoria_nueva_general || meta.categoria_nueva || null;
 
@@ -244,17 +268,23 @@ function Review() {
     <div className="mx-auto max-w-2xl space-y-4">
       <Header count={products.length} index={index} onToggle={() => router.replace("/review?view=table")} />
 
-      <article key={current.id} className="animate-in card space-y-5 p-0">
-        {/* Foto */}
-        <div className="relative aspect-[4/3] overflow-hidden rounded-t-3xl bg-slate-100">
+      <article key={current.id} className={`card space-y-5 p-0 ${leaving ? "animate-out-left" : "animate-in-right"}`}>
+        {/* Foto (toca para ampliar) */}
+        <button type="button" onClick={() => setZoom(true)} className="relative block aspect-[4/3] w-full overflow-hidden rounded-t-3xl bg-slate-100 text-left">
           {current.image_url && <img src={current.image_url} alt="" className="h-full w-full object-contain" />}
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-5 pb-3 pt-10 text-white">
             <p className="truncate text-lg font-bold">{title || "Sin nombre"}</p>
           </div>
-        </div>
+          <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">Toca para ampliar</span>
+          {catOfCurrent && (
+            <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${catColor.bg} ${catColor.text} ${catColor.ring}`}>
+              {catOfCurrent.icon ? `${catOfCurrent.icon} ` : ""}{catOfCurrent.name}
+            </span>
+          )}
+        </button>
 
-        <div className="space-y-5 px-5 pb-5">
-          {/* Subcategoría */}
+        <div className="stagger space-y-5 px-5 pb-5">
+          {/* Categoría */}
           <div>
             <label className="label flex items-center gap-1">
               <IconSparkles size={14} className="text-brand-500" /> Categoría
@@ -274,12 +304,7 @@ function Review() {
                   </button>
                 )}
                 {meta.categoria_nueva && !categories.some((c) => c.parent_id === draft.categoryId && c.name.toLowerCase() === meta.categoria_nueva!.toLowerCase()) && (
-                  <button
-                    type="button"
-                    disabled={settingUp}
-                    onClick={() => createSuggestedCategory(draft.categoryId)}
-                    className="chip border-brand-300 bg-white text-brand-700"
-                  >
+                  <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory(draft.categoryId)} className="chip border-brand-300 bg-white text-brand-700">
                     <IconPlus size={14} /> Subcategoría “{meta.categoria_nueva}” aquí
                   </button>
                 )}
@@ -293,24 +318,14 @@ function Review() {
                   Este producto no encaja en tus categorías. Sugerencias:
                 </p>
                 {meta.catalogo_sugerido && getPreset(meta.catalogo_sugerido) && (
-                  <button
-                    type="button"
-                    disabled={settingUp}
-                    onClick={() => setupAndAssign({ presets: [meta.catalogo_sugerido!] }, meta.categoria_nueva)}
-                    className="btn-primary btn-sm w-full justify-start"
-                  >
+                  <button type="button" disabled={settingUp} onClick={() => setupAndAssign({ presets: [meta.catalogo_sugerido!] }, meta.categoria_nueva)} className="btn-primary btn-sm w-full justify-start">
                     {settingUp ? <Spinner size={14} /> : <IconPlus size={14} />}
                     Agregar catálogo {getPreset(meta.catalogo_sugerido)!.icon} {getPreset(meta.catalogo_sugerido)!.name}
                     <span className="ml-auto text-[10px] font-normal opacity-80">listo para usar</span>
                   </button>
                 )}
                 {generalName && (
-                  <button
-                    type="button"
-                    disabled={settingUp}
-                    onClick={() => setupAndAssign({ description: `${generalName}. Ejemplo de producto: ${title || meta.etiqueta || ""}` }, meta.categoria_nueva)}
-                    className="btn-secondary btn-sm w-full justify-start"
-                  >
+                  <button type="button" disabled={settingUp} onClick={() => setupAndAssign({ description: `${generalName}. Ejemplo de producto: ${title || meta.etiqueta || ""}` }, meta.categoria_nueva)} className="btn-secondary btn-sm w-full justify-start">
                     {settingUp ? <Spinner size={14} /> : <IconSparkles size={14} className="text-brand-600" />}
                     Crear categoría “{generalName}” con la IA
                     <span className="ml-auto text-[10px] font-normal text-slate-500">subcategorías + datos</span>
@@ -335,47 +350,70 @@ function Review() {
             )}
           </div>
 
-          {/* Lo que leyó en la etiqueta */}
-          {meta.etiqueta && (
-            <div className="flex gap-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
-              <IconTag size={16} className="mt-0.5 shrink-0 text-slate-400" />
-              <p><span className="font-semibold text-slate-700">En la etiqueta se lee:</span> {meta.etiqueta}</p>
+          {/* Nombre (lo más importante que reconoció la IA) */}
+          {nameField && (
+            <div>
+              <label className="label flex items-center gap-1">{fieldLabel(nameField.name)} <IconSparkles size={12} className="text-brand-500" /></label>
+              <FieldInput field={nameField} value={draft.data[nameField.name]} onChange={(v) => setValue(nameField, v)} className="input font-semibold" />
             </div>
           )}
 
-          {/* Campos que llenó la IA */}
-          {aiFields.length > 0 && (
-            <section className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
-                <IconSparkles size={12} className="mr-1 inline" /> Lo reconoció la IA
-              </p>
-              {aiFields.map((f) => (
-                <div key={f.id}>
-                  <label className="label">{fieldLabel(f.name)}</label>
-                  <FieldInput field={f} value={draft.data[f.name]} onChange={(v) => setValue(f, v)} />
-                </div>
-              ))}
-            </section>
-          )}
-
-          {/* Campos manuales */}
-          {manualFields.length > 0 && (
-            <section className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Completa tú</p>
+          {/* Precio y stock: lo que completa el usuario, grande */}
+          {keyFields.length > 0 && (
+            <section>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Completa tú</p>
               <div className="grid grid-cols-2 gap-3">
-                {manualFields.map((f) => (
-                  <div key={f.id} className={f.field_type === "text" ? "col-span-2" : ""}>
-                    <label className="label">{fieldLabel(f.name)}</label>
-                    <FieldInput field={f} value={draft.data[f.name]} onChange={(v) => setValue(f, v)} className={f.field_type === "number" ? "input-lg" : "input"} />
+                {keyFields.map((f) => (
+                  <div key={f.id} className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                    <label className="label mb-1">{fieldLabel(f.name)}</label>
+                    <FieldInput field={f} value={draft.data[f.name]} onChange={(v) => setValue(f, v)} className="input-lg text-2xl tabular-nums" />
                   </div>
                 ))}
               </div>
             </section>
           )}
 
-          {fields.length === 0 && (
+          {/* Resto de datos, plegado */}
+          {otherFields.length > 0 && (
+            <section className="rounded-2xl ring-1 ring-slate-200">
+              <button type="button" onClick={() => setMoreOpen((v) => !v)} className="flex w-full items-center gap-2 px-4 py-3 text-left">
+                <span className="flex-1">
+                  <span className="block text-sm font-semibold text-ink">Más datos ({otherFields.length})</span>
+                  {!moreOpen && (
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {otherFields
+                        .filter((f) => draft.data[f.name] !== "" && draft.data[f.name] !== null && draft.data[f.name] !== undefined)
+                        .map((f) => `${fieldLabel(f.name)}: ${draft.data[f.name]}`)
+                        .join(" · ") || "Marca, descripción, color…"}
+                    </span>
+                  )}
+                </span>
+                <IconChevronRight className={`shrink-0 text-slate-400 transition ${moreOpen ? "rotate-90" : ""}`} />
+              </button>
+              {moreOpen && (
+                <div className="stagger space-y-3 border-t border-slate-100 px-4 py-4">
+                  {otherFields.map((f) => (
+                    <div key={f.id}>
+                      <label className="label flex items-center gap-1">
+                        {fieldLabel(f.name)} {f.is_ai_fillable && <IconSparkles size={12} className="text-brand-500" />}
+                      </label>
+                      <FieldInput field={f} value={draft.data[f.name]} onChange={(v) => setValue(f, v)} />
+                    </div>
+                  ))}
+                  {meta.etiqueta && (
+                    <div className="flex gap-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+                      <IconTag size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                      <p><span className="font-semibold text-slate-700">En la etiqueta se lee:</span> {meta.etiqueta}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {fields.length === 0 && draft.categoryId && (
             <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">
-              Esta subcategoría aún no tiene datos definidos.{" "}
+              Esta categoría aún no tiene datos definidos.{" "}
               <Link href="/templates" className="font-semibold underline">Definir datos</Link>
             </p>
           )}
@@ -385,7 +423,7 @@ function Review() {
             <button onClick={remove} className="btn-danger px-4" title="Eliminar" disabled={saving}>
               <IconTrash size={18} />
             </button>
-            <button onClick={() => save("confirmed")} className="btn-success btn-lg" disabled={saving}>
+            <button onClick={() => save("confirmed")} className={`btn-success btn-lg ${leaving ? "pulse-success" : ""}`} disabled={saving}>
               {saving ? <Spinner /> : <IconCheck size={20} />} Confirmar y siguiente
             </button>
             <button onClick={() => save("draft")} className="btn-ghost col-span-2 text-slate-500" disabled={saving}>
@@ -394,6 +432,21 @@ function Review() {
           </div>
         </div>
       </article>
+
+      {/* Foto ampliada (pellizca para hacer zoom) */}
+      {zoom && current.image_url && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => setZoom(false)}>
+          <div className="h-full w-full overflow-auto" style={{ touchAction: "pinch-zoom" }}>
+            <img src={current.image_url} alt="" className="mx-auto h-full w-auto max-w-none object-contain" />
+          </div>
+          <button type="button" className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white backdrop-blur" onClick={() => setZoom(false)}>
+            <IconX size={22} />
+          </button>
+          {meta.etiqueta && (
+            <p className="absolute inset-x-4 bottom-6 rounded-2xl bg-black/60 p-3 text-center text-xs text-white/90">{meta.etiqueta}</p>
+          )}
+        </div>
+      )}
 
       {/* Navegación entre pendientes */}
       <div className="flex items-center justify-between text-sm">

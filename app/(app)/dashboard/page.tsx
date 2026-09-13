@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCountUp } from "@/lib/useCountUp";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -114,6 +115,11 @@ export default function DashboardPage() {
   );
 }
 
+function CountUp({ value }: { value?: number }) {
+  const n = useCountUp(value ?? 0);
+  return <>{value === undefined ? "–" : n}</>;
+}
+
 function BigLink({ href, icon, title, subtitle, count, tone }: { href: string; icon: React.ReactNode; title: string; subtitle: string; count?: number; tone: "amber" | "emerald" }) {
   const tones = { amber: "bg-amber-100 text-amber-700", emerald: "bg-emerald-100 text-emerald-700" };
   return (
@@ -123,7 +129,7 @@ function BigLink({ href, icon, title, subtitle, count, tone }: { href: string; i
         <span className="block text-lg font-bold text-ink">{title}</span>
         <span className="block text-sm text-slate-500">{subtitle}</span>
       </span>
-      <span className="text-2xl font-bold tabular-nums text-ink">{count ?? "–"}</span>
+      <span className="text-2xl font-bold tabular-nums text-ink"><CountUp value={count} /></span>
       <IconChevronRight className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500" />
     </Link>
   );

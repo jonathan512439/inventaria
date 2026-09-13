@@ -8,6 +8,7 @@ import { getEffectiveFields, fieldLabel } from "@/lib/fields";
 import PresetPicker from "@/components/PresetPicker";
 import { useToast } from "@/components/ui/Toast";
 import { IconArrowLeft, IconChevronRight, IconPlus, IconSparkles, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
+import { categoryColor } from "@/lib/colors";
 
 /**
  * "Mi tienda": las categorías (tipos de producto) con sus subcategorías.
@@ -103,9 +104,9 @@ export default function StorePage() {
             const ai = fields.filter((f) => f.is_ai_fillable).map((f) => fieldLabel(f.name));
             const manual = fields.filter((f) => !f.is_ai_fillable).map((f) => fieldLabel(f.name));
             return (
-              <section key={t.id} className="animate-in card space-y-3">
+              <section key={t.id} className="animate-in card space-y-3" style={{ borderLeft: `4px solid ${categoryColor(t.name).dot}` }}>
                 <div className="flex items-center gap-3">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-50 text-2xl">{t.icon || "🏪"}</span>
+                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-2xl ring-1 ${categoryColor(t.name).bg} ${categoryColor(t.name).ring}`}>{t.icon || "🏪"}</span>
                   <div className="min-w-0 flex-1">
                     {renaming?.id === t.id ? (
                       <div className="flex gap-2">

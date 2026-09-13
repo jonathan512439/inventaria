@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/types/database";
 import { useToast } from "./ui/Toast";
 import { IconArrowLeft, IconCheck, IconChevronRight, IconPlus, IconX, Spinner } from "./ui/Icons";
+import { categoryColor } from "@/lib/colors";
 
 interface Props {
   categories: Category[];
@@ -146,7 +147,7 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
                     return (
                       <li key={r.id}>
                         <button type="button" onClick={() => setStep(r.id)} className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition ${active ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:border-brand-300 hover:bg-brand-50/40"}`}>
-                          <span className="grid h-9 w-9 place-items-center rounded-xl bg-white text-xl ring-1 ring-slate-200">{r.icon || "🏷️"}</span>
+                          <span className={`grid h-9 w-9 place-items-center rounded-xl text-xl ring-1 ${categoryColor(r.name).bg} ${categoryColor(r.name).ring}`}>{r.icon || "🏷️"}</span>
                           <span className="flex-1">
                             <span className="block font-semibold text-ink">{r.name}</span>
                             <span className="block text-xs text-slate-500">{n ? `${n} subcategorías` : "sin subcategorías"}</span>

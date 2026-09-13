@@ -119,3 +119,72 @@
     scrollbar-width: none;
   }
 }
+
+/* ---------- Animaciones de interfaz ---------- */
+@layer utilities {
+  .animate-out-left {
+    animation: out-left 0.28s ease-in both;
+  }
+  @keyframes out-left {
+    to {
+      opacity: 0;
+      transform: translateX(-40px) scale(0.98);
+    }
+  }
+  .animate-in-right {
+    animation: in-right 0.3s ease-out both;
+  }
+  @keyframes in-right {
+    from {
+      opacity: 0;
+      transform: translateX(40px);
+    }
+  }
+  .stagger > * {
+    animation: fade-up 0.35s ease-out both;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 0.03s; }
+  .stagger > *:nth-child(2) { animation-delay: 0.08s; }
+  .stagger > *:nth-child(3) { animation-delay: 0.13s; }
+  .stagger > *:nth-child(4) { animation-delay: 0.18s; }
+  .stagger > *:nth-child(5) { animation-delay: 0.23s; }
+  .stagger > *:nth-child(6) { animation-delay: 0.28s; }
+  .stagger > *:nth-child(n + 7) { animation-delay: 0.33s; }
+  .pulse-success {
+    animation: pulse-success 0.6s ease-out;
+  }
+  @keyframes pulse-success {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+    100% { box-shadow: 0 0 0 18px rgba(16, 185, 129, 0); }
+  }
+  /* Barrido de luz sobre la miniatura mientras la IA analiza */
+  .scanning::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.0) 40%, rgba(99, 102, 241, 0.55) 50%, rgba(255, 255, 255, 0.0) 60%, transparent 100%);
+    background-size: 100% 200%;
+    animation: scan 1.6s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes scan {
+    from { background-position: 0 -100%; }
+    to { background-position: 0 100%; }
+  }
+  .scanning::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba(99, 102, 241, 0.7);
+    border-radius: inherit;
+    animation: scan-border 1.2s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  @keyframes scan-border {
+    from { opacity: 0.3; }
+    to { opacity: 1; }
+  }
+  .press:active {
+    transform: scale(0.97);
+  }
+}

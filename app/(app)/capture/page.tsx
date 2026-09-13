@@ -32,6 +32,7 @@ export default function CapturePage() {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
     if (!files.length) return;
+    navigator.vibrate?.(12);
     setPreparing(files.length);
     const blobs: Blob[] = [];
     for (const f of files) {
@@ -136,7 +137,7 @@ export default function CapturePage() {
               La IA está ocupada, continúa en {waiting}s. Puedes seguir tomando fotos.
             </p>
           )}
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+          <div className="stagger grid grid-cols-4 gap-2 sm:grid-cols-6">
             {Array.from({ length: preparing }).map((_, i) => (
               <div key={`p${i}`} className="shimmer aspect-square rounded-2xl" />
             ))}
@@ -170,14 +171,10 @@ function Stat({ n, label, tone, spinning }: { n: number; label: string; tone: st
 function Thumb({ item }: { item: QueueItem }) {
   const title = item.product ? productTitle(item.product.data) : "";
   return (
-    <div className="group relative aspect-square overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-900/5">
-      <img src={item.previewUrl} alt="" className={`h-full w-full object-cover transition ${item.status === "processing" ? "opacity-60" : ""}`} />
+    <div className={`group relative aspect-square overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-900/5 ${item.status === "processing" ? "scanning" : ""}`}>
+      <img src={item.previewUrl} alt="" className={`h-full w-full object-cover transition ${item.status === "processing" ? "opacity-80" : ""}`} />
       {item.status === "processing" && (
-        <div className="absolute inset-0 grid place-items-center text-white">
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-600/90 shadow">
-            <Spinner size={18} />
-          </span>
-        </div>
+        <span className="absolute inset-x-0 bottom-0 bg-brand-600/85 py-0.5 text-center text-[10px] font-semibold text-white">✨ Analizando…</span>
       )}
       {item.status === "queued" && (
         <span className="absolute left-1.5 top-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white">en cola</span>

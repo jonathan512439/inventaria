@@ -7,7 +7,10 @@ import type { Category, FieldTemplate, Product } from "@/types/database";
 import { buildTree, categoryPath, getDescendantIds } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import ProductTable from "@/components/ProductTable";
-import { IconBox, IconCamera, IconChevronRight, IconDownload, IconGrid, IconSearch, IconTable, Spinner } from "@/components/ui/Icons";
+import { IconBox, IconCamera, IconChevronRight, IconDownload, IconGrid, IconSearch, IconTable } from "@/components/ui/Icons";
+import { ListSkeleton } from "@/components/ui/Skeleton";
+import { IllustrationCapture } from "@/components/guide/Illustrations";
+import { categoryColor } from "@/lib/colors";
 
 export default function ProductsPage() {
   const supabase = createClient();
@@ -86,9 +89,11 @@ export default function ProductsPage() {
           </button>
           {roots.map((c) => {
             const n = getDescendantIds(categories, c.id).reduce((s, id) => s + (countByCat.get(id) ?? 0), 0);
+            const col = categoryColor(c.name);
             return (
               <button key={c.id} onClick={() => setFilter(filter === c.id ? null : c.id)} className={`chip shrink-0 ${filter === c.id ? "chip-active" : ""}`}>
-                {c.name} <span className="opacity-70">{n}</span>
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: col.dot }} />
+                {c.icon ? `${c.icon} ` : ""}{c.name} <span className="opacity-70">{n}</span>
               </button>
             );
           })}
@@ -96,10 +101,10 @@ export default function ProductsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner size={28} className="text-brand-500" /></div>
+        <ListSkeleton rows={6} />
       ) : products.length === 0 ? (
         <div className="animate-in card mx-auto max-w-sm text-center">
-          <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-brand-100 text-brand-600"><IconBox size={32} /></span>
+          <div className="mx-auto h-[190px] w-[150px]"><IllustrationCapture /></div>
           <h2 className="mt-4 text-lg font-bold">Tu inventario está vacío</h2>
           <p className="mt-1 text-sm text-slate-500">Empieza tomando una foto de un producto.</p>
           <Link href="/capture" className="btn-primary mt-5 w-full"><IconCamera size={18} /> Agregar productos</Link>
@@ -108,13 +113,16 @@ export default function ProductsPage() {
         <ProductTable products={visible} categories={categories} templates={templates} mode="confirmed" onChanged={load} />
       ) : (
         <>
-          <ul className="animate-in grid gap-2 md:grid-cols-2">
+          <ul className="stagger grid gap-2 md:grid-cols-2">
             {visible.slice(0, limit).map((p) => {
               const pk = priceKey(p);
               const sk = stockKey(p);
+              const cat = p.category_id ? categories.find((c) => c.id === p.category_id) : null;
+              const top = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) ?? cat : cat;
+              const col = categoryColor(top?.name);
               return (
                 <li key={p.id}>
-                  <Link href={`/products/${p.id}`} className="card group flex items-center gap-3 p-3 transition hover:ring-brand-300">
+                  <Link href={`/products/${p.id}`} className="card press group flex items-center gap-3 p-3 transition hover:ring-brand-300" style={{ borderLeft: `4px solid ${col.dot}` }}>
                     {p.image_url ? (
                       <img src={p.image_url} alt="" loading="lazy" className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
                     ) : (
