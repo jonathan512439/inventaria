@@ -105,12 +105,24 @@ export default function DashboardPage() {
 
       <CleanupCard />
 
-      <div className="flex justify-center gap-4 text-sm">
-        <Link href="/export" className="inline-flex items-center gap-1.5 font-medium text-slate-500 hover:text-brand-700">
-          <IconDownload size={16} /> Exportar a Excel
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/export" className="animate-in press flex items-center gap-3 rounded-3xl border-2 border-emerald-300 bg-white p-4 shadow-card transition hover:border-emerald-500 hover:bg-emerald-50">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
+            <IconDownload size={22} />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-bold text-ink">Exportar</span>
+            <span className="block text-xs text-slate-500">a Excel</span>
+          </span>
         </Link>
-        <Link href="/settings" className="inline-flex items-center gap-1.5 font-medium text-slate-500 hover:text-brand-700">
-          <IconSettings size={16} /> Ajustes
+        <Link href="/settings" className="animate-in press flex items-center gap-3 rounded-3xl border-2 border-slate-300 bg-white p-4 shadow-card transition hover:border-brand-400 hover:bg-brand-50">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-700">
+            <IconSettings size={22} />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-bold text-ink">Ajustes</span>
+            <span className="block text-xs text-slate-500">mi tienda y datos</span>
+          </span>
         </Link>
       </div>
 

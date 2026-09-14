@@ -25,6 +25,7 @@ import {
   IconChevronRight,
   IconEdit,
   IconList,
+  IconRefresh,
   IconPlus,
   IconSparkles,
   IconTable,
@@ -66,6 +67,24 @@ function Review() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [openIn, setOpenIn] = useState<{ id: string; nonce: number } | null>(null);
   const [openPicker, setOpenPicker] = useState<{ step: string | null; nonce: number } | null>(null);
+  const [reanalyzing, setReanalyzing] = useState(false);
+
+  /** Vuelve a analizar la foto del producto actual (1 petición de IA). */
+  async function reanalyze() {
+    if (!current) return;
+    if (!confirm("La IA volverá a leer la foto y actualizará los datos y la categoría. Precio y stock se conservan.\n\nConsume 1 análisis de tu cupo diario. ¿Continuar?")) return;
+    setReanalyzing(true);
+    const res = await fetch("/api/reanalyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product_id: current.id }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { changed?: string[]; error?: string };
+    setReanalyzing(false);
+    if (!res.ok) return toast("error", json.error || "No se pudo volver a analizar");
+    await load();
+    toast("success", json.changed?.length ? `Actualizado: ${json.changed.map(fieldLabel).join(", ")}` : "La IA no encontró nada nuevo");
+  }
   // Gesto: deslizar la tarjeta a la derecha = confirmar, a la izquierda = siguiente
   const [dragX, setDragX] = useState(0);
   const drag = useRef<{ x: number; y: number; active: boolean; horizontal: boolean | null }>({ x: 0, y: 0, active: false, horizontal: null });
@@ -563,6 +582,11 @@ function Review() {
                 <IconTrash size={16} /> Eliminar
               </button>
             </div>
+            {current.image_url && (
+              <button onClick={reanalyze} disabled={saving || reanalyzing} className="btn-secondary w-full border-brand-300 text-brand-700">
+                {reanalyzing ? <Spinner size={16} /> : <IconRefresh size={16} />} ¿Se equivocó la IA? Volver a analizar la foto
+              </button>
+            )}
           </div>
         </div>
       </article>

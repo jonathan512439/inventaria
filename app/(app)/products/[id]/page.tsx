@@ -9,7 +9,8 @@ import { categoryPath } from "@/lib/categories";
 import { canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
-import { IconArrowLeft, IconCheck, IconEdit, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
+import { IconArrowLeft, IconCheck, IconEdit, IconRefresh, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
+import { useToast } from "@/components/ui/Toast";
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +26,29 @@ export default function ProductDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [moreActions, setMoreActions] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const toast = useToast();
+
+  /** Vuelve a analizar la foto con la IA (1 petición). Conserva precio, stock y datos manuales. */
+  async function reanalyze(keepCategory: boolean) {
+    if (!product) return;
+    const msg = keepCategory
+      ? "La IA volverá a leer la foto y actualizará nombre, marca, descripción… (se conservan precio, stock y la categoría actual)."
+      : "La IA volverá a leer la foto, actualizará los datos y podrá cambiar la categoría y subcategoría. Se conservan precio y stock.";
+    if (!confirm(`${msg}\n\nConsume 1 análisis de tu cupo diario. ¿Continuar?`)) return;
+    setReanalyzing(true);
+    const res = await fetch("/api/reanalyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product_id: product.id, keep_category: keepCategory }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { product?: Product; changed?: string[]; error?: string };
+    setReanalyzing(false);
+    if (!res.ok) return toast("error", json.error || "No se pudo volver a analizar");
+    await load();
+    const n = json.changed?.length ?? 0;
+    toast("success", n ? `Actualizado: ${json.changed!.map(fieldLabel).join(", ")}` : "La IA no encontró nada nuevo que cambiar");
+  }
 
   const load = useCallback(async () => {
     const [p, c, t] = await Promise.all([
@@ -63,9 +87,10 @@ export default function ProductDetailPage() {
       .eq("id", product.id);
     setSaving(false);
     if (error) return setError(error.message);
-    if (status === "confirmed") router.push("/products");
-    else if (status === "draft") router.push("/review");
-    else load();
+    toast("success", "Cambios guardados");
+    // Tras editar, se vuelve a la lista de donde vino el producto
+    if (status === "draft") router.push("/review");
+    else router.push("/products");
   }
 
   async function remove() {
@@ -115,6 +140,24 @@ export default function ProductDetailPage() {
               <div className="flex h-48 items-center justify-center text-sm text-slate-400">Sin foto</div>
             )}
           </div>
+          {/* Volver a analizar con IA */}
+          <div className="rounded-2xl border-2 border-brand-200 bg-brand-50/60 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-brand-900">
+              <IconSparkles size={14} className="text-brand-600" /> ¿La IA se equivocó?
+            </p>
+            <p className="mt-0.5 text-xs text-slate-600">Vuelve a leer la foto y corrige los datos. Precio y stock no se tocan.</p>
+            <div className="mt-2 grid gap-2">
+              <button onClick={() => reanalyze(false)} disabled={reanalyzing || !product.image_url} className="btn-primary btn-sm w-full justify-start">
+                {reanalyzing ? <Spinner size={14} /> : <IconRefresh size={16} />} Volver a analizar con IA
+                <span className="ml-auto text-[11px] font-normal opacity-80">puede recolocarlo</span>
+              </button>
+              <button onClick={() => reanalyze(true)} disabled={reanalyzing || !product.image_url} className="btn-secondary btn-sm w-full justify-start">
+                <IconRefresh size={16} className="text-brand-600" /> Solo actualizar los datos
+                <span className="ml-auto text-[11px] font-normal text-slate-500">mantiene la categoría</span>
+              </button>
+            </div>
+          </div>
+
           {product.ai_meta?.etiqueta && (
             <div className="flex gap-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
               <IconTag size={16} className="mt-0.5 shrink-0 text-slate-400" />
