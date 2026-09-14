@@ -83,7 +83,7 @@ export default function CategoryInventoryPage() {
   const title = isOrphan ? "Sin categoría" : top?.name ?? "…";
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto w-full max-w-3xl space-y-4 overflow-x-hidden">
       <header className="animate-in">
         <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -139,7 +139,7 @@ export default function CategoryInventoryPage() {
         <ProductTable products={visible} categories={categories} templates={templates} mode="confirmed" onChanged={() => location.reload()} />
       ) : (
         <>
-          <ul className="stagger mx-auto grid w-full max-w-3xl grid-cols-1 gap-3">
+          <ul className="stagger grid w-full grid-cols-1 gap-3">
             {visible.slice(0, limit).map((p) => (
               <ProductRow key={p.id} product={p} categories={categories} templates={templates} showSub={!sub} onAdjust={setAdjusting} />
             ))}
