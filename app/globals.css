@@ -3,6 +3,17 @@
 @tailwind utilities;
 
 @layer base {
+  /* Salvaguarda móvil: un texto largo sin cortes (truncate/nowrap) nunca ensancha una tarjeta
+     más allá de la pantalla. Las utilidades min-w-* siguen mandando por encima de esto. */
+  .grid > * {
+    min-width: 0;
+  }
+  img,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+
   html {
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;

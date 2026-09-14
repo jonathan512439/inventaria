@@ -166,7 +166,7 @@ function Templates() {
 
       <form onSubmit={addField} className="animate-in card space-y-3">
         <h2 className="font-semibold">Nuevo dato {scope ? `solo para "${categoryPath(categories, scope)}"` : ""}</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="fname">Nombre</label>
             <input id="fname" className="input" placeholder="Ej. talla, precio mayorista" value={fName} onChange={(e) => setFName(e.target.value)} required />

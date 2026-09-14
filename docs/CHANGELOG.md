@@ -3,6 +3,34 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-14 · Inventario visual, ventas y escáner
+
+### 7.1 Tarjetas del inventario: sin desborde en el celular (causa raíz)
+- **Qué**: las tarjetas de **Mi inventario** (estantes por categoría y resultados de búsqueda) se salían de la pantalla porque la cuadrícula no tenía columna definida en móvil y un texto largo sin cortes (nombre de categoría, lista de subcategorías) la ensanchaba. Ahora todas las cuadrículas de una columna lo declaran (`grid-cols-1`) y hay una salvaguarda global: ningún elemento de una cuadrícula puede ser más ancho que su columna (texto largo se corta con "…"). Verificado con captura real a 360 px y 390 px.
+- **Validar**: en el celular, Inventario → las tarjetas de categoría y las de productos (dentro de una categoría) terminan antes del borde derecho, con sombra y esquinas visibles; no hay scroll horizontal. Buscar un producto de nombre largo → la fila se corta con "…".
+
+### 7.2 Un solo botón para crear categoría con IA (Revisar)
+- **Qué**: cuando el producto no encaja en ninguna categoría, hay un único botón **Crear categoría y subcategoría con IA**: crea la categoría con sus subcategorías (incluida la que la IA sugirió para este producto) y **asigna el producto automáticamente**; se puede cambiar con *Cambiar*.
+- **Validar**: Revisar → producto sin categoría → tocar el botón → el producto queda en *Categoría › Subcategoría* y el aviso lo indica.
+
+### 7.3 Inventario: una fila por producto, atajo +/− Stock y ventas
+- **Qué**: dentro de una categoría cada producto ocupa una fila (foto, nombre, subcategoría, precio, stock, datos en cuadrícula con "Ver N datos más"). Botón **+/− Stock: sumar, vender o retirar** → al restar pregunta **¿Es una venta?**: *Sí* registra la venta (precio, total → ingresos); *No* solo resta (motivo). Nuevo panel **Ventas y movimientos** (`/movements`) con periodos, ingresos, más vendidos y lista; tarjeta **Ventas este mes** en Mi inventario. Tabla `stock_movements` (SQL `supabase/006_stock_movements.sql`, ya aplicado).
+- **Validar**: Inventario → categoría → **+/− Stock** en un producto → Restar → 2 → Sí, es venta → Confirmar; Mi inventario muestra el monto en *Ventas este mes* y `/movements` lista la venta.
+
+### 7.4 Plan v2 · Fase 1: inventario visual
+- **Qué**: Mi inventario muestra **estantes por categoría** (totales, unidades, valor de venta, alertas de agotados / sin precio / sin foto, subcategorías con conteo), búsqueda global y, al entrar, chips de subcategorías + filtros *Agotados / Sin precio / Sin foto / Agregados hoy* + Excel de esa categoría.
+- **Validar**: Inventario → tocar una categoría → chips de subcategorías filtran la lista; *Excel de …* descarga solo lo visible.
+
+### 7.5 Escáner de código de barras (sin IA)
+- **Qué**: `/scan` lee códigos con la cámara; si el producto ya existe lo muestra (con +/− Stock); si no, busca en 4 catálogos públicos (Open Food/Beauty/Products/Pet Food Facts), trae foto y categoría sugerida y lo da de alta **sin consumir análisis de IA**. Modo continuo para lotes, **beep + destello verde + pausa de 1,5 s** tras cada lectura; un mismo código se repite solo tras 4 s.
+- **Validar**: Agregar → *Escanear código* → apuntar a un envase → suena el beep y aparece la ficha; segundo escaneo del mismo código en <4 s se ignora.
+
+### 7.6 Botones con voz, re-análisis, limpieza e Inicio
+- **Qué**: textos de acción explícitos en Revisar / Agregar / detalle / tabla ("Confirmar y pasar al siguiente", "Guardar y seguir", etc.); al guardar vuelve con aviso *Cambios guardados*; **Volver a analizar con IA** en el detalle (mantiene lo editado a mano, opción de conservar categoría); tarjeta **Ordenar y limpiar** en el Inicio (borradores viejos, subcategorías vacías, fotos huérfanas) y accesos **Exportar** / **Ajustes** visibles.
+- **Validar**: Inicio → *Ordenar y limpiar* muestra conteos y ejecuta cada acción con confirmación; detalle de producto → *Más opciones* → *Volver a analizar*.
+
+---
+
 ### 5.2 Editar producto: botones centrados y sin desborde (móvil)
 - **Qué**: en el detalle del producto los botones se apilan a lo ancho (acción principal grande arriba: *Guardar en inventario* o *Guardar cambios*; debajo *Guardar sin confirmar* / *Pasar a pendientes* y *Eliminar*). La tarjeta va centrada (ancho máximo cómodo) y no puede desbordar la pantalla. En escritorio quedan en una fila.
 - **Validar**: Inventario → abrir un producto en el celular → todos los botones se ven completos, centrados y sin scroll horizontal.

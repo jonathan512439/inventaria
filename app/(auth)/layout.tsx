@@ -11,7 +11,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-fuchsia-200/40 blur-3xl" />
       </div>
 
-      <div className="mx-auto grid min-h-screen max-w-5xl items-center gap-8 px-4 py-8 md:grid-cols-2 md:px-8">
+      <div className="mx-auto grid min-h-screen max-w-5xl grid-cols-1 items-center gap-8 px-4 py-8 md:grid-cols-2 md:px-8">
         {/* Panel de marca */}
         <section className="animate-in text-center md:text-left">
           <div className="mb-5 inline-flex items-center gap-3">

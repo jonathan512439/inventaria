@@ -5,7 +5,7 @@ export function Skeleton({ className = "" }: { className?: string }) {
 
 export function ListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="grid gap-2 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="card flex items-center gap-3 p-3">
           <Skeleton className="h-16 w-16 shrink-0" />

@@ -110,11 +110,11 @@ export default function ProductsPage() {
           )}
 
           {/* Estantes */}
-          <ul className="stagger grid gap-3 md:grid-cols-2">
+          <ul className="stagger grid grid-cols-1 gap-3 md:grid-cols-2">
             {shelves.map((s) => {
               const col = categoryColor(s.category.name);
               return (
-                <li key={s.category.id}>
+                <li key={s.category.id} className="min-w-0">
                   <Link href={`/products/c/${s.category.id}`} className="press group block rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-900/10 transition hover:ring-brand-400" style={{ borderTop: `5px solid ${col.dot}` }}>
                     <div className="flex items-center gap-3">
                       <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl ring-1 ${col.bg} ${col.ring}`}>{s.category.icon || "🏷️"}</span>
@@ -187,12 +187,12 @@ function AlertLine({ alerts }: { alerts: Alerts }) {
 function SearchResults({ results, categories }: { results: Product[]; categories: Category[] }) {
   if (!results.length) return <p className="py-8 text-center text-sm text-slate-500">Nada coincide con tu búsqueda.</p>;
   return (
-    <ul className="stagger grid gap-2 md:grid-cols-2">
+    <ul className="stagger grid grid-cols-1 gap-2 md:grid-cols-2">
       {results.map((p) => {
         const stock = stockOf(p);
         const price = priceOf(p);
         return (
-          <li key={p.id}>
+          <li key={p.id} className="min-w-0">
             <Link href={`/products/${p.id}`} className="press flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 hover:ring-brand-400">
               {p.image_url ? <Photo src={p.image_url} wrapperClassName="h-14 w-14 shrink-0 rounded-xl" className="h-14 w-14 object-cover" /> : <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-400"><IconBox /></span>}
               <span className="min-w-0 flex-1">

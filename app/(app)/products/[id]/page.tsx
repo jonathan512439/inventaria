@@ -137,7 +137,7 @@ export default function ProductDetailPage() {
         </span>
       </div>
 
-      <div className="mx-auto grid w-full max-w-xl gap-5 md:max-w-none md:grid-cols-[340px_1fr]">
+      <div className="mx-auto grid w-full max-w-xl grid-cols-1 gap-5 md:max-w-none md:grid-cols-[340px_1fr]">
         <div className="animate-in space-y-3">
           <div className="card overflow-hidden p-0">
             {product.image_url ? (

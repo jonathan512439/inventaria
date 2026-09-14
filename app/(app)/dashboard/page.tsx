@@ -79,7 +79,7 @@ export default function DashboardPage() {
       {!allDone && <ProgressCard progress={progress} />}
 
       {/* Acciones principales */}
-      <div className="grid gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <Link
           href="/capture"
           className="animate-in group relative flex items-center gap-4 overflow-hidden rounded-3xl p-5 text-white shadow-float transition hover:brightness-110 active:scale-[0.99]"
