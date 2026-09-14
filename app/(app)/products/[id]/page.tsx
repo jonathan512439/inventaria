@@ -11,6 +11,9 @@ import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import { IconArrowLeft, IconCheck, IconEdit, IconRefresh, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
 import { useToast } from "@/components/ui/Toast";
+import StockAdjust from "@/components/StockAdjust";
+import { fmtMoney } from "@/lib/inventory";
+import type { StockMovement } from "@/types/database";
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +30,8 @@ export default function ProductDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [moreActions, setMoreActions] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
   const toast = useToast();
 
   /** Vuelve a analizar la foto con la IA (1 petición). Conserva precio, stock y datos manuales. */
@@ -58,6 +63,7 @@ export default function ProductDetailPage() {
     ]);
     setCategories(c.data ?? []);
     setTemplates(t.data ?? []);
+    supabase.from("stock_movements").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(8).then(({ data }) => setMovements((data ?? []) as StockMovement[]));
     if (!p.data) setNotFound(true);
     else {
       setProduct(p.data);
@@ -140,6 +146,28 @@ export default function ProductDetailPage() {
               <div className="flex h-48 items-center justify-center text-sm text-slate-400">Sin foto</div>
             )}
           </div>
+          {/* Sumar / restar stock */}
+          <button onClick={() => setAdjusting(true)} className="btn-primary w-full justify-start">
+            <IconCheck size={18} /> +/− Stock: sumar, vender o retirar
+            <span className="ml-auto text-xs font-normal opacity-80">sin editar el producto</span>
+          </button>
+          {movements.length > 0 && (
+            <div className="rounded-2xl border-2 border-slate-200 p-3">
+              <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Últimos movimientos</p>
+              <ul className="space-y-1 text-xs">
+                {movements.map((m) => (
+                  <li key={m.id} className="flex items-center gap-2">
+                    <span className={`w-14 shrink-0 rounded-full px-1.5 py-0.5 text-center font-bold ${m.tipo === "venta" ? "bg-emerald-100 text-emerald-800" : m.tipo === "entrada" ? "bg-brand-100 text-brand-800" : "bg-slate-200 text-slate-700"}`}>{m.tipo === "venta" ? "venta" : m.tipo === "entrada" ? "entrada" : "retiro"}</span>
+                    <span className="flex-1 text-slate-600">{new Date(m.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}{m.motivo ? ` · ${m.motivo}` : ""}</span>
+                    <span className="font-bold tabular-nums text-ink">{m.tipo === "entrada" ? "+" : "−"}{m.cantidad}</span>
+                    {m.tipo === "venta" && <span className="font-semibold text-emerald-700">Bs {fmtMoney(m.total ?? 0)}</span>}
+                  </li>
+                ))}
+              </ul>
+              <Link href="/movements" className="mt-2 inline-block text-xs font-semibold text-brand-700 hover:underline">Ver todos →</Link>
+            </div>
+          )}
+
           {/* Volver a analizar con IA */}
           <div className="rounded-2xl border-2 border-brand-200 bg-brand-50/60 p-3">
             <p className="flex items-center gap-1.5 text-xs font-bold text-brand-900">
@@ -232,6 +260,13 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </div>
+      {adjusting && product && (
+        <StockAdjust
+          product={{ ...product, data }}
+          onClose={() => setAdjusting(false)}
+          onSaved={() => load()}
+        />
+      )}
     </div>
   );
 }

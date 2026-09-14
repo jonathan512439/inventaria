@@ -33,6 +33,22 @@ export type FieldTemplate = {
 
 export type ProductData = Record<string, string | number | null>;
 
+export type MovementType = "entrada" | "venta" | "salida" | "ajuste";
+
+export type StockMovement = {
+  id: number;
+  user_id: string;
+  product_id: string | null;
+  product_name: string | null;
+  tipo: MovementType;
+  cantidad: number;
+  precio_unitario: number | null;
+  total: number | null;
+  motivo: string | null;
+  stock_resultante: number | null;
+  created_at: string;
+};
+
 export type AiUsage = {
   id: string;
   user_id: string | null;
@@ -95,6 +111,20 @@ export interface Database {
         Update: Partial<FieldTemplate>;
         Relationships: [];
       };
+      stock_movements: {
+        Row: StockMovement;
+        Insert: Omit<StockMovement, "id" | "created_at" | "precio_unitario" | "total" | "motivo" | "stock_resultante" | "product_name"> & {
+          id?: number;
+          created_at?: string;
+          precio_unitario?: number | null;
+          total?: number | null;
+          motivo?: string | null;
+          stock_resultante?: number | null;
+          product_name?: string | null;
+        };
+        Update: Partial<StockMovement>;
+        Relationships: [];
+      };
       ai_usage: {
         Row: AiUsage;
         Insert: Omit<AiUsage, "id" | "created_at" | "quota_limit"> & { id?: string; created_at?: string; quota_limit?: number | null };
@@ -118,7 +148,7 @@ export interface Database {
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
-    Enums: { field_type: FieldType; product_status: ProductStatus };
+    Enums: { field_type: FieldType; product_status: ProductStatus; movement_type: MovementType };
     CompositeTypes: { [_ in never]: never };
   };
 }

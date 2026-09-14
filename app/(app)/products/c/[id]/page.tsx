@@ -11,9 +11,10 @@ import { categoryColor } from "@/lib/colors";
 import { applyFilters, fmtMoney, priceOf, stockOf, type Filter } from "@/lib/inventory";
 import { exportToExcel } from "@/lib/export";
 import ProductTable from "@/components/ProductTable";
-import Photo from "@/components/ui/Photo";
+import ProductRow from "@/components/ProductRow";
+import StockAdjust from "@/components/StockAdjust";
 import { ListSkeleton } from "@/components/ui/Skeleton";
-import { IconArrowLeft, IconBox, IconCamera, IconDownload, IconGrid, IconTable } from "@/components/ui/Icons";
+import { IconArrowLeft, IconCamera, IconDownload, IconList, IconTable } from "@/components/ui/Icons";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "agotados", label: "Agotados" },
@@ -32,8 +33,9 @@ export default function CategoryInventoryPage() {
   const [loading, setLoading] = useState(true);
   const [sub, setSub] = useState<string | null>(null); // subcategoría elegida (null = toda la categoría)
   const [filters, setFilters] = useState<Set<Filter>>(new Set());
-  const [view, setView] = useState<"grid" | "table">("grid");
-  const [limit, setLimit] = useState(48);
+  const [view, setView] = useState<"list" | "table">("list");
+  const [limit, setLimit] = useState(40);
+  const [adjusting, setAdjusting] = useState<Product | null>(null);
 
   const isOrphan = id === "none";
 
@@ -96,8 +98,8 @@ export default function CategoryInventoryPage() {
             <button onClick={() => exportToExcel({ products: visible, categories, templates, fileName: title.toLowerCase().replace(/\s+/g, "-") })} className="btn-secondary btn-sm" disabled={!visible.length}>
               <IconDownload size={16} /> Excel de {sub ? "esta subcategoría" : title}
             </button>
-            <button onClick={() => setView(view === "grid" ? "table" : "grid")} className="btn-secondary btn-sm hidden md:inline-flex">
-              {view === "grid" ? <IconTable size={16} /> : <IconGrid size={16} />} {view === "grid" ? "Tabla" : "Cuadrícula"}
+            <button onClick={() => setView(view === "list" ? "table" : "list")} className="btn-secondary btn-sm hidden md:inline-flex">
+              {view === "list" ? <IconTable size={16} /> : <IconList size={16} />} {view === "list" ? "Tabla" : "Lista"}
             </button>
           </div>
         </div>
@@ -137,40 +139,23 @@ export default function CategoryInventoryPage() {
         <ProductTable products={visible} categories={categories} templates={templates} mode="confirmed" onChanged={() => location.reload()} />
       ) : (
         <>
-          <ul className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {visible.slice(0, limit).map((p) => {
-              const stock = stockOf(p);
-              const price = priceOf(p);
-              const out = (stock ?? 0) <= 0;
-              const subName = p.category_id && p.category_id !== top?.id ? categories.find((c) => c.id === p.category_id)?.name : null;
-              return (
-                <li key={p.id} className="min-w-0">
-                  <Link href={`/products/${p.id}`} className="press group flex h-full flex-col overflow-hidden rounded-3xl bg-white shadow-card ring-1 ring-slate-900/10 transition hover:ring-brand-400">
-                    <div className="relative aspect-square bg-slate-100">
-                      {p.image_url ? (
-                        <Photo src={p.image_url} loading="lazy" wrapperClassName="h-full w-full" className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="grid h-full w-full place-items-center text-slate-300"><IconBox size={36} /></span>
-                      )}
-                      {out && <span className="absolute left-2 top-2 rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white">Agotado</span>}
-                      {!sub && subName && <span className="absolute bottom-2 left-2 max-w-[90%] truncate rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">{subName}</span>}
-                    </div>
-                    <div className="flex flex-1 flex-col p-3">
-                      <span className="line-clamp-2 text-sm font-bold leading-tight text-ink">{productTitle(p.data) || "Sin nombre"}</span>
-                      <span className="mt-auto flex items-end justify-between pt-2">
-                        {price !== null ? <span className="text-base font-bold tabular-nums text-emerald-700">Bs {fmtMoney(price)}</span> : <span className="text-xs font-semibold text-amber-700">Sin precio</span>}
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${out ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"}`}>{stock ?? "—"} u.</span>
-                      </span>
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
+          <ul className="stagger mx-auto grid w-full max-w-3xl grid-cols-1 gap-3">
+            {visible.slice(0, limit).map((p) => (
+              <ProductRow key={p.id} product={p} categories={categories} templates={templates} showSub={!sub} onAdjust={setAdjusting} />
+            ))}
           </ul>
           {visible.length > limit && (
-            <button onClick={() => setLimit((l) => l + 48)} className="btn-secondary mx-auto block">Ver más ({visible.length - limit} restantes)</button>
+            <button onClick={() => setLimit((l) => l + 40)} className="btn-secondary mx-auto block">Ver más ({visible.length - limit} restantes)</button>
           )}
         </>
+      )}
+
+      {adjusting && (
+        <StockAdjust
+          product={adjusting}
+          onClose={() => setAdjusting(null)}
+          onSaved={(u) => setProducts((ps) => ps.map((x) => (x.id === u.id ? u : x)))}
+        />
       )}
     </div>
   );

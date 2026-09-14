@@ -11,7 +11,7 @@ import { computeShelves, fmtMoney, priceOf, stockOf, type Alerts } from "@/lib/i
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Photo from "@/components/ui/Photo";
 import { IllustrationCapture } from "@/components/guide/Illustrations";
-import { IconAlert, IconBox, IconCamera, IconChevronRight, IconDownload, IconPlus, IconSearch, IconTable } from "@/components/ui/Icons";
+import { IconAlert, IconBox, IconCamera, IconChevronRight, IconDownload, IconPlus, IconSearch, IconTable, IconTag } from "@/components/ui/Icons";
 
 /** Nivel 1 del inventario: estantes por categoría con totales y alertas. */
 export default function ProductsPage() {
@@ -20,6 +20,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [salesMonth, setSalesMonth] = useState<{ total: number; count: number } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -30,6 +31,11 @@ export default function ProductsPage() {
       setCategories(c.data ?? []);
       setProducts((p.data ?? []) as Product[]);
       setLoading(false);
+      const start = new Date();
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      const { data: sales } = await supabase.from("stock_movements").select("total").eq("tipo", "venta").gte("created_at", start.toISOString());
+      setSalesMonth({ total: (sales ?? []).reduce((s, r) => s + (r.total ?? 0), 0), count: (sales ?? []).length });
     })();
   }, [supabase]);
 
@@ -51,6 +57,7 @@ export default function ProductsPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/products/new" className="btn-primary btn-sm"><IconPlus size={16} /> Producto</Link>
+          <Link href="/movements" className="btn-secondary btn-sm border-emerald-400 text-emerald-800"><IconTag size={16} /> Ventas</Link>
           <Link href="/export" className="btn-secondary btn-sm"><IconDownload size={16} /> Excel</Link>
           <Link href="/products/table" className="btn-secondary btn-sm hidden md:inline-flex"><IconTable size={16} /> Tabla</Link>
         </div>
@@ -62,7 +69,11 @@ export default function ProductsPage() {
           <Stat label="Productos" value={String(total.products)} />
           <Stat label="Unidades" value={fmtMoney(total.units)} />
           <Stat label="Valor de venta" value={`Bs ${fmtMoney(total.saleValue)}`} tone="ok" />
-          <Stat label="Costo del stock" value={total.costValue ? `Bs ${fmtMoney(total.costValue)}` : "—"} hint={total.costValue ? undefined : "sin precio de compra"} />
+          <Link href="/movements" className="rounded-2xl bg-emerald-600 p-3 text-white shadow-card transition hover:brightness-110">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Ventas este mes</p>
+            <p className="text-xl font-bold tabular-nums">Bs {fmtMoney(salesMonth?.total ?? 0)}</p>
+            <p className="text-[11px] text-white/80">{salesMonth ? `${salesMonth.count} venta${salesMonth.count === 1 ? "" : "s"} · ver detalle` : "…"}</p>
+          </Link>
         </div>
       )}
 
