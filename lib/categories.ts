@@ -7,7 +7,7 @@ export type CategoryNode = Category & {
 
 /** Clave de comparación de nombres: sin mayúsculas, acentos ni espacios dobles ("Bebidas" = "bebidas" = "BEBÍDAS"). */
 export function nameKey(name: string): string {
-  return name.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ");
+  return name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
 }
 
 /** Busca una categoría por nombre equivalente (misma clave) entre las hermanas de `parentId`. */
