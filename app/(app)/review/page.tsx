@@ -261,7 +261,7 @@ function Review() {
   }
 
   /** Agrega un catálogo preconfigurado o crea una categoría nueva con la IA, y asigna el producto. */
-  async function setupAndAssign(body: { presets?: string[]; description?: string }, preferSubName?: string | null) {
+  async function setupAndAssign(body: { presets?: string[]; description?: string; ensure_section?: string }, preferSubName?: string | null) {
     setSettingUp(true);
     const res = await fetch("/api/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const json = (await res.json().catch(() => ({}))) as { error?: string; types?: string[] };
@@ -277,13 +277,19 @@ function Review() {
     setCategories(all);
     setTemplates(tpls ?? []);
     const typeName = json.types?.[0];
-    const top = all.find((c) => !c.parent_id && c.name.toLowerCase() === typeName?.toLowerCase());
+    const top = all.find((c) => !c.parent_id && nameKey(c.name) === nameKey(typeName ?? ""));
     setSettingUp(false);
     if (!top) return toast("error", "La categoría no se encontró tras crearla");
-    setDraft((d) => (d ? { ...d, categoryId: top.id } : d));
-    toast("success", `Categoría "${typeName}" lista`);
-    // Elegir la subcategoría automáticamente (coincidencia de texto o IA)
-    if (current) await autoSubcategory(current.id, top.id);
+    // Subcategoría: la que sugirió la IA si se creó; si no, la elige el clasificador
+    const sub = preferSubName ? all.find((c) => c.parent_id === top.id && nameKey(c.name) === nameKey(preferSubName)) : undefined;
+    if (sub) {
+      setDraft((d) => (d ? { ...d, categoryId: sub.id } : d));
+      toast("success", `Asignado a ${top.icon ? top.icon + " " : ""}${top.name} › ${sub.name}. Puedes cambiarlo con “Cambiar”.`);
+    } else {
+      setDraft((d) => (d ? { ...d, categoryId: top.id } : d));
+      toast("success", `Categoría "${typeName}" creada`);
+      if (current) await autoSubcategory(current.id, top.id);
+    }
   }
 
   // ---------- Vistas ----------
@@ -449,12 +455,13 @@ function Review() {
                   <button type="button" onClick={() => setOpenPicker({ step: draft.categoryId!, nonce: Date.now() })} className="chip">
                     <IconList size={14} /> Ver todas
                   </button>
-                  <button type="button" disabled={classifying} onClick={() => autoSubcategory(current.id, draft.categoryId!)} className="chip border-brand-400 bg-white text-brand-700">
-                    {classifying ? <Spinner size={14} /> : <IconSparkles size={14} />} Que la elija la IA
-                  </button>
-                  {meta.categoria_nueva && !categories.some((c) => c.parent_id === draft.categoryId && nameKey(c.name) === nameKey(meta.categoria_nueva!)) && (
-                    <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory(draft.categoryId)} className="chip border-brand-400 bg-white text-brand-700">
-                      <IconPlus size={14} /> Crear “{meta.categoria_nueva}”
+                  {meta.categoria_nueva && !categories.some((c) => c.parent_id === draft.categoryId && nameKey(c.name) === nameKey(meta.categoria_nueva!)) ? (
+                    <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory(draft.categoryId)} className="chip border-brand-500 bg-brand-600 text-white hover:bg-brand-700">
+                      <IconSparkles size={14} /> Crear subcategoría “{meta.categoria_nueva}” y asignar
+                    </button>
+                  ) : (
+                    <button type="button" disabled={classifying} onClick={() => autoSubcategory(current.id, draft.categoryId!)} className="chip border-brand-400 bg-white text-brand-700">
+                      {classifying ? <Spinner size={14} /> : <IconSparkles size={14} />} Que la elija la IA
                     </button>
                   )}
                 </div>
@@ -464,39 +471,26 @@ function Review() {
             {/* Sin categoría: opciones en orden de preferencia */}
             {!draft.categoryId && (
               <div className="mt-3 space-y-2 rounded-2xl bg-amber-50 p-3">
-                <p className="text-xs font-semibold text-amber-900">
-                  La IA no encontró una categoría adecuada entre las tuyas. Elige una opción:
+                <p className="text-sm font-semibold text-amber-900">Este producto no encaja en tus categorías.</p>
+                <p className="text-xs text-amber-800">
+                  La IA creará la categoría <b>{generalName || title || "nueva"}</b>
+                  {meta.categoria_nueva ? <> con la subcategoría <b>{meta.categoria_nueva}</b></> : " con sus subcategorías"} y sus datos, y pondrá este producto ahí. Luego puedes cambiarlo con <b>Cambiar</b>.
                 </p>
-                <button type="button" onClick={() => setOpenPicker({ step: null, nonce: Date.now() })} className="btn-secondary w-full justify-start">
-                  <IconList size={16} /> Elegir una de las mías
-                  <span className="ml-auto text-xs font-normal text-slate-500">{categories.length} disponibles</span>
+                <button
+                  type="button"
+                  disabled={settingUp}
+                  onClick={() =>
+                    setupAndAssign(
+                      { description: `${generalName || title || meta.etiqueta || "Productos varios"}. Ejemplo de producto: ${title || meta.etiqueta || ""}`, ensure_section: meta.categoria_nueva ?? undefined },
+                      meta.categoria_nueva
+                    )
+                  }
+                  className="btn-primary btn-lg w-full"
+                >
+                  {settingUp ? <Spinner size={18} /> : <IconSparkles size={20} />}
+                  {settingUp ? "Creando y asignando…" : "Crear categoría y subcategoría con IA"}
                 </button>
-                {meta.catalogo_sugerido && getPreset(meta.catalogo_sugerido) && (
-                  <button type="button" disabled={settingUp} onClick={() => setupAndAssign({ presets: [meta.catalogo_sugerido!] }, meta.categoria_nueva)} className="btn-primary w-full justify-start">
-                    {settingUp ? <Spinner size={16} /> : <IconPlus size={16} />}
-                    Agregar catálogo {getPreset(meta.catalogo_sugerido)!.icon} {getPreset(meta.catalogo_sugerido)!.name}
-                    <span className="ml-auto text-[11px] font-normal opacity-80">ya preparado</span>
-                  </button>
-                )}
-                {generalName && (
-                  <button type="button" disabled={settingUp} onClick={() => setupAndAssign({ description: `${generalName}. Ejemplo de producto: ${title || meta.etiqueta || ""}` }, meta.categoria_nueva)} className="btn-secondary w-full justify-start border-brand-400 text-brand-700">
-                    {settingUp ? <Spinner size={16} /> : <IconSparkles size={16} className="text-brand-600" />}
-                    Crear con IA la categoría “{generalName}”
-                    <span className="ml-auto text-[11px] font-normal text-slate-500">+ subcategorías y datos</span>
-                  </button>
-                )}
-                {meta.categoria_nueva && types.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory()} className="chip border-brand-400 bg-white text-brand-700">
-                      <IconPlus size={14} /> Crear subcategoría “{meta.categoria_nueva}”
-                    </button>
-                    <select className="input w-auto py-1.5 text-sm" value={newParent ?? types[0]?.id ?? ""} onChange={(e) => setNewParent(e.target.value)}>
-                      {types.map((t) => (
-                        <option key={t.id} value={t.id}>dentro de {t.icon ? `${t.icon} ` : ""}{t.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <p className="text-center text-[11px] text-amber-800">Consume 1 análisis · o toca <b>Cambiar</b> arriba para elegir una existente</p>
               </div>
             )}
           </section>

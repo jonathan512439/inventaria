@@ -11,6 +11,7 @@ export const runtime = "edge";
 interface Body {
   presets?: string[]; // ids de lib/presets
   description?: string; // "vendo repuestos de moto" → la IA genera la categoría
+  ensure_section?: string; // subcategoría que debe existir en la categoría generada (la que sugirió la IA para el producto)
   plain_names?: string[]; // categorías "solo con nombre": traen los datos básicos, sin subcategorías
   business_name?: string;
   onboarded?: boolean;
@@ -69,7 +70,12 @@ export async function POST(request: Request) {
       specs.push({
         name: g.name,
         icon: g.icon || "🏪",
-        sections: g.sections.slice(0, 10),
+        sections: (() => {
+          const secs = g.sections.slice(0, 10);
+          const want = body.ensure_section?.trim();
+          if (want && !secs.some((s) => nameKey(s) === nameKey(want))) secs.unshift(want.slice(0, 40));
+          return secs;
+        })(),
         fields: [
           { name: "nombre", field_type: "text", is_ai_fillable: true },
           { name: "marca", field_type: "text", is_ai_fillable: true },
