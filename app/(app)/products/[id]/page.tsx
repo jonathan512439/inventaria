@@ -105,7 +105,7 @@ export default function ProductDetailPage() {
         </span>
       </div>
 
-      <div className="grid gap-5 md:grid-cols-[340px_1fr]">
+      <div className="mx-auto grid w-full max-w-xl gap-5 md:max-w-none md:grid-cols-[340px_1fr]">
         <div className="animate-in space-y-3">
           <div className="card overflow-hidden p-0">
             {product.image_url ? (
@@ -122,7 +122,7 @@ export default function ProductDetailPage() {
           )}
         </div>
 
-        <div className="animate-in card space-y-4">
+        <div className="animate-in card min-w-0 space-y-4">
           <div>
             <label className="label">Categoría</label>
             <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} onCategoriesChange={setCategories} emptyLabel="Sin categoría" />
@@ -150,14 +150,19 @@ export default function ProductDetailPage() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div className="flex flex-wrap gap-2 pt-2">
-            <button className="btn-secondary" onClick={() => save()} disabled={saving}>Guardar</button>
+          {/* Acciones: apiladas y centradas en móvil, en fila en escritorio */}
+          <div className="grid w-full gap-2 pt-2 sm:grid-cols-[1fr_auto_auto]">
             {isDraft ? (
-              <button className="btn-success" onClick={() => save("confirmed")} disabled={saving}>✓ Guardar en inventario</button>
+              <button className="btn-success btn-lg w-full" onClick={() => save("confirmed")} disabled={saving}>✓ Guardar en inventario</button>
             ) : (
-              <button className="btn-ghost" onClick={() => save("draft")} disabled={saving}>↩ Pasar a pendientes</button>
+              <button className="btn-primary btn-lg w-full" onClick={() => save()} disabled={saving}>Guardar cambios</button>
             )}
-            <button className="btn-danger ml-auto" onClick={remove} disabled={saving}>Eliminar</button>
+            {isDraft ? (
+              <button className="btn-secondary w-full" onClick={() => save()} disabled={saving}>Guardar sin confirmar</button>
+            ) : (
+              <button className="btn-secondary w-full" onClick={() => save("draft")} disabled={saving}>↩ Pasar a pendientes</button>
+            )}
+            <button className="btn-danger w-full" onClick={remove} disabled={saving}>Eliminar</button>
           </div>
         </div>
       </div>
