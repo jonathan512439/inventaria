@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generatePreset, GeminiError } from "@/lib/gemini";
 import { getPreset, type PresetField } from "@/lib/presets";
+import { nameKey } from "@/lib/categories";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logUsage } from "@/lib/aiUsage";
 
@@ -96,11 +97,11 @@ export async function POST(request: Request) {
     supabase.from("categories").select("*"),
     supabase.from("field_templates").select("*"),
   ]);
-  const existingTop = new Map((cats ?? []).filter((c) => !c.parent_id).map((c) => [c.name.toLowerCase(), c]));
+  const existingTop = new Map((cats ?? []).filter((c) => !c.parent_id).map((c) => [nameKey(c.name), c]));
   const created: string[] = [];
 
   for (const spec of specs) {
-    let top = existingTop.get(spec.name.toLowerCase());
+    let top = existingTop.get(nameKey(spec.name));
     if (!top) {
       const { data, error } = await supabase
         .from("categories")
@@ -109,13 +110,13 @@ export async function POST(request: Request) {
         .single();
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       top = data;
-      existingTop.set(spec.name.toLowerCase(), data);
+      existingTop.set(nameKey(spec.name), data);
       created.push(spec.name);
     }
 
     // Subcategorías hijas que falten
-    const existingChildren = new Set((cats ?? []).filter((c) => c.parent_id === top!.id).map((c) => c.name.toLowerCase()));
-    const newSections = spec.sections.filter((s) => !existingChildren.has(s.toLowerCase()));
+    const existingChildren = new Set((cats ?? []).filter((c) => c.parent_id === top!.id).map((c) => nameKey(c.name)));
+    const newSections = spec.sections.filter((s) => !existingChildren.has(nameKey(s)));
     if (newSections.length) {
       const { error } = await supabase
         .from("categories")

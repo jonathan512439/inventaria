@@ -9,7 +9,7 @@ import PresetPicker from "@/components/PresetPicker";
 import { useToast } from "@/components/ui/Toast";
 import { IconArrowLeft, IconChevronRight, IconPlus, IconSparkles, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 import { categoryColor } from "@/lib/colors";
-import { getDescendantIds } from "@/lib/categories";
+import { findSibling, getDescendantIds } from "@/lib/categories";
 
 /**
  * "Mi tienda": las categorías (tipos de producto) con sus subcategorías.
@@ -52,6 +52,11 @@ export default function StorePage() {
 
   async function addSection() {
     if (!newSection || !newSection.name.trim()) return;
+    const dup = findSibling(categories, newSection.typeId, newSection.name);
+    if (dup) {
+      setNewSection(null);
+      return toast("info", `Ya existe la subcategoría “${dup.name}”`);
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();

@@ -5,6 +5,17 @@ export type CategoryNode = Category & {
   depth: number;
 }
 
+/** Clave de comparación de nombres: sin mayúsculas, acentos ni espacios dobles ("Bebidas" = "bebidas" = "BEBÍDAS"). */
+export function nameKey(name: string): string {
+  return name.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ");
+}
+
+/** Busca una categoría por nombre equivalente (misma clave) entre las hermanas de `parentId`. */
+export function findSibling(categories: Category[], parentId: string | null, name: string): Category | undefined {
+  const k = nameKey(name);
+  return categories.find((c) => (c.parent_id ?? null) === parentId && nameKey(c.name) === k);
+}
+
 /** Convierte la lista plana en un árbol ordenado por nombre. */
 export function buildTree(categories: Category[]): CategoryNode[] {
   const map = new Map<string, CategoryNode>();

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
-import { categoryPath } from "@/lib/categories";
+import { categoryPath, findSibling } from "@/lib/categories";
 import { applyDefaults, canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import { useQueue, queueSummary, removeByProductId } from "@/lib/queue";
 import { getPreset } from "@/lib/presets";
@@ -223,6 +223,11 @@ function Review() {
     const name = current?.ai_meta?.categoria_nueva;
     if (!name) return;
     const parent = parentOverride ?? newParent ?? types[0]?.id ?? null;
+    const dup = findSibling(categories, parent, name);
+    if (dup) {
+      setDraft((d) => (d ? { ...d, categoryId: dup.id } : d));
+      return toast("info", `Ya existía “${dup.name}”: asignada`);
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();

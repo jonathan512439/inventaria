@@ -7,6 +7,7 @@ import type { Category } from "@/types/database";
 import { useToast } from "./ui/Toast";
 import { IconArrowLeft, IconCheck, IconChevronRight, IconPlus, IconX, Spinner } from "./ui/Icons";
 import { categoryColor } from "@/lib/colors";
+import { findSibling } from "@/lib/categories";
 
 interface Props {
   categories: Category[];
@@ -68,6 +69,15 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
     if (!name) return;
     setBusy(true);
     if (creating === "cat") {
+      const dupTop = findSibling(categories, null, name);
+      if (dupTop) {
+        setBusy(false);
+        setCreating(null);
+        setNewName("");
+        toast("info", `Ya existe “${dupTop.name}”`);
+        setStep(dupTop.id);
+        return;
+      }
       const res = await fetch("/api/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plain_names: [name] }) });
       if (!res.ok) {
         setBusy(false);
@@ -85,6 +95,15 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
         setStep(created.id);
       }
     } else if (creating === "sub" && step) {
+      const dup = findSibling(categories, step, name);
+      if (dup) {
+        setBusy(false);
+        setCreating(null);
+        setNewName("");
+        toast("info", `Ya existe “${dup.name}”: la usamos`);
+        choose(dup.id);
+        return;
+      }
       const {
         data: { user },
       } = await supabase.auth.getUser();
