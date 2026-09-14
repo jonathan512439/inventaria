@@ -7,6 +7,11 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 - **Qué**: en el detalle del producto los botones se apilan a lo ancho (acción principal grande arriba: *Guardar en inventario* o *Guardar cambios*; debajo *Guardar sin confirmar* / *Pasar a pendientes* y *Eliminar*). La tarjeta va centrada (ancho máximo cómodo) y no puede desbordar la pantalla. En escritorio quedan en una fila.
 - **Validar**: Inventario → abrir un producto en el celular → todos los botones se ven completos, centrados y sin scroll horizontal.
 
+### 5.3 Carga por lotes
+- **Qué**: además de "Galería → varias a la vez" (ya existía), en escritorio hay una zona para **arrastrar y soltar** muchas fotos o **elegir una carpeta entera**; hasta 300 fotos por lote. Las fotos se preparan en tandas de 4 y se encolan en cuanto están listas (la IA empieza sin esperar al lote completo). Barra **"Lote: 37 de 100 listas · ≈ 3 min restantes"**.
+- **Validar**: en la computadora, Agregar → arrastra 10 fotos a la zona punteada → aparece la barra de lote y las miniaturas se van analizando; en el celular, Galería → selecciona 5 → igual.
+- **Nota**: con el plan gratuito de la IA (≈120 análisis/día en total) un lote grande puede pausarse hasta el día siguiente; la app lo avisa y continúa sola.
+
 ---
 
 ## 2026-09-13 · Fase 3 — Robustez · Fase 4 — Pruebas

@@ -21,31 +21,54 @@ export default function CapturePage() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [showCategory, setShowCategory] = useState(false);
   const [preparing, setPreparing] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [batch, setBatch] = useState<{ total: number; startedAt: number } | null>(null); // lote de esta sesión
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     supabase.from("categories").select("*").then(({ data }) => setCategories(data ?? []));
   }, [supabase]);
 
-  async function onPick(e: React.ChangeEvent<HTMLInputElement>, fromCamera: boolean) {
+  const MAX_BATCH = 300;
+
+  /** Prepara (redimensiona) y encola una lista de archivos; ignora los que no son imagen. */
+  async function addFiles(all: File[], fromCamera = false) {
+    const files = all.filter((f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)).slice(0, MAX_BATCH);
+    if (!files.length) return toast("error", "No hay imágenes en la selección");
+    if (all.length > MAX_BATCH) toast("info", `Se tomaron las primeras ${MAX_BATCH} fotos`);
+    navigator.vibrate?.(12);
+    setBatch((b) => ({ total: (b?.total ?? 0) + files.length, startedAt: b?.startedAt ?? Date.now() }));
+    setPreparing(files.length);
+    // Preparación en tandas de 4 para no bloquear la interfaz con lotes grandes
+    const blobs: Blob[] = [];
+    for (let i = 0; i < files.length; i += 4) {
+      const chunk = files.slice(i, i + 4);
+      const results = await Promise.allSettled(chunk.map((f) => resizeImage(f)));
+      results.forEach((r, j) => {
+        if (r.status === "fulfilled") blobs.push(r.value);
+        else toast("error", `No se pudo leer ${chunk[j].name}`);
+      });
+      setPreparing((n) => n - chunk.length);
+      if (blobs.length >= 8 || i + 4 >= files.length) {
+        enqueue(blobs.splice(0, blobs.length), categoryId); // encola en cuanto hay listas: la IA empieza sin esperar al lote entero
+      }
+    }
+    if (fromCamera) setTimeout(() => cameraRef.current?.click(), 250);
+  }
+
+  function onPick(e: React.ChangeEvent<HTMLInputElement>, fromCamera: boolean) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!files.length) return;
-    navigator.vibrate?.(12);
-    setPreparing(files.length);
-    const blobs: Blob[] = [];
-    for (const f of files) {
-      try {
-        blobs.push(await resizeImage(f));
-      } catch {
-        toast("error", `No se pudo leer ${f.name}`);
-      }
-      setPreparing((n) => n - 1);
-    }
-    if (blobs.length) enqueue(blobs, categoryId);
-    // En modo cámara, volvemos a abrirla para encadenar fotos
-    if (fromCamera && blobs.length) setTimeout(() => cameraRef.current?.click(), 250);
+    if (files.length) addFiles(files, fromCamera);
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length) addFiles(files);
   }
 
   const items = useMemo(() => [...queue.items].sort((a, b) => b.createdAt - a.createdAt), [queue.items]);
@@ -68,6 +91,8 @@ export default function CapturePage() {
 
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPick(e, true)} />
       <input ref={galleryRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPick(e, false)} />
+      {/* Carpeta completa (escritorio) */}
+      <input ref={folderRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPick(e, false)} {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} />
 
       {categories.length === 0 && (
         <Link href="/store" className="animate-in flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
@@ -91,8 +116,29 @@ export default function CapturePage() {
         <button type="button" onClick={() => galleryRef.current?.click()} className="btn-secondary btn-lg flex-col gap-1 py-6">
           <IconImages size={32} className="text-brand-600" />
           <span>Galería</span>
-          <span className="text-xs font-normal text-slate-500">elige varias</span>
+          <span className="text-xs font-normal text-slate-500">elige varias a la vez</span>
         </button>
+      </div>
+
+      {/* Escritorio: zona de arrastre + carpeta completa */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        className={`animate-in hidden items-center gap-4 rounded-3xl border-2 border-dashed p-5 transition md:flex ${
+          dragging ? "border-brand-500 bg-brand-50" : "border-slate-300 bg-white/60"
+        }`}
+      >
+        <IconImages size={36} className="shrink-0 text-brand-500" />
+        <div className="flex-1 text-sm">
+          <p className="font-semibold text-ink">Subir un lote desde la computadora</p>
+          <p className="text-slate-500">Arrastra aquí muchas fotos (o una carpeta entera). Hasta {MAX_BATCH} por lote; se van analizando solas.</p>
+        </div>
+        <button type="button" onClick={() => folderRef.current?.click()} className="btn-secondary">Elegir carpeta</button>
+        <button type="button" onClick={() => galleryRef.current?.click()} className="btn-primary">Elegir fotos</button>
       </div>
 
       {/* Categoría: automática por defecto */}
@@ -121,6 +167,29 @@ export default function CapturePage() {
           </div>
         )}
       </div>
+
+      {/* Progreso del lote */}
+      {batch && batch.total > 1 && (() => {
+        const pending = preparing + summary.queued + summary.processing;
+        const done = Math.max(0, batch.total - pending);
+        const pct = Math.round((done / batch.total) * 100);
+        const etaSec = Math.ceil((pending * 5) / 2); // ~5 s por foto, 2 en paralelo
+        const eta = etaSec >= 60 ? `${Math.ceil(etaSec / 60)} min` : `${etaSec} s`;
+        return (
+          <div className="animate-in rounded-3xl bg-ink p-4 text-white shadow-float">
+            <div className="flex items-end justify-between text-sm">
+              <span className="font-semibold">Lote: {done} de {batch.total} listas</span>
+              <span className="text-white/70">{pending > 0 ? `≈ ${eta} restantes` : "completado ✓"}</span>
+            </div>
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/15">
+              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundImage: "linear-gradient(90deg,#6366f1,#a78bfa)" }} />
+            </div>
+            {pending === 0 && (
+              <button onClick={() => setBatch(null)} className="mt-2 text-xs text-white/60 hover:text-white">Ocultar</button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Estado de la cola */}
       {(summary.total > 0 || preparing > 0) && (
