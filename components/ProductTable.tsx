@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData, ProductStatus } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { coerceValue, fieldLabel, getEffectiveFields } from "@/lib/fields";
+import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
+import { categoryColor } from "@/lib/colors";
+import { IconChevronRight } from "./ui/Icons";
 import FieldInput from "./FieldInput";
 
 interface Props {
@@ -25,6 +28,13 @@ export default function ProductTable({ products, categories, templates, mode, on
   const [edits, setEdits] = useState<Record<string, ProductData>>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleGroup = (k: string) =>
+    setCollapsed((c) => {
+      const n = new Set(c);
+      n.has(k) ? n.delete(k) : n.add(k);
+      return n;
+    });
 
   const groups = useMemo(() => {
     const map = new Map<string | null, Product[]>();
@@ -103,12 +113,31 @@ export default function ProductTable({ products, categories, templates, mode, on
       {groups.map(([catId, list]) => {
         const fields = getEffectiveFields(templates, categories, catId);
         const dirtyCount = list.filter((p) => isDirty(p.id)).length;
+        const cat = catId ? categories.find((c) => c.id === catId) ?? null : null;
+        const top = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) ?? cat : cat;
+        const col = categoryColor(top?.name);
+        const key = catId ?? "none";
+        const isCollapsed = collapsed.has(key);
+        const units = list.reduce((s, p) => s + (stockOf(p) ?? 0), 0);
+        const value = list.reduce((s, p) => s + (priceOf(p) ?? 0) * (stockOf(p) ?? 0), 0);
         return (
-          <section key={catId ?? "none"} className="card p-0">
+          <section key={key} className="card p-0" style={{ borderLeft: `5px solid ${col.dot}` }}>
             <header className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3">
-              <h2 className="flex-1 text-sm font-semibold">
-                {categoryPath(categories, catId)} <span className="font-normal text-slate-500">({list.length})</span>
-              </h2>
+              <button type="button" onClick={() => toggleGroup(key)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                <IconChevronRight size={18} className={`shrink-0 text-slate-400 transition ${isCollapsed ? "" : "rotate-90"}`} />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold text-ink">
+                    {top && cat && cat.id !== top.id ? (
+                      <><span className="text-slate-500">{top.icon ? `${top.icon} ` : ""}{top.name} › </span>{cat.name}</>
+                    ) : (
+                      <>{top?.icon ? `${top.icon} ` : ""}{categoryPath(categories, catId)}</>
+                    )}
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    {list.length} producto{list.length === 1 ? "" : "s"} · {fmtMoney(units)} unid.{value ? ` · Bs ${fmtMoney(value)}` : ""}
+                  </span>
+                </span>
+              </button>
               {dirtyCount > 0 && (
                 <button className="btn-secondary btn-sm" onClick={() => saveAll(list, fields)}>
                   Guardar cambios ({dirtyCount})
@@ -127,6 +156,7 @@ export default function ProductTable({ products, categories, templates, mode, on
               </p>
             )}
 
+            {!isCollapsed && (
             <div className="overflow-x-auto">
               <table className="w-full min-w-max text-sm">
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -193,6 +223,7 @@ export default function ProductTable({ products, categories, templates, mode, on
                 </tbody>
               </table>
             </div>
+            )}
           </section>
         );
       })}
