@@ -17,6 +17,17 @@ export default function AiUsageCard() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
+  async function adjust(model: string, name: string, used: number) {
+    const raw = prompt(`Consumo real de hoy para ${name} (peticiones usadas). Útil si usaste la clave fuera de la app.`, String(used));
+    if (raw === null) return;
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 0) return;
+    setLoading(true);
+    const res = await fetch("/api/usage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model, used: n }) });
+    if (res.ok) setData((await res.json()) as UsageData);
+    setLoading(false);
+  }
+
   async function load() {
     setLoading(true);
     const res = await fetch("/api/usage", { cache: "no-store" });
@@ -96,6 +107,9 @@ export default function AiUsageCard() {
                     <span className="block truncate text-[11px] text-white/50">{m.hint}</span>
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip}`}>{state}</span>
+                  <button onClick={() => adjust(m.model, m.name, m.used)} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/70 hover:bg-white/20" title="Ajustar consumo manualmente">
+                    ajustar
+                  </button>
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
                   <div className="h-full rounded-full transition-all duration-700" style={{ width: `${m.exhausted ? 100 : p}%`, backgroundImage: bar }} />
@@ -112,7 +126,8 @@ export default function AiUsageCard() {
             );
           })}
           <li className="pt-1 text-[11px] leading-snug text-white/50">
-            El cupo gratuito es por modelo y por día; la app usa el siguiente modelo cuando uno se agota. El conteo es de toda la app.
+            El cupo gratuito es por modelo y por día; la app usa el siguiente modelo cuando uno se agota. El conteo es de toda la app; si usas la misma clave
+            fuera de la app, corrígelo con “ajustar”.
           </li>
         </ul>
       )}

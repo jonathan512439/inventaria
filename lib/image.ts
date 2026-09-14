@@ -8,6 +8,14 @@ const QUALITY = 0.82;
  * Ahorra almacenamiento en Supabase y reduce el payload hacia Gemini.
  */
 export async function resizeImage(file: File, maxWidth = MAX_WIDTH): Promise<File> {
+  // iPhone: HEIC/HEIF → JPEG antes de procesar (el navegador no lo decodifica)
+  const isHeic = /image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+  if (isHeic) {
+    const { default: heic2any } = await import("heic2any");
+    const out = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+    const blob = Array.isArray(out) ? out[0] : out;
+    file = new File([blob], file.name.replace(/\.hei[cf]$/i, "") + ".jpg", { type: "image/jpeg" });
+  }
   const bitmap = await loadBitmap(file);
   const scale = Math.min(1, maxWidth / bitmap.width);
   const w = Math.round(bitmap.width * scale);

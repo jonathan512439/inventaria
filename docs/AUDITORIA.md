@@ -111,19 +111,19 @@ Leyenda de riesgo: **P** = probabilidad (1–5), **I** = impacto (1–5), **R = 
 3. **Cola idempotente**: `/api/analyze` devuelve el producto existente si el `product_id` ya está creado; la subida usa `upsert: true`.
 4. **Excel completo**: columnas = datos definidos **+ cualquier clave presente en los productos exportados**; cabeceras legibles ("Precio compra"); columnas **Categoría** y **Subcategoría** separadas; "una hoja por categoría" agrupa por categoría principal con columna Subcategoría; números como números; columnas Modelo IA y Etiqueta al final.
 
-### Fase 2 — Flujo de creación (siguiente)
+### Fase 2 — Flujo de creación ✅ aplicada
 5. **Alta manual de producto**: botón "+ Producto" en Inventario y Revisar → formulario con foto opcional, categoría y datos.
 6. **Eliminar categoría**: aviso explícito "se borrarán sus datos: X, Y" y opción de mover productos a otra categoría antes.
 7. "Guardar sin confirmar" avanza a la siguiente tarjeta; "Deshacer" vuelve a la tarjeta deshecha.
 8. Producto sin categoría: texto "Elige la categoría para completar precio y stock".
 
-### Fase 3 — Robustez
+### Fase 3 — Robustez ✅ aplicada
 9. Conversión HEIC → JPEG en el cliente (heic2any) y fallback a `<img>` cuando `createImageBitmap` falle.
 10. Login: si el correo no está confirmado, mensaje "Revisa tu correo" + botón *Reenviar confirmación*.
 11. Clasificación por texto solo con coincidencia de palabra completa.
 12. Medidor: opción "Ajustar consumo" manual y registro de llamadas externas por `GEMINI_API_KEY` compartida (documentado).
 
-### Fase 4 — Pruebas automatizadas
+### Fase 4 — Pruebas automatizadas ✅ aplicada (`npm run test:e2e`, `npm run ai:probe`)
 13. Script `npm run test:e2e` (ya existen scripts ad hoc): registro → categoría → foto sintética → revisar → exportar y comprobar el .xlsx (columnas y valores).
 14. Verificación semanal del cupo y modelos disponibles (`scripts/gemini-probe.mjs`).
 

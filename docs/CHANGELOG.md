@@ -5,6 +5,33 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
 ---
 
+## 2026-09-13 · Fase 3 — Robustez · Fase 4 — Pruebas
+
+### 3.1 Fotos HEIC (iPhone) (riesgo #9)
+- **Qué**: si la galería entrega `.heic/.heif`, se convierte a JPEG en el navegador (librería `heic2any`, se carga solo cuando hace falta) antes de redimensionar.
+- **Validar**: en iPhone, Agregar → Galería → foto HEIC → la miniatura aparece y se analiza sin "No se pudo leer".
+
+### 3.2 Login con correo sin confirmar (riesgo #10)
+- **Qué**: si el correo no está confirmado, el login muestra un aviso ámbar y el botón **Reenviar confirmación** (el enlace del correo funciona desde cualquier dispositivo).
+- **Validar**: con "Confirm email" activado en Supabase, regístrate y sin abrir el correo intenta entrar → aviso + botón; al pulsarlo, "Correo reenviado ✓".
+
+### 3.3 Subcategoría automática por palabra completa (riesgo #11)
+- **Qué**: la coincidencia por texto ahora exige palabras completas (sin acentos, ≥4 letras) en vez de fragmentos ("Baño" ya no coincide con "Bañador").
+- **Validar**: producto "Bañador azul" en Limpieza → no se asigna a "Baño"; queda en categoría general o lo decide la IA.
+
+### 3.4 Ajuste manual del medidor de IA (riesgo #13)
+- **Qué**: en Inicio → Consumo de IA → detalle por modelo → **ajustar**: escribes el consumo real de hoy (p. ej. si usaste la clave fuera de la app). Se registra como ajuste manual sin tocar el consumo real.
+- **Validar**: ajustar el Modelo Pro a 15 → la barra y "Restan" se actualizan; al volver a poner 10, baja.
+
+### 4.1 Prueba automatizada `npm run test:e2e`
+- Recorre: categoría preconfigurada + rápida → foto → producto con nombre, etiqueta y stock → reenvío idempotente → subcategoría automática → alta manual con decimales → medidor. Usuario temporal, se elimina al final. `BASE_URL=https://inventaria.pages.dev npm run test:e2e` para producción.
+- Resultado en local (2026-09-13): 11/11 ✓.
+
+### 4.2 Sonda de modelos `npm run ai:probe`
+- Muestra qué modelos de la cadena responden hoy y el cupo que reporta Google. Consume 1 petición por modelo.
+
+---
+
 ## 2026-09-13 · Fase 2 — Flujo de creación
 
 ### 2.1 Alta manual de producto (riesgo #5)

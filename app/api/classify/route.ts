@@ -37,8 +37,15 @@ export async function POST(request: Request) {
   const hint = product.ai_meta?.categoria_nueva ?? "";
   const text = `${hint} ${title} ${desc} ${product.ai_meta?.etiqueta ?? ""}`.toLowerCase();
 
-  // 1) coincidencia directa por nombre de subcategoría
-  let chosen = subs.find((s) => s.name.toLowerCase() === hint.toLowerCase()) ?? subs.find((s) => text.includes(s.name.toLowerCase()));
+  // 1) coincidencia directa por nombre de subcategoría (nombre exacto o palabra completa, sin acentos)
+  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const words = new Set(norm(text).split(/[^a-z0-9]+/).filter((w) => w.length >= 3));
+  let chosen =
+    subs.find((s) => norm(s.name) === norm(hint)) ??
+    subs.find((s) => {
+      const parts = norm(s.name).split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !["para", "con", "sin"].includes(w));
+      return parts.length > 0 && parts.every((w) => words.has(w));
+    });
 
   // 2) IA (solo texto)
   if (!chosen) {
