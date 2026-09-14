@@ -41,6 +41,31 @@ export default function ScanPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const loopRef = useRef<number | null>(null);
   const lastSeen = useRef<{ code: string; at: number }>({ code: "", at: 0 });
+  const pausedUntil = useRef(0); // tras cada lectura, pausa breve para no contar el mismo producto 2 o 3 veces
+  const [flash, setFlash] = useState<string | null>(null); // código recién leído (destello verde)
+  const audioRef = useRef<AudioContext | null>(null);
+
+  /** Beep corto (generado, sin archivo) + vibración. */
+  const beep = useCallback((repeat = false) => {
+    try {
+      const Ctx = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+      audioRef.current ??= new Ctx();
+      const ctx = audioRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.value = repeat ? 660 : 1320; // más grave si es un código repetido en el lote
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    } catch {
+      /* sin audio: la vibración y el destello bastan */
+    }
+    navigator.vibrate?.(repeat ? [20, 40, 20] : 35);
+  }, []);
 
   const [continuous, setContinuous] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -139,6 +164,14 @@ export default function ScanPage() {
   async function start() {
     setCamError(null);
     if (!continuous) setResult(null);
+    // iPhone solo permite sonido si el audio se inicia desde un toque: lo preparamos aquí (el botón)
+    try {
+      const Ctx = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+      audioRef.current ??= new Ctx();
+      await audioRef.current.resume();
+    } catch {
+      /* sin audio */
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } } });
       streamRef.current = stream;
@@ -148,18 +181,24 @@ export default function ScanPage() {
       await video.play();
       const tick = async () => {
         if (!streamRef.current) return;
-        if (video.readyState >= 2) {
+        const now = Date.now();
+        if (video.readyState >= 2 && now >= pausedUntil.current) {
           const found = await scanFrame(video);
           if (found) {
             if (!continuous) {
+              beep();
               stop();
               await lookup(found);
               return;
             }
-            // continuo: ignora el mismo código durante 2,5 s (evita contar de más)
-            const now = Date.now();
-            if (found !== lastSeen.current.code || now - lastSeen.current.at > 2500) {
+            // Lote: el mismo código solo cuenta otra vez si pasaron 4 s o se leyó otro código entre medias
+            const isRepeat = found === lastSeen.current.code;
+            if (!isRepeat || now - lastSeen.current.at > 4000) {
               lastSeen.current = { code: found, at: now };
+              beep(isRepeat);
+              setFlash(found);
+              pausedUntil.current = now + 1500; // pausa: 1,5 s sin leer nada
+              setTimeout(() => setFlash(null), 1500);
               addToList(found);
             }
           }
@@ -272,9 +311,14 @@ export default function ScanPage() {
         <div className="animate-in card space-y-3">
           <div className={`relative overflow-hidden rounded-2xl bg-slate-900 ${scanning ? "" : "hidden"}`}>
             <video ref={videoRef} playsInline muted className="h-64 w-full object-cover" />
-            <div className="pointer-events-none absolute inset-x-8 top-1/2 h-24 -translate-y-1/2 rounded-xl border-2 border-emerald-400/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+            <div className={`pointer-events-none absolute inset-x-8 top-1/2 h-24 -translate-y-1/2 rounded-xl border-2 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)] transition ${flash ? "border-emerald-300 bg-emerald-400/40" : "border-emerald-400/90"}`} />
+            {flash && (
+              <div className="pointer-events-none absolute inset-0 grid place-items-center">
+                <span className="animate-in rounded-full bg-emerald-500 px-4 py-2 text-lg font-bold text-white shadow-lg">✓ {flash}</span>
+              </div>
+            )}
             <span className="absolute inset-x-0 bottom-2 text-center text-xs font-semibold text-white">
-              {continuous ? `Sigue escaneando · ${rows.length} código${rows.length === 1 ? "" : "s"}` : "Apunta al código de barras"}
+              {flash ? "Leído · aparta el producto y pasa el siguiente" : continuous ? `Sigue escaneando · ${rows.length} código${rows.length === 1 ? "" : "s"}` : "Apunta al código de barras"}
             </span>
           </div>
           {!scanning ? (
@@ -445,7 +489,7 @@ export default function ScanPage() {
               <li className="flex gap-2"><b className="shrink-0 text-brand-700">2.</b><span><b>Catálogos públicos gratuitos</b> (Open Food, Beauty, Products y Pet Food Facts, consultados a la vez). Si el producto existe: nombre, marca, contenido, <b>foto</b> y una <b>categoría sugerida</b> de las tuyas. Guardas sin usar IA.</span></li>
               <li className="flex gap-2"><b className="shrink-0 text-brand-700">3.</b><span><b>No encontrado.</b> Escribes nombre y precio (el código se guarda igual) o pasas a la foto con IA.</span></li>
             </ol>
-            <p><b>Lote continuo:</b> la cámara sigue abierta; cada código se agrega a la lista y las repeticiones suman ×N. Al final, <i>Dar de alta</i> crea los nuevos con stock = veces escaneado y suma stock a los que ya tenías.</p>
+            <p><b>Lote continuo:</b> la cámara sigue abierta; cada código se agrega a la lista y las repeticiones suman ×N. Tras cada lectura suena un <b>beep</b>, la pantalla parpadea en verde y se hace una <b>pausa de 1,5 s</b> para que un producto no cuente 2 o 3 veces; el mismo código solo vuelve a contar si pasaron 4 s o leíste otro producto entre medias (beep más grave = repetido). Al final, <i>Dar de alta</i> crea los nuevos con stock = veces escaneado y suma stock a los que ya tenías.</p>
             <p><b>Ahorro:</b> nada de esta pantalla consume cupo de IA. Cada producto resuelto por código = 1 análisis ahorrado.</p>
             <p className="rounded-xl bg-amber-50 p-2 text-amber-900"><b>Límite:</b> los catálogos cubren productos envasados de marca (bebidas, abarrotes, limpieza, farmacia, cosmética, mascotas). Ropa, juguetes o productos locales sin registro solo aprovechan el paso 1; sus datos los da la foto con IA.</p>
           </div>
