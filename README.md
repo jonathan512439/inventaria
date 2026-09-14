@@ -6,6 +6,11 @@ MVP SaaS de inventario: el usuario define sus propias columnas por categoría, t
 
 ---
 
+## Documentación
+
+- [docs/AUDITORIA.md](docs/AUDITORIA.md): trazabilidad por endpoint/pantalla, riesgos y plan de depuración.
+- [docs/CHANGELOG.md](docs/CHANGELOG.md): cada cambio con su forma de validación.
+
 ## Estructura del proyecto
 
 ```

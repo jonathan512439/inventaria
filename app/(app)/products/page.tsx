@@ -7,7 +7,7 @@ import type { Category, FieldTemplate, Product } from "@/types/database";
 import { buildTree, categoryPath, getDescendantIds } from "@/lib/categories";
 import { normalizeFieldName, productTitle } from "@/lib/fields";
 import ProductTable from "@/components/ProductTable";
-import { IconBox, IconCamera, IconChevronRight, IconDownload, IconGrid, IconSearch, IconTable } from "@/components/ui/Icons";
+import { IconBox, IconCamera, IconChevronRight, IconDownload, IconGrid, IconPlus, IconSearch, IconTable } from "@/components/ui/Icons";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Photo from "@/components/ui/Photo";
 import { IllustrationCapture } from "@/components/guide/Illustrations";
@@ -76,6 +76,7 @@ export default function ProductsPage() {
           <p className="text-sm text-slate-500">{loading ? " " : `${products.length} producto${products.length === 1 ? "" : "s"}`}</p>
         </div>
         <div className="flex gap-2">
+          <Link href="/products/new" className="btn-primary btn-sm"><IconPlus size={16} /> Producto</Link>
           <Link href="/export" className="btn-secondary btn-sm"><IconDownload size={16} /> Excel</Link>
           <button onClick={() => setView(view === "cards" ? "table" : "cards")} className="btn-secondary btn-sm hidden md:inline-flex">
             {view === "cards" ? <IconTable size={16} /> : <IconGrid size={16} />}
@@ -116,7 +117,8 @@ export default function ProductsPage() {
           <div className="mx-auto h-[190px] w-[150px]"><IllustrationCapture /></div>
           <h2 className="mt-4 text-lg font-bold">Tu inventario está vacío</h2>
           <p className="mt-1 text-sm text-slate-500">Empieza tomando una foto de un producto.</p>
-          <Link href="/capture" className="btn-primary mt-5 w-full"><IconCamera size={18} /> Agregar productos</Link>
+          <Link href="/capture" className="btn-primary mt-5 w-full"><IconCamera size={18} /> Agregar con foto</Link>
+          <Link href="/products/new" className="btn-secondary mt-2 w-full"><IconPlus size={18} /> Escribirlo a mano</Link>
         </div>
       ) : view === "table" ? (
         <ProductTable products={visible} categories={categories} templates={templates} mode="confirmed" onChanged={load} />

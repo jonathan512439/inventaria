@@ -180,6 +180,7 @@ function Review() {
     if (error) return toast("error", error.message);
     if (status === "confirmed") {
       const id = current.id;
+      const position = index;
       navigator.vibrate?.(20);
       setLeaving(true);
       await new Promise((r) => setTimeout(r, 260));
@@ -193,12 +194,18 @@ function Review() {
         label: "Deshacer",
         onClick: async () => {
           await supabase.from("products").update({ status: "draft" }).eq("id", id);
-          load();
+          await load();
+          setIndex(position); // vuelve a la tarjeta deshecha
         },
       });
     } else {
       setProducts((list) => list.map((p) => (p.id === current.id ? { ...p, data: clean, category_id: draft.categoryId } : p)));
-      toast("success", "Cambios guardados");
+      toast("success", "Guardado. Sigue pendiente de confirmar");
+      // avanza a la siguiente tarjeta si la hay
+      if (index < products.length - 1) {
+        setIndex((i) => i + 1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     }
   }
 
@@ -282,8 +289,9 @@ function Review() {
           </h2>
           <p className="mt-1 text-sm text-slate-500">Toma más fotos cuando quieras.</p>
           <div className="mt-5 grid gap-2">
-            <Link href="/capture" className="btn-primary"><IconCamera size={18} /> Agregar productos</Link>
-            <Link href="/products" className="btn-secondary">Ver mi inventario</Link>
+            <Link href="/capture" className="btn-primary"><IconCamera size={18} /> Agregar con foto</Link>
+            <Link href="/products/new" className="btn-secondary"><IconPlus size={18} /> Escribir un producto a mano</Link>
+            <Link href="/products" className="btn-ghost">Ver mi inventario</Link>
           </div>
         </div>
       </Centered>
@@ -420,7 +428,7 @@ function Review() {
               </div>
             )}
             {!draft.categoryId && fields.length === 0 && (
-              <p className="mt-2 text-xs text-slate-500">Elige la categoría para ver y completar los datos del producto.</p>
+              <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Elige la categoría: ahí aparecerán el precio, el stock y los demás datos para completar.</p>
             )}
           </div>
 
