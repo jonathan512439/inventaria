@@ -16,6 +16,28 @@ export function findSibling(categories: Category[], parentId: string | null, nam
   return categories.find((c) => (c.parent_id ?? null) === parentId && nameKey(c.name) === k);
 }
 
+const STOP = new Set(["para", "con", "sin", "los", "las", "del", "por", "que", "otros", "otras", "varios", "varias"]);
+function words(name: string): string[] {
+  return nameKey(name).split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !STOP.has(w));
+}
+
+/** Subcategorías hermanas parecidas a un nombre propuesto (comparten alguna palabra o raíz). */
+export function findSimilar(categories: Category[], parentId: string | null, name: string, limit = 3): Category[] {
+  const ws = words(name);
+  if (!ws.length) return [];
+  const score = (c: Category) => {
+    const cw = words(c.name);
+    return cw.reduce((s, w) => s + (ws.some((x) => x === w || x.startsWith(w.slice(0, 5)) || w.startsWith(x.slice(0, 5))) ? 1 : 0), 0);
+  };
+  return categories
+    .filter((c) => (c.parent_id ?? null) === parentId)
+    .map((c) => ({ c, s: score(c) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, limit)
+    .map((x) => x.c);
+}
+
 /** Convierte la lista plana en un árbol ordenado por nombre. */
 export function buildTree(categories: Category[]): CategoryNode[] {
   const map = new Map<string, CategoryNode>();

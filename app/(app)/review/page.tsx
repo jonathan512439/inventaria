@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
-import { categoryPath, findSibling } from "@/lib/categories";
+import { categoryPath, findSibling, findSimilar } from "@/lib/categories";
 import { applyDefaults, canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import { useQueue, queueSummary, removeByProductId } from "@/lib/queue";
 import { getPreset } from "@/lib/presets";
@@ -391,9 +391,16 @@ function Review() {
                   </button>
                 )}
                 {meta.categoria_nueva && !categories.some((c) => c.parent_id === draft.categoryId && c.name.toLowerCase() === meta.categoria_nueva!.toLowerCase()) && (
-                  <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory(draft.categoryId)} className="chip border-brand-300 bg-white text-brand-700">
-                    <IconPlus size={14} /> Subcategoría “{meta.categoria_nueva}” aquí
-                  </button>
+                  <>
+                    {findSimilar(categories, draft.categoryId, meta.categoria_nueva).map((c) => (
+                      <button key={c.id} type="button" onClick={() => setDraft({ ...draft, categoryId: c.id })} className="chip border-emerald-300 bg-emerald-50 text-emerald-800" title="Ya existe una parecida">
+                        <IconCheck size={14} /> Usar “{c.name}”
+                      </button>
+                    ))}
+                    <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory(draft.categoryId)} className="chip border-brand-300 bg-white text-brand-700">
+                      <IconPlus size={14} /> Crear “{meta.categoria_nueva}”
+                    </button>
+                  </>
                 )}
               </div>
             )}

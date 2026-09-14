@@ -14,7 +14,8 @@
     "db:sql": "node scripts/supabase-sql.mjs",
     "supabase:auth": "node scripts/supabase-auth-config.mjs",
     "test:e2e": "node scripts/test-e2e.mjs",
-    "ai:probe": "node scripts/gemini-probe.mjs"
+    "ai:probe": "node scripts/gemini-probe.mjs",
+    "storage:clean": "node scripts/cleanup-orphans.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

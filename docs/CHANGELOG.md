@@ -12,6 +12,11 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 - **Validar**: en la computadora, Agregar → arrastra 10 fotos a la zona punteada → aparece la barra de lote y las miniaturas se van analizando; en el celular, Galería → selecciona 5 → igual.
 - **Nota**: con el plan gratuito de la IA (≈120 análisis/día en total) un lote grande puede pausarse hasta el día siguiente; la app lo avisa y continúa sola.
 
+### 5.4 Control de proliferación de categorías y almacenamiento
+- **Qué**: (a) la IA prefiere siempre una subcategoría existente y, si propone una nueva, debe ser genérica (un tipo de producto, no un producto); (b) en Revisar, antes de "Crear X" se ofrecen las subcategorías parecidas que ya existen ("Usar 'Limpiadores'"); (c) Mi tienda muestra **Limpiar vacías** cuando hay ≥5 subcategorías sin productos; (d) script `npm run storage:clean` borra fotos huérfanas del bucket.
+- **Validar**: en Revisar, un producto sin subcategoría con sugerencia parecida a una existente muestra primero el chip verde "Usar …". En Mi tienda con muchas subcategorías vacías aparece el aviso con "Limpiar vacías".
+- **Cifras medidas (2026-09-14)**: 24 fotos = 2,57 MB (109 KB promedio) → ≈ 9 500 fotos en el GB gratuito; base de datos 11 MB de 500 MB; un producto ≈ 0,9 KB, una categoría ≈ 0,1 KB.
+
 ---
 
 ## 2026-09-13 · Fase 3 — Robustez · Fase 4 — Pruebas

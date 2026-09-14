@@ -28,6 +28,18 @@ export default function StorePage() {
   const [removing, setRemoving] = useState<{ cat: Category; isType: boolean; moveTo: string | "" } | null>(null);
   const [removeBusy, setRemoveBusy] = useState(false);
 
+  /** Subcategorías sin ningún producto (candidatas a limpieza). */
+  const emptySubs = useMemo(() => categories.filter((c) => c.parent_id && !counts.get(c.id)), [categories, counts]);
+
+  async function cleanEmpty() {
+    if (!emptySubs.length) return;
+    if (!confirm(`¿Eliminar ${emptySubs.length} subcategorías sin productos? (Las categorías principales se conservan.)`)) return;
+    const { error } = await supabase.from("categories").delete().in("id", emptySubs.map((c) => c.id));
+    if (error) return toast("error", error.message);
+    toast("success", `${emptySubs.length} subcategorías vacías eliminadas`);
+    load();
+  }
+
   const load = useCallback(async () => {
     const [c, t, p] = await Promise.all([
       supabase.from("categories").select("*").order("name"),
@@ -111,6 +123,14 @@ export default function StorePage() {
         <div className="flex justify-center py-10"><Spinner size={28} className="text-brand-500" /></div>
       ) : (
         <>
+          {emptySubs.length >= 5 && (
+            <div className="animate-in flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm">
+              <span className="flex-1 text-slate-700">
+                Tienes <b>{emptySubs.length} subcategorías sin productos</b>. Las vacías no ocupan casi espacio, pero ensucian el selector y el Excel.
+              </span>
+              <button onClick={cleanEmpty} className="btn-secondary btn-sm"><IconTrash size={14} /> Limpiar vacías</button>
+            </div>
+          )}
           {types.length === 0 && !adding && (
             <div className="animate-in card bg-gradient-to-br from-brand-600 to-violet-600 text-white ring-0">
               <p className="flex items-center gap-2 text-lg font-semibold"><IconSparkles className="text-amber-300" /> Empieza eligiendo qué vendes</p>

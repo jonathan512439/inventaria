@@ -70,7 +70,7 @@ export function buildResponseSchema(fields: FieldTemplate[], ctx: PromptContext)
   properties[META_KEYS.categoriaNueva] = {
     type: "STRING",
     description:
-      "Nombre corto de la subcategoría que le correspondería a este producto cuando NO existe una adecuada: si elegiste una categoría general (sin subcategoría), si ninguna categoría encaja, o si no hay categorías. Si ya elegiste una subcategoría concreta, cadena vacía.",
+      "Solo cuando NO existe una subcategoría adecuada: nombre corto y GENÉRICO de subcategoría (un tipo de producto, no un producto concreto; p. ej. 'Limpiadores' y no 'Limpia lentes Claro'). Si ya elegiste una subcategoría concreta, cadena vacía.",
   };
   order.push(META_KEYS.categoriaNueva);
   if (!ctx.fixedCategoryPath && ctx.catalogs?.length) {
@@ -136,6 +136,7 @@ export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string
     "Si un campo pertenece a otro tipo de producto y no tiene sentido para este (p. ej. talla_casco en una bebida), déjalo vacío; nunca escribas 'No aplica'.",
     'Para "nombre" usa un nombre comercial corto y útil para buscar (marca + producto + variante, máx. 8 palabras). Para "descripcion" 1-2 frases concretas.',
     catLine,
+    "Prefiere SIEMPRE una subcategoría existente aunque no sea perfecta; propón una nueva solo si ninguna tiene relación. Las subcategorías nuevas deben ser genéricas (agrupan muchos productos), nunca el nombre de un producto.",
     catalogLine,
     `Campos a completar:\n${fieldList}`,
   ].join("\n");
