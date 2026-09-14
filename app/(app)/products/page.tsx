@@ -7,7 +7,7 @@ import type { Category, Product } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import { categoryColor } from "@/lib/colors";
-import { computeShelves, fmtMoney, priceOf, stockOf, type Alerts } from "@/lib/inventory";
+import { computeShelves, fmtMoney, priceOf, stockOf, timeAgo, LOW_STOCK_MAX, type CategoryStats } from "@/lib/inventory";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Photo from "@/components/ui/Photo";
 import { IllustrationCapture } from "@/components/guide/Illustrations";
@@ -65,10 +65,21 @@ export default function ProductsPage() {
 
       {/* Resumen */}
       {!loading && total.products > 0 && (
-        <div className="animate-in grid grid-cols-2 gap-2 md:grid-cols-4">
-          <Stat label="Productos" value={String(total.products)} />
-          <Stat label="Unidades" value={fmtMoney(total.units)} />
-          <Stat label="Valor de venta" value={`Bs ${fmtMoney(total.saleValue)}`} tone="ok" />
+        <div className="animate-in grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+          <Stat label="Productos" value={String(total.products)} hint={`en ${shelves.length} categoría${shelves.length === 1 ? "" : "s"}`} />
+          <Stat label="Unidades" value={fmtMoney(total.units)} hint={total.lowStock ? `${total.lowStock} con poco stock` : "en existencia"} />
+          <Stat label="Valor de venta" value={`Bs ${fmtMoney(total.saleValue)}`} tone="ok" hint="precio × stock" />
+          {total.costValue > 0 ? (
+            <Stat label="Ganancia estimada" value={`Bs ${fmtMoney(total.saleValue - total.costValue)}`} tone="ok" hint={`costo Bs ${fmtMoney(total.costValue)}`} />
+          ) : (
+            <Stat label="Ganancia estimada" value="—" hint="agrega precio de compra" />
+          )}
+          <Stat
+            label="Por atender"
+            value={String(total.alerts.agotados + total.alerts.sinPrecio)}
+            tone={total.alerts.agotados + total.alerts.sinPrecio ? "warn" : undefined}
+            hint={total.alerts.agotados + total.alerts.sinPrecio ? `${total.alerts.agotados} agotados · ${total.alerts.sinPrecio} sin precio` : "todo en orden"}
+          />
           <Link href="/movements" className="rounded-2xl bg-emerald-600 p-3 text-white shadow-card transition hover:brightness-110">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Ventas este mes</p>
             <p className="text-xl font-bold tabular-nums">Bs {fmtMoney(salesMonth?.total ?? 0)}</p>
@@ -110,36 +121,66 @@ export default function ProductsPage() {
           )}
 
           {/* Estantes */}
-          <ul className="stagger grid grid-cols-1 gap-3 md:grid-cols-2">
+          <ul className="stagger grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {shelves.map((s) => {
               const col = categoryColor(s.category.name);
               return (
                 <li key={s.category.id} className="min-w-0">
-                  <Link href={`/products/c/${s.category.id}`} className="press group block rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-900/10 transition hover:ring-brand-400" style={{ borderTop: `5px solid ${col.dot}` }}>
+                  <Link href={`/products/c/${s.category.id}`} className="press group flex h-full flex-col rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-900/10 transition hover:ring-brand-400" style={{ borderTop: `5px solid ${col.dot}` }}>
                     <div className="flex items-center gap-3">
                       <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl ring-1 ${col.bg} ${col.ring}`}>{s.category.icon || "🏷️"}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-lg font-bold text-ink">{s.category.name}</span>
                         <span className="block text-xs text-slate-500">
-                          {s.products} producto{s.products === 1 ? "" : "s"} · {fmtMoney(s.units)} unid. · {s.children.length} subcategoría{s.children.length === 1 ? "" : "s"}
+                          {s.products} producto{s.products === 1 ? "" : "s"} · {s.children.length} subcategoría{s.children.length === 1 ? "" : "s"}
                         </span>
                       </span>
                       <IconChevronRight className="shrink-0 text-slate-300 group-hover:text-brand-500" />
                     </div>
-                    <AlertLine alerts={s.alerts} />
+
+                    {/* Cifras */}
+                    <dl className="mt-3 grid grid-cols-3 gap-2">
+                      <Mini label="Unidades" value={fmtMoney(s.units)} />
+                      <Mini label="Valor venta" value={s.saleValue > 0 ? `Bs ${fmtMoney(s.saleValue)}` : "—"} tone="ok" />
+                      {s.costValue > 0 ? (
+                        <Mini label="Ganancia" value={`Bs ${fmtMoney(s.saleValue - s.costValue)}`} tone="ok" />
+                      ) : (
+                        <Mini label="Poco stock" value={String(s.lowStock)} tone={s.lowStock ? "warn" : undefined} />
+                      )}
+                    </dl>
+
+                    <AlertLine stats={s} />
+
+                    {/* Subcategorías */}
                     {s.children.length > 0 && (
-                      <p className="mt-2 truncate text-xs text-slate-500">
-                        {s.children.filter((c) => c.products > 0).map((c) => `${c.category.name} ${c.products}`).join(" · ") || "sin productos en subcategorías"}
+                      <p className="mt-2 flex flex-wrap gap-1">
+                        {s.children.slice(0, 6).map((c) => (
+                          <span key={c.category.id} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${c.products ? `${col.bg} ${col.text}` : "bg-slate-100 text-slate-400"}`}>
+                            {c.category.name} <b>{c.products}</b>
+                          </span>
+                        ))}
+                        {s.children.length > 6 && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">+{s.children.length - 6}</span>}
                       </p>
                     )}
-                    {s.saleValue > 0 && <p className="mt-1 text-xs font-semibold text-emerald-700">Valor de venta Bs {fmtMoney(s.saleValue)}</p>}
+
+                    {/* Pie: último agregado y el más valioso */}
+                    {(s.lastAdded || s.topProduct) && (
+                      <p className="mt-auto pt-3 text-[11px] leading-snug text-slate-500">
+                        {s.lastAdded && <span className="block truncate">Último agregado <b className="text-slate-700">{timeAgo(s.lastAdded)}</b></span>}
+                        {s.topProduct && (
+                          <span className="block truncate">
+                            Más valor en stock: <b className="text-slate-700">{productTitle(s.topProduct.product.data) || "Sin nombre"}</b> · Bs {fmtMoney(s.topProduct.value)}
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </Link>
                 </li>
               );
             })}
             {orphan.products > 0 && (
               <li>
-                <Link href="/products/c/none" className="press group block rounded-3xl border-2 border-dashed border-amber-300 bg-amber-50/60 p-4 transition hover:border-amber-500">
+                <Link href="/products/c/none" className="press group flex h-full flex-col justify-center rounded-3xl border-2 border-dashed border-amber-300 bg-amber-50/60 p-4 transition hover:border-amber-500">
                   <div className="flex items-center gap-3">
                     <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700"><IconAlert size={22} /></span>
                     <span className="min-w-0 flex-1">
@@ -158,19 +199,32 @@ export default function ProductsPage() {
   );
 }
 
-function Stat({ label, value, tone, hint }: { label: string; value: string; tone?: "ok"; hint?: string }) {
+const TONE = { ok: "text-emerald-700", warn: "text-amber-700", none: "text-ink" };
+
+function Stat({ label, value, tone, hint }: { label: string; value: string; tone?: "ok" | "warn"; hint?: string }) {
   return (
     <div className="rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`text-xl font-bold tabular-nums ${tone === "ok" ? "text-emerald-700" : "text-ink"}`}>{value}</p>
-      {hint && <p className="text-[11px] text-slate-400">{hint}</p>}
+      <p className={`text-xl font-bold tabular-nums ${TONE[tone ?? "none"]}`}>{value}</p>
+      {hint && <p className="truncate text-[11px] text-slate-400">{hint}</p>}
     </div>
   );
 }
 
-function AlertLine({ alerts }: { alerts: Alerts }) {
+function Mini({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-slate-50 px-2 py-1.5">
+      <dt className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
+      <dd className={`m-0 truncate text-sm font-bold tabular-nums ${TONE[tone ?? "none"]}`}>{value}</dd>
+    </div>
+  );
+}
+
+function AlertLine({ stats }: { stats: CategoryStats }) {
+  const { alerts } = stats;
   const items = [
     alerts.agotados ? { t: `${alerts.agotados} agotado${alerts.agotados === 1 ? "" : "s"}`, c: "bg-rose-100 text-rose-700" } : null,
+    stats.lowStock ? { t: `${stats.lowStock} con ≤${LOW_STOCK_MAX} unid.`, c: "bg-orange-100 text-orange-800" } : null,
     alerts.sinPrecio ? { t: `${alerts.sinPrecio} sin precio`, c: "bg-amber-100 text-amber-800" } : null,
     alerts.sinFoto ? { t: `${alerts.sinFoto} sin foto`, c: "bg-slate-100 text-slate-600" } : null,
   ].filter(Boolean) as { t: string; c: string }[];
@@ -187,7 +241,7 @@ function AlertLine({ alerts }: { alerts: Alerts }) {
 function SearchResults({ results, categories }: { results: Product[]; categories: Category[] }) {
   if (!results.length) return <p className="py-8 text-center text-sm text-slate-500">Nada coincide con tu búsqueda.</p>;
   return (
-    <ul className="stagger grid grid-cols-1 gap-2 md:grid-cols-2">
+    <ul className="stagger grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
       {results.map((p) => {
         const stock = stockOf(p);
         const price = priceOf(p);

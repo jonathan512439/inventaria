@@ -80,7 +80,7 @@ export default function Nav() {
     <>
       {/* Escritorio: barra superior */}
       <header className="sticky top-0 z-30 hidden border-b border-slate-200/70 bg-white/80 backdrop-blur-md md:block">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 items-center justify-between px-6 xl:px-10 2xl:px-14">
           <Link href="/dashboard">
             <LogoWordmark />
           </Link>

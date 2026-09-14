@@ -74,7 +74,7 @@ export default function MovementsPage() {
   const TABS: { k: Tab; t: string }[] = [{ k: "venta", t: "Ventas" }, { k: "entrada", t: "Entradas" }, { k: "salida", t: "Retiros" }, { k: "todos", t: "Todo" }];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="w-full space-y-5">
       <header className="animate-in">
         <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Ventas y movimientos</h1>
@@ -88,7 +88,7 @@ export default function MovementsPage() {
       </div>
 
       {/* Resumen */}
-      <div className="animate-in grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="animate-in grid grid-cols-2 gap-2 md:grid-cols-4 xl:max-w-4xl">
         <div className="rounded-3xl bg-emerald-600 p-4 text-white shadow-float">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Ingresos por ventas</p>
           <p className="text-2xl font-bold tabular-nums">Bs {fmtMoney(ingresos)}</p>
@@ -127,7 +127,7 @@ export default function MovementsPage() {
       ) : list.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-500">Sin movimientos en este periodo. Usa <b>+/− Stock</b> en un producto del inventario.</p>
       ) : (
-        <ul className="stagger space-y-2">
+        <ul className="stagger grid grid-cols-1 gap-2 xl:grid-cols-2">
           {list.map((r) => {
             const l = LABEL[r.tipo];
             return (

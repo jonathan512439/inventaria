@@ -34,7 +34,12 @@ export interface CategoryStats {
   saleValue: number;
   costValue: number;
   alerts: Alerts;
-  children: { category: Category; products: number }[];
+  lowStock: number;
+  children: { category: Category; products: number; units: number }[];
+  /** Producto que más valor de venta acumula (precio × stock) */
+  topProduct: { product: Product; value: number } | null;
+  /** Fecha del último producto agregado */
+  lastAdded: string | null;
 }
 
 export interface Summary {
@@ -43,7 +48,11 @@ export interface Summary {
   saleValue: number;
   costValue: number;
   alerts: Alerts;
+  /** Productos con 1–LOW_STOCK_MAX unidades: conviene reponer */
+  lowStock: number;
 }
+
+export const LOW_STOCK_MAX = 3;
 
 function alertsOf(list: Product[]): Alerts {
   return {
@@ -62,7 +71,21 @@ function summarize(list: Product[]): Summary {
     saleValue += (priceOf(p) ?? 0) * s;
     costValue += (costOf(p) ?? 0) * s;
   }
-  return { products: list.length, units, saleValue, costValue, alerts: alertsOf(list) };
+  const lowStock = list.filter((p) => {
+    const s = stockOf(p) ?? 0;
+    return s > 0 && s <= LOW_STOCK_MAX;
+  }).length;
+  return { products: list.length, units, saleValue, costValue, alerts: alertsOf(list), lowStock };
+}
+
+/** "hoy", "ayer", "hace 3 días", "hace 2 meses" */
+export function timeAgo(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days <= 0) return "hoy";
+  if (days === 1) return "ayer";
+  if (days < 30) return `hace ${days} días`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? "hace 1 mes" : `hace ${months} meses`;
 }
 
 /** Estadísticas por categoría principal (incluye sus subcategorías) + productos sin categoría. */
@@ -77,9 +100,16 @@ export function computeShelves(products: Product[], categories: Category[]) {
       .sort((a, b) => a.name.localeCompare(b.name, "es"))
       .map((c) => {
         const cids = new Set(getDescendantIds(categories, c.id));
-        return { category: c, products: products.filter((p) => p.category_id && cids.has(p.category_id)).length };
+        const inSub = products.filter((p) => p.category_id && cids.has(p.category_id));
+        return { category: c, products: inSub.length, units: inSub.reduce((a, p) => a + (stockOf(p) ?? 0), 0) };
       });
-    return { category: root, ...s, children };
+    let topProduct: CategoryStats["topProduct"] = null;
+    for (const p of list) {
+      const value = (priceOf(p) ?? 0) * (stockOf(p) ?? 0);
+      if (value > 0 && (!topProduct || value > topProduct.value)) topProduct = { product: p, value };
+    }
+    const lastAdded = list.reduce<string | null>((m, p) => (!m || p.created_at > m ? p.created_at : m), null);
+    return { category: root, ...s, children, topProduct, lastAdded };
   });
   const orphan = products.filter((p) => !p.category_id || !categories.some((c) => c.id === p.category_id));
   return { shelves, orphan: summarize(orphan), orphanList: orphan, total: summarize(products) };
