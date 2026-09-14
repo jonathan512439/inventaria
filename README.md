@@ -136,6 +136,16 @@ Cambios de base de datos: `npm run db:sql supabase/<archivo>.sql` (usa `SUPABASE
 5. Llama a Gemini con `responseMimeType: application/json`. Ante **429/503** reintenta con backoff exponencial (2s, 4s, 8s). Si persiste, igual crea el borrador (vacío) y devuelve un aviso claro al usuario.
 6. Inserta el producto en `products` con `status = 'draft'` y los valores de la IA; los campos manuales quedan vacíos.
 
+## Código de barras (sin IA)
+
+Pantalla **Agregar → Escanear código de barras** (`/scan`, `GET/POST /api/barcode`). Orden de consulta:
+
+1. **Inventario propio** (campos `codigo_barras`, `codigo`, `sku`, `barcode`, `ean`) → repetido: sumar stock (+1/+5/+10 o ×N en lote).
+2. **Catálogos públicos** en paralelo (Open Food / Beauty / Products / Pet Food Facts, gratis, sin clave) → nombre, marca, contenido, foto (copiada al Storage) y **categoría sugerida** por coincidencia de palabras con tus categorías.
+3. **No encontrado** → alta manual (el código se guarda) o foto con IA.
+
+Modo **Lote continuo**: cámara abierta, lista con ×N por repetición, alta masiva. Ninguna de estas rutas consume cupo de Gemini. Cobertura buena en envasados de marca; ropa, juguetes y productos locales sin registro requieren la foto con IA.
+
 ## Límites del free tier considerados
 
 | Recurso | Límite | Medida en el MVP |
