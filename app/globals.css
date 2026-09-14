@@ -45,6 +45,19 @@
   .btn-ghost {
     @apply btn text-slate-700 hover:bg-slate-200/70;
   }
+  /* Acción destructiva con presencia: borde y texto, nunca solo un icono */
+  .btn-destructive {
+    @apply btn border-2 border-rose-300 bg-rose-50 text-rose-700 hover:border-rose-400 hover:bg-rose-100;
+  }
+  /* Botón que despliega una sección (chevron a la derecha) */
+  .btn-disclosure {
+    @apply flex w-full items-center gap-3 rounded-2xl border-2 border-slate-300 bg-white px-4 py-3 text-left
+      font-semibold text-ink shadow-sm transition hover:border-brand-400 hover:bg-brand-50 active:scale-[0.99];
+  }
+  /* Fila de datos con etiqueta y valor + acción a la derecha */
+  .row-action {
+    @apply flex items-center gap-3 rounded-2xl border-2 border-slate-200 bg-white px-3 py-2.5;
+  }
   .btn-sm {
     @apply rounded-xl px-3 py-2 text-xs;
   }

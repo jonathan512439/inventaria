@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
-import { categoryPath, findSibling, findSimilar } from "@/lib/categories";
+import { categoryPath, findSibling, findSimilar, nameKey } from "@/lib/categories";
 import { applyDefaults, canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import { useQueue, queueSummary, removeByProductId } from "@/lib/queue";
 import { getPreset } from "@/lib/presets";
@@ -23,6 +23,8 @@ import {
   IconCheck,
   IconCheckCircle,
   IconChevronRight,
+  IconEdit,
+  IconList,
   IconPlus,
   IconSparkles,
   IconTable,
@@ -63,6 +65,7 @@ function Review() {
   const [zoom, setZoom] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [openIn, setOpenIn] = useState<{ id: string; nonce: number } | null>(null);
+  const [openPicker, setOpenPicker] = useState<{ step: string | null; nonce: number } | null>(null);
   // Gesto: deslizar la tarjeta a la derecha = confirmar, a la izquierda = siguiente
   const [dragX, setDragX] = useState(0);
   const drag = useRef<{ x: number; y: number; active: boolean; horizontal: boolean | null }>({ x: 0, y: 0, active: false, horizontal: null });
@@ -296,7 +299,7 @@ function Review() {
           <div className="mt-5 grid gap-2">
             <Link href="/capture" className="btn-primary"><IconCamera size={18} /> Agregar con foto</Link>
             <Link href="/products/new" className="btn-secondary"><IconPlus size={18} /> Escribir un producto a mano</Link>
-            <Link href="/products" className="btn-ghost">Ver mi inventario</Link>
+            <Link href="/products" className="btn-secondary">Ver mi inventario</Link>
           </div>
         </div>
       </Centered>
@@ -311,6 +314,18 @@ function Review() {
   const catOfCurrent = draft.categoryId ? categories.find((c) => c.id === draft.categoryId) ?? null : null;
   const topOfCurrent = catOfCurrent?.parent_id ? categories.find((c) => c.id === catOfCurrent.parent_id) ?? catOfCurrent : catOfCurrent;
   const catColor = categoryColor(topOfCurrent?.name);
+  const emptyOthers = otherFields.filter((f) => {
+    const v = draft.data[f.name];
+    return v === "" || v === null || v === undefined;
+  }).length;
+  // Estado de la ubicación: completo / falta subcategoría / sin categoría
+  const locState = !draft.categoryId
+    ? { label: "Sin categoría", chip: "bg-rose-100 text-rose-800", border: "border-rose-200 bg-rose-50/40" }
+    : !catOfCurrent?.parent_id && categories.some((c) => c.parent_id === draft.categoryId)
+      ? { label: "Falta subcategoría", chip: "bg-amber-100 text-amber-800", border: "border-amber-200 bg-amber-50/40" }
+      : meta.categoria_sugerida && draft.categoryId === current.category_id
+        ? { label: "✨ Asignado por la IA", chip: "bg-emerald-100 text-emerald-800", border: "border-emerald-200 bg-emerald-50/40" }
+        : { label: "Ubicación elegida", chip: "bg-emerald-100 text-emerald-800", border: "border-emerald-200 bg-emerald-50/40" };
   // Nombre para una categoría general nueva: el propuesto por la IA, o la subcategoría sugerida
   const generalName = meta.categoria_nueva_general || meta.categoria_nueva || null;
 
@@ -354,95 +369,118 @@ function Review() {
         </button>
 
         <div className="stagger space-y-5 px-5 pb-5">
-          {/* Categoría */}
-          <div>
-            <label className="label flex items-center gap-1">
-              <IconSparkles size={14} className="text-brand-500" /> Categoría
-            </label>
-            <CategoryPicker
-              categories={categories}
-              value={draft.categoryId}
-              onChange={(v) => setDraft({ ...draft, categoryId: v })}
-              onCategoriesChange={setCategories}
-              emptyLabel="Sin categoría"
-              openIn={openIn}
-            />
-            {catOfCurrent && (
-              <p className="mt-1.5 flex flex-wrap items-center gap-x-1 text-xs text-slate-600">
-                {meta.categoria_sugerida && draft.categoryId === current.category_id ? (
-                  <><IconSparkles size={12} className="text-brand-500" /> <span className="font-semibold text-brand-700">La IA eligió:</span></>
-                ) : (
-                  <span className="font-semibold">Elegida:</span>
-                )}
-                <span>{topOfCurrent?.icon ? `${topOfCurrent.icon} ` : ""}{topOfCurrent?.name}</span>
-                {catOfCurrent.parent_id ? (
-                  <span>› <b>{catOfCurrent.name}</b></span>
-                ) : (
-                  <span className="text-amber-700">› sin subcategoría</span>
-                )}
-                <span className="text-slate-400">· toca arriba para cambiar</span>
-              </p>
-            )}
-            {draft.categoryId && !categories.find((c) => c.id === draft.categoryId)?.parent_id && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {categories.some((c) => c.parent_id === draft.categoryId) && (
-                  <button type="button" disabled={classifying} onClick={() => autoSubcategory(current.id, draft.categoryId!)} className="chip border-brand-300 bg-brand-50 text-brand-700">
-                    {classifying ? <Spinner size={14} /> : <IconSparkles size={14} />} Elegir subcategoría automáticamente
+          {/* ¿Dónde va este producto? */}
+          <section className={`rounded-2xl border-2 p-3 ${locState.border}`}>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-bold text-ink">¿Dónde va este producto?</h2>
+              <span className={`badge ${locState.chip}`}>{locState.label}</span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="row-action">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Categoría</span>
+                  <span className="block truncate font-semibold text-ink">
+                    {topOfCurrent ? `${topOfCurrent.icon ? topOfCurrent.icon + " " : ""}${topOfCurrent.name}` : "— sin asignar —"}
+                  </span>
+                </span>
+                <button type="button" onClick={() => setOpenPicker({ step: null, nonce: Date.now() })} className="btn-secondary btn-sm shrink-0">
+                  <IconEdit size={14} /> Cambiar
+                </button>
+              </div>
+
+              <div className="row-action">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Subcategoría</span>
+                  <span className={`block truncate font-semibold ${catOfCurrent?.parent_id ? "text-ink" : "text-amber-700"}`}>
+                    {catOfCurrent?.parent_id ? catOfCurrent.name : topOfCurrent ? "— falta elegir —" : "—"}
+                  </span>
+                </span>
+                {topOfCurrent && (
+                  <button type="button" onClick={() => setOpenPicker({ step: topOfCurrent!.id, nonce: Date.now() })} className="btn-secondary btn-sm shrink-0">
+                    <IconEdit size={14} /> Cambiar
                   </button>
                 )}
-                {meta.categoria_nueva && !categories.some((c) => c.parent_id === draft.categoryId && c.name.toLowerCase() === meta.categoria_nueva!.toLowerCase()) && (
-                  <>
-                    {findSimilar(categories, draft.categoryId, meta.categoria_nueva).map((c) => (
-                      <button key={c.id} type="button" onClick={() => setDraft({ ...draft, categoryId: c.id })} className="chip border-emerald-300 bg-emerald-50 text-emerald-800" title="Ya existe una parecida">
-                        <IconCheck size={14} /> Usar “{c.name}”
-                      </button>
-                    ))}
-                    <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory(draft.categoryId)} className="chip border-brand-300 bg-white text-brand-700">
+              </div>
+            </div>
+
+            {/* Selector (se abre desde los botones Cambiar) */}
+            <div className="sr-only">
+              <CategoryPicker
+                categories={categories}
+                value={draft.categoryId}
+                onChange={(v) => setDraft({ ...draft, categoryId: v })}
+                onCategoriesChange={setCategories}
+                emptyLabel="Sin categoría"
+                openIn={openPicker?.step ? { id: openPicker.step, nonce: openPicker.nonce } : openIn}
+                openNonce={openPicker?.step === null ? openPicker.nonce : undefined}
+              />
+            </div>
+
+            {/* Falta subcategoría dentro de una categoría que sí tiene */}
+            {draft.categoryId && !catOfCurrent?.parent_id && categories.some((c) => c.parent_id === draft.categoryId) && (
+              <div className="mt-3 space-y-2 rounded-2xl bg-brand-50 p-3">
+                <p className="text-xs font-semibold text-brand-900">Elige la subcategoría para terminar de ordenarlo:</p>
+                <div className="flex flex-wrap gap-2">
+                  {(meta.categoria_nueva ? findSimilar(categories, draft.categoryId, meta.categoria_nueva) : []).map((c) => (
+                    <button key={c.id} type="button" onClick={() => setDraft({ ...draft, categoryId: c.id })} className="chip border-emerald-400 bg-emerald-50 text-emerald-800">
+                      <IconCheck size={14} /> {c.name}
+                    </button>
+                  ))}
+                  <button type="button" onClick={() => setOpenPicker({ step: draft.categoryId!, nonce: Date.now() })} className="chip">
+                    <IconList size={14} /> Ver todas
+                  </button>
+                  <button type="button" disabled={classifying} onClick={() => autoSubcategory(current.id, draft.categoryId!)} className="chip border-brand-400 bg-white text-brand-700">
+                    {classifying ? <Spinner size={14} /> : <IconSparkles size={14} />} Que la elija la IA
+                  </button>
+                  {meta.categoria_nueva && !categories.some((c) => c.parent_id === draft.categoryId && nameKey(c.name) === nameKey(meta.categoria_nueva!)) && (
+                    <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory(draft.categoryId)} className="chip border-brand-400 bg-white text-brand-700">
                       <IconPlus size={14} /> Crear “{meta.categoria_nueva}”
                     </button>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
             )}
 
-            {!draft.categoryId && (meta.catalogo_sugerido || meta.categoria_nueva_general || meta.categoria_nueva) && (
-              <div className="mt-2 space-y-2 rounded-2xl border border-brand-200 bg-brand-50/60 p-3">
-                <p className="text-xs font-semibold text-brand-800">
-                  <IconSparkles size={12} className="mr-1 inline" />
-                  Este producto no encaja en tus categorías. Sugerencias:
+            {/* Sin categoría: opciones en orden de preferencia */}
+            {!draft.categoryId && (
+              <div className="mt-3 space-y-2 rounded-2xl bg-amber-50 p-3">
+                <p className="text-xs font-semibold text-amber-900">
+                  La IA no encontró una categoría adecuada entre las tuyas. Elige una opción:
                 </p>
+                <button type="button" onClick={() => setOpenPicker({ step: null, nonce: Date.now() })} className="btn-secondary w-full justify-start">
+                  <IconList size={16} /> Elegir una de las mías
+                  <span className="ml-auto text-xs font-normal text-slate-500">{categories.length} disponibles</span>
+                </button>
                 {meta.catalogo_sugerido && getPreset(meta.catalogo_sugerido) && (
-                  <button type="button" disabled={settingUp} onClick={() => setupAndAssign({ presets: [meta.catalogo_sugerido!] }, meta.categoria_nueva)} className="btn-primary btn-sm w-full justify-start">
-                    {settingUp ? <Spinner size={14} /> : <IconPlus size={14} />}
+                  <button type="button" disabled={settingUp} onClick={() => setupAndAssign({ presets: [meta.catalogo_sugerido!] }, meta.categoria_nueva)} className="btn-primary w-full justify-start">
+                    {settingUp ? <Spinner size={16} /> : <IconPlus size={16} />}
                     Agregar catálogo {getPreset(meta.catalogo_sugerido)!.icon} {getPreset(meta.catalogo_sugerido)!.name}
-                    <span className="ml-auto text-[10px] font-normal opacity-80">listo para usar</span>
+                    <span className="ml-auto text-[11px] font-normal opacity-80">ya preparado</span>
                   </button>
                 )}
                 {generalName && (
-                  <button type="button" disabled={settingUp} onClick={() => setupAndAssign({ description: `${generalName}. Ejemplo de producto: ${title || meta.etiqueta || ""}` }, meta.categoria_nueva)} className="btn-secondary btn-sm w-full justify-start">
-                    {settingUp ? <Spinner size={14} /> : <IconSparkles size={14} className="text-brand-600" />}
-                    Crear categoría “{generalName}” con la IA
-                    <span className="ml-auto text-[10px] font-normal text-slate-500">subcategorías + datos</span>
+                  <button type="button" disabled={settingUp} onClick={() => setupAndAssign({ description: `${generalName}. Ejemplo de producto: ${title || meta.etiqueta || ""}` }, meta.categoria_nueva)} className="btn-secondary w-full justify-start border-brand-400 text-brand-700">
+                    {settingUp ? <Spinner size={16} /> : <IconSparkles size={16} className="text-brand-600" />}
+                    Crear con IA la categoría “{generalName}”
+                    <span className="ml-auto text-[11px] font-normal text-slate-500">+ subcategorías y datos</span>
                   </button>
                 )}
                 {meta.categoria_nueva && types.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2">
-                    <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory()} className="chip border-brand-300 bg-white text-brand-700">
-                      <IconPlus size={14} /> Subcategoría “{meta.categoria_nueva}”
+                    <button type="button" disabled={settingUp} onClick={() => createSuggestedCategory()} className="chip border-brand-400 bg-white text-brand-700">
+                      <IconPlus size={14} /> Crear subcategoría “{meta.categoria_nueva}”
                     </button>
                     <select className="input w-auto py-1.5 text-sm" value={newParent ?? types[0]?.id ?? ""} onChange={(e) => setNewParent(e.target.value)}>
                       {types.map((t) => (
-                        <option key={t.id} value={t.id}>en {t.icon ? `${t.icon} ` : ""}{t.name}</option>
+                        <option key={t.id} value={t.id}>dentro de {t.icon ? `${t.icon} ` : ""}{t.name}</option>
                       ))}
                     </select>
                   </div>
                 )}
               </div>
             )}
-            {!draft.categoryId && fields.length === 0 && (
-              <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">Elige la categoría: ahí aparecerán el precio, el stock y los demás datos para completar.</p>
-            )}
-          </div>
+          </section>
 
           {/* Nombre (lo más importante que reconoció la IA) */}
           {nameField && (
@@ -469,23 +507,23 @@ function Review() {
 
           {/* Resto de datos, plegado */}
           {otherFields.length > 0 && (
-            <section className="rounded-2xl ring-1 ring-slate-200">
-              <button type="button" onClick={() => setMoreOpen((v) => !v)} className="flex w-full items-center gap-2 px-4 py-3 text-left">
-                <span className="flex-1">
-                  <span className="block text-sm font-semibold text-ink">Más datos ({otherFields.length})</span>
-                  {!moreOpen && (
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">
-                      {otherFields
-                        .filter((f) => draft.data[f.name] !== "" && draft.data[f.name] !== null && draft.data[f.name] !== undefined)
-                        .map((f) => `${fieldLabel(f.name)}: ${draft.data[f.name]}`)
-                        .join(" · ") || "Marca, descripción, color…"}
-                    </span>
-                  )}
+            <section>
+              <button type="button" onClick={() => setMoreOpen((v) => !v)} className="btn-disclosure">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-100 text-brand-700">
+                  <IconList size={18} />
                 </span>
-                <IconChevronRight className={`shrink-0 text-slate-400 transition ${moreOpen ? "rotate-90" : ""}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block">{moreOpen ? "Ocultar los demás datos" : `Revisar los demás datos (${otherFields.length})`}</span>
+                  <span className="block truncate text-xs font-normal text-slate-500">
+                    {emptyOthers > 0 ? `${emptyOthers} sin completar · ` : "todos completos · "}
+                    {otherFields.map((f) => fieldLabel(f.name)).join(", ")}
+                  </span>
+                </span>
+                {emptyOthers > 0 && !moreOpen && <span className="badge shrink-0 bg-amber-100 text-amber-800">{emptyOthers}</span>}
+                <IconChevronRight className={`shrink-0 text-brand-600 transition ${moreOpen ? "rotate-90" : ""}`} />
               </button>
               {moreOpen && (
-                <div className="stagger space-y-3 border-t border-slate-100 px-4 py-4">
+                <div className="stagger mt-2 space-y-3 rounded-2xl border-2 border-slate-200 px-4 py-4">
                   {otherFields.map((f) => (
                     <div key={f.id}>
                       <label className="label flex items-center gap-1">
@@ -513,16 +551,18 @@ function Review() {
           )}
 
           {/* Acciones */}
-          <div className="grid grid-cols-[auto_1fr] gap-2 pt-1">
-            <button onClick={remove} className="btn-danger px-4" title="Eliminar" disabled={saving}>
-              <IconTrash size={18} />
+          <div className="grid gap-2 pt-1">
+            <button onClick={() => save("confirmed")} className={`btn-success btn-lg w-full ${leaving ? "pulse-success" : ""}`} disabled={saving}>
+              {saving ? <Spinner /> : <IconCheck size={22} />} Confirmar y pasar al siguiente
             </button>
-            <button onClick={() => save("confirmed")} className={`btn-success btn-lg ${leaving ? "pulse-success" : ""}`} disabled={saving}>
-              {saving ? <Spinner /> : <IconCheck size={20} />} Confirmar y siguiente
-            </button>
-            <button onClick={() => save("draft")} className="btn-ghost col-span-2 text-slate-500" disabled={saving}>
-              Guardar sin confirmar
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => save("draft")} className="btn-secondary" disabled={saving}>
+                <IconEdit size={16} /> Guardar y seguir
+              </button>
+              <button onClick={remove} className="btn-destructive" disabled={saving}>
+                <IconTrash size={16} /> Eliminar
+              </button>
+            </div>
           </div>
         </div>
       </article>
@@ -544,13 +584,16 @@ function Review() {
       )}
 
       {/* Navegación entre pendientes */}
-      <div className="flex items-center justify-between text-sm">
-        <button className="btn-ghost btn-sm" disabled={index === 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>
-          <IconArrowLeft size={16} /> Anterior
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <button className="btn-secondary justify-self-start" disabled={index === 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>
+          <IconArrowLeft size={18} /> Anterior
         </button>
-        <span className="text-slate-500">{index + 1} de {products.length} <span className="hidden text-slate-400 sm:inline">· desliza → confirmar</span></span>
-        <button className="btn-ghost btn-sm" disabled={index >= products.length - 1} onClick={() => setIndex((i) => Math.min(products.length - 1, i + 1))}>
-          Siguiente <IconArrowRight size={16} />
+        <span className="text-center text-sm font-semibold text-slate-600">
+          {index + 1} de {products.length}
+          <span className="hidden text-xs font-normal text-slate-400 sm:block">o desliza la tarjeta</span>
+        </span>
+        <button className="btn-secondary justify-self-end" disabled={index >= products.length - 1} onClick={() => setIndex((i) => Math.min(products.length - 1, i + 1))}>
+          Siguiente <IconArrowRight size={18} />
         </button>
       </div>
     </div>

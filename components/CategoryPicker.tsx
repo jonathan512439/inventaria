@@ -22,13 +22,15 @@ interface Props {
   className?: string;
   /** Cambiar este valor abre el panel directamente en el paso 2 de esa categoría */
   openIn?: { id: string; nonce: number } | null;
+  /** Cambiar este valor abre el panel en el paso 1 (lista de categorías) */
+  openNonce?: number;
 }
 
 /**
  * Selector de categoría en dos pasos: primero la categoría, luego su subcategoría.
  * Abre un panel (hoja inferior en móvil). Permite crear sobre la marcha.
  */
-export default function CategoryPicker({ categories, value, onChange, onCategoriesChange, allowCreate = true, emptyLabel = null, className = "", openIn = null }: Props) {
+export default function CategoryPicker({ categories, value, onChange, onCategoriesChange, allowCreate = true, emptyLabel = null, className = "", openIn = null, openNonce }: Props) {
   const supabase = createClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -58,6 +60,13 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
       setTimeout(() => setStep(openIn.id), 0);
     }
   }, [openIn]);
+
+  useEffect(() => {
+    if (openNonce) {
+      setOpen(true);
+      setTimeout(() => setStep(null), 0); // paso 1: lista de categorías
+    }
+  }, [openNonce]);
 
   function choose(id: string | null) {
     onChange(id);

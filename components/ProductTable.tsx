@@ -179,12 +179,12 @@ export default function ProductTable({ products, categories, templates, mode, on
                                 ✓ Confirmar
                               </button>
                             ) : (
-                              <button className="btn-ghost btn-sm" disabled={isBusy} onClick={() => persist(p, fields, "draft")}>
-                                ↩ A pendientes
+                              <button className="btn-secondary btn-sm" disabled={isBusy} onClick={() => persist(p, fields, "draft")}>
+                                ↩ Revisar de nuevo
                               </button>
                             )}
-                            <Link href={`/products/${p.id}`} className="btn-ghost btn-sm">Ver</Link>
-                            <button className="btn-ghost btn-sm text-rose-600" disabled={isBusy} onClick={() => remove(p)}>✕</button>
+                            <Link href={`/products/${p.id}`} className="btn-secondary btn-sm">Abrir</Link>
+                            <button className="btn-destructive btn-sm" disabled={isBusy} onClick={() => remove(p)}>Eliminar</button>
                           </div>
                         </td>
                       </tr>

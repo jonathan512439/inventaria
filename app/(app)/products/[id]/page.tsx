@@ -9,7 +9,7 @@ import { categoryPath } from "@/lib/categories";
 import { canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
-import { IconArrowLeft, IconSparkles, IconTag } from "@/components/ui/Icons";
+import { IconArrowLeft, IconCheck, IconEdit, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +24,7 @@ export default function ProductDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [moreActions, setMoreActions] = useState(false);
 
   const load = useCallback(async () => {
     const [p, c, t] = await Promise.all([
@@ -150,19 +151,41 @@ export default function ProductDetailPage() {
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          {/* Acciones: apiladas y centradas en móvil, en fila en escritorio */}
-          <div className="grid w-full gap-2 pt-2 sm:grid-cols-[1fr_auto_auto]">
+          {/* Acciones: una principal clara + el resto en "Más opciones" */}
+          <div className="grid w-full gap-2 pt-2">
             {isDraft ? (
-              <button className="btn-success btn-lg w-full" onClick={() => save("confirmed")} disabled={saving}>✓ Guardar en inventario</button>
+              <button className="btn-success btn-lg w-full" onClick={() => save("confirmed")} disabled={saving}>
+                {saving ? <Spinner /> : <IconCheck size={20} />} Guardar en el inventario
+              </button>
             ) : (
-              <button className="btn-primary btn-lg w-full" onClick={() => save()} disabled={saving}>Guardar cambios</button>
+              <button className="btn-primary btn-lg w-full" onClick={() => save()} disabled={saving}>
+                {saving ? <Spinner /> : <IconEdit size={18} />} Guardar cambios
+              </button>
             )}
-            {isDraft ? (
-              <button className="btn-secondary w-full" onClick={() => save()} disabled={saving}>Guardar sin confirmar</button>
-            ) : (
-              <button className="btn-secondary w-full" onClick={() => save("draft")} disabled={saving}>↩ Pasar a pendientes</button>
+
+            <button type="button" onClick={() => setMoreActions((v) => !v)} className="text-sm font-semibold text-slate-500 underline hover:text-ink">
+              {moreActions ? "Ocultar más opciones" : "Más opciones"}
+            </button>
+
+            {moreActions && (
+              <div className="animate-in grid gap-2 rounded-2xl border-2 border-slate-200 p-3">
+                {isDraft ? (
+                  <button className="btn-secondary w-full justify-start" onClick={() => save()} disabled={saving}>
+                    <IconEdit size={16} /> Guardar sin pasarlo al inventario
+                    <span className="ml-auto text-xs font-normal text-slate-500">sigue en pendientes</span>
+                  </button>
+                ) : (
+                  <button className="btn-secondary w-full justify-start" onClick={() => save("draft")} disabled={saving}>
+                    <IconEdit size={16} /> Marcar para revisar de nuevo
+                    <span className="ml-auto text-xs font-normal text-slate-500">vuelve a pendientes</span>
+                  </button>
+                )}
+                <button className="btn-destructive w-full justify-start" onClick={remove} disabled={saving}>
+                  <IconTrash size={16} /> Eliminar este producto
+                  <span className="ml-auto text-xs font-normal">y su foto</span>
+                </button>
+              </div>
             )}
-            <button className="btn-danger w-full" onClick={remove} disabled={saving}>Eliminar</button>
           </div>
         </div>
       </div>

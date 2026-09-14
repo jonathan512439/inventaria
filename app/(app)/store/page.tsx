@@ -162,7 +162,7 @@ export default function StorePage() {
                       </>
                     )}
                   </div>
-                  <button className="btn-ghost btn-sm text-rose-600" onClick={() => remove(t, true)} title="Eliminar categoría"><IconTrash size={16} /></button>
+                  <button className="btn-destructive btn-sm shrink-0" onClick={() => remove(t, true)}><IconTrash size={16} /> Eliminar</button>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">

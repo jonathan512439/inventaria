@@ -200,17 +200,14 @@ export default function CapturePage() {
             {summary.error > 0 && <Stat n={summary.error} label="con error" tone="text-rose-600" />}
             <span className="ml-auto flex gap-2">
               {summary.queued + summary.processing > 0 && (
-                <button onClick={() => confirm("¿Cancelar las fotos que faltan por analizar?") && cancelAll()} className="btn-ghost btn-sm text-rose-600">
-                  <IconX size={14} /> Cancelar {summary.queued + summary.processing > 1 ? "todas" : ""}
+                <button onClick={() => confirm("¿Cancelar las fotos que faltan por analizar?") && cancelAll()} className="btn-destructive btn-sm">
+                  <IconX size={14} /> Cancelar pendientes
                 </button>
               )}
               {summary.done > 0 && (
                 <Link href="/review" className="btn-success btn-sm">
-                  <IconCheck size={14} /> Revisar {summary.done}
+                  <IconCheck size={16} /> Revisar {summary.done} listas
                 </Link>
-              )}
-              {summary.done > 0 && (
-                <button onClick={clearDone} className="btn-ghost btn-sm">Limpiar</button>
               )}
             </span>
           </div>
@@ -228,6 +225,11 @@ export default function CapturePage() {
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
               {queue.pausedReason === "offline" ? "Sin conexión." : "La IA está saturada,"} reintentamos en {waiting}s. Puedes seguir tomando fotos.
             </p>
+          )}
+          {summary.done > 0 && (
+            <button onClick={clearDone} className="text-xs font-semibold text-slate-500 underline hover:text-ink">
+              Quitar de esta lista las {summary.done} ya analizadas (seguirán en Revisar)
+            </button>
           )}
           <div className="stagger grid grid-cols-4 gap-2 sm:grid-cols-6">
             {Array.from({ length: preparing }).map((_, i) => (
