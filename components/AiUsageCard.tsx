@@ -125,6 +125,11 @@ export default function AiUsageCard() {
               </li>
             );
           })}
+          <li className="pt-1">
+            <a href="/scan" className="flex items-center gap-2 rounded-2xl bg-emerald-500/15 px-3 py-2 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/25">
+              💡 ¿Productos con código de barras? Escanéalos: no consumen cupo.
+            </a>
+          </li>
           <li className="pt-1 text-[11px] leading-snug text-white/50">
             El cupo gratuito es por modelo y por día; la app usa el siguiente modelo cuando uno se agota. El conteo es de toda la app; si usas la misma clave
             fuera de la app, corrígelo con “ajustar”.

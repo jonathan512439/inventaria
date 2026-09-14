@@ -10,7 +10,7 @@ import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import CategoryPicker from "@/components/CategoryPicker";
 import { useToast } from "@/components/ui/Toast";
-import { IconAlert, IconCamera, IconCheck, IconImages, IconRefresh, IconSparkles, IconX, Spinner } from "@/components/ui/Icons";
+import { IconAlert, IconCamera, IconCheck, IconImages, IconRefresh, IconSparkles, IconTag, IconX, Spinner } from "@/components/ui/Icons";
 
 export default function CapturePage() {
   const supabase = createClient();
@@ -119,6 +119,18 @@ export default function CapturePage() {
           <span className="text-xs font-normal text-slate-500">elige varias a la vez</span>
         </button>
       </div>
+
+      {/* Código de barras: alta sin gastar IA */}
+      <Link href="/scan" className="animate-in press flex items-center gap-3 rounded-3xl border-2 border-emerald-300 bg-white p-4 shadow-card transition hover:border-emerald-500 hover:bg-emerald-50">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700">
+          <IconTag size={24} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-bold text-ink">Escanear código de barras</span>
+          <span className="block text-xs text-slate-500">Detecta repetidos y da de alta productos conocidos · <b className="text-emerald-700">sin gastar IA</b></span>
+        </span>
+        <span className="btn-secondary btn-sm shrink-0">Abrir</span>
+      </Link>
 
       {/* Escritorio: zona de arrastre + carpeta completa */}
       <div

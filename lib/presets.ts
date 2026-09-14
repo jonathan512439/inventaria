@@ -27,6 +27,9 @@ const BASE_AI: PresetField[] = [
   { name: "marca", field_type: "text", is_ai_fillable: true },
   { name: "descripcion", field_type: "text", is_ai_fillable: true },
 ];
+/** Código de barras: lo llena el escáner, no la IA. */
+const CODE_FIELD: PresetField = { name: "codigo_barras", field_type: "text", is_ai_fillable: false };
+
 const BASE_USER: PresetField[] = [
   { name: "precio", field_type: "number", is_ai_fillable: false },
   { name: "precio_compra", field_type: "number", is_ai_fillable: false },
@@ -58,14 +61,14 @@ export const PRESETS: Preset[] = [
   p("bebidas", "Bebidas", "🥤", "Gaseosas, agua, jugos, cerveza, licores",
     ["Gaseosas", "Agua", "Jugos y néctares", "Energizantes", "Cerveza", "Vinos y licores", "Lácteos"],
     [{ name: "sabor", field_type: "text", is_ai_fillable: true }, { name: "volumen", field_type: "text", is_ai_fillable: true }],
-    [{ name: "unidades_por_paquete", field_type: "number", is_ai_fillable: false, default_value: "1" }]),
+    [{ name: "unidades_por_paquete", field_type: "number", is_ai_fillable: false, default_value: "1" }, CODE_FIELD]),
   p("abarrotes", "Abarrotes y tienda", "🛒", "Alimentos envasados, snacks, despensa",
     ["Arroz, fideos y granos", "Aceites y conservas", "Snacks y golosinas", "Panadería y galletas", "Lácteos y huevos", "Condimentos", "Café, té y azúcar"],
     [{ name: "peso_o_contenido", field_type: "text", is_ai_fillable: true }, { name: "sabor", field_type: "text", is_ai_fillable: true }],
-    [{ name: "unidades_por_paquete", field_type: "number", is_ai_fillable: false, default_value: "1" }]),
+    [{ name: "unidades_por_paquete", field_type: "number", is_ai_fillable: false, default_value: "1" }, CODE_FIELD]),
   p("limpieza", "Limpieza y hogar", "🧴", "Detergentes, desinfectantes, cocina, baño",
     ["Detergentes y jabones", "Desinfectantes", "Papel y toallas", "Cocina", "Baño", "Ambientadores"],
-    [{ name: "aroma", field_type: "text", is_ai_fillable: true }, { name: "contenido", field_type: "text", is_ai_fillable: true }]),
+    [{ name: "aroma", field_type: "text", is_ai_fillable: true }, { name: "contenido", field_type: "text", is_ai_fillable: true }], [CODE_FIELD]),
   p("ferreteria", "Ferretería", "🔧", "Herramientas, tornillería, eléctricos, pintura",
     ["Herramientas manuales", "Herramientas eléctricas", "Tornillos y fijaciones", "Eléctricos", "Plomería", "Pintura", "Construcción"],
     [{ name: "medida", field_type: "text", is_ai_fillable: true }, { name: "material", field_type: "text", is_ai_fillable: true }, { name: "modelo", field_type: "text", is_ai_fillable: true }],
@@ -73,7 +76,7 @@ export const PRESETS: Preset[] = [
   p("farmacia", "Farmacia", "💊", "Medicamentos, vitaminas, cuidado personal",
     ["Analgésicos", "Antibióticos", "Vitaminas y suplementos", "Cuidado personal", "Primeros auxilios", "Bebé", "Dermatología"],
     [{ name: "presentacion", field_type: "text", is_ai_fillable: true }, { name: "contenido", field_type: "text", is_ai_fillable: true }, { name: "principio_activo", field_type: "text", is_ai_fillable: true }],
-    [{ name: "fecha_vencimiento", field_type: "text", is_ai_fillable: false }]),
+    [{ name: "fecha_vencimiento", field_type: "text", is_ai_fillable: false }, CODE_FIELD]),
   p("cosmeticos", "Cosméticos y belleza", "💄", "Maquillaje, cabello, piel, perfumes",
     ["Maquillaje", "Cabello", "Cuidado de la piel", "Perfumes", "Uñas", "Accesorios"],
     [{ name: "color_o_tono", field_type: "text", is_ai_fillable: true }, { name: "contenido", field_type: "text", is_ai_fillable: true }]),

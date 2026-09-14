@@ -34,6 +34,9 @@ export function coerceValue(field: FieldTemplate, raw: unknown): string | number
   return String(raw);
 }
 
+/** Nombres de campo donde puede estar guardado el código de barras. */
+export const CODE_FIELDS = ["codigo_barras", "codigo", "sku", "barcode", "ean"];
+
 /** Nombre de dato normalizado: minúsculas, sin espacios ni acentos raros → clave estable en `data`. */
 export function normalizeFieldName(name: string): string {
   return name
