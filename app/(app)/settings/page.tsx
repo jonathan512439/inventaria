@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
-import { IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, Spinner } from "@/components/ui/Icons";
+import { IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconTrash, Spinner } from "@/components/ui/Icons";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -71,6 +71,7 @@ export default function SettingsPage() {
         <Row href="/store" icon={<IconFolder />} title="Mi tienda" subtitle={counts ? `${counts.types} categoría${counts.types === 1 ? "" : "s"} · ${counts.sections} subcategorías · qué vendes y cómo se organiza` : ""} />
         <Row href="/export" icon={<IconDownload />} title="Exportar a Excel" subtitle="Descarga tu inventario" />
         <Row href="/dashboard#guia" icon={<IconList />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" />
+        <Row href="/dashboard#limpiar" icon={<IconTrash />} title="Ordenar y limpiar" subtitle="Pendientes viejos, categorías vacías y fotos sueltas" />
       </section>
 
       <button onClick={signOut} className="btn-ghost w-full text-rose-600"><IconLogout size={18} /> Cerrar sesión</button>
