@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, FieldType } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
-import { BASIC_TEMPLATE, fieldLabel, getEffectiveFields } from "@/lib/fields";
+import { BASIC_TEMPLATE, fieldLabel, getEffectiveFields, normalizeFieldName } from "@/lib/fields";
 import CategorySelect from "@/components/CategorySelect";
 import Link from "next/link";
 import { IconArrowLeft, IconSparkles } from "@/components/ui/Icons";
@@ -81,7 +81,7 @@ function Templates() {
     const { error } = await supabase.from("field_templates").insert({
       user_id: user!.id,
       category_id: scope,
-      name: fName.trim(),
+      name: normalizeFieldName(fName) || fName.trim(),
       field_type: fType,
       options: fType === "select" ? parseOptions(fOptions) : null,
       is_ai_fillable: fAi,
@@ -115,7 +115,7 @@ function Templates() {
     const { error } = await supabase
       .from("field_templates")
       .update({
-        name: editing.name.trim(),
+        name: normalizeFieldName(editing.name) || editing.name.trim(),
         field_type: editing.field_type,
         options: editing.field_type === "select" ? parseOptions(editOptions) : null,
         is_ai_fillable: editing.is_ai_fillable,

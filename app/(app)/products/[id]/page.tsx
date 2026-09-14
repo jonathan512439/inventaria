@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
-import { coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
+import { canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import { IconArrowLeft, IconSparkles, IconTag } from "@/components/ui/Icons";
@@ -31,14 +31,14 @@ export default function ProductDetailPage() {
       supabase.from("categories").select("*"),
       supabase.from("field_templates").select("*").order("sort_order"),
     ]);
+    setCategories(c.data ?? []);
+    setTemplates(t.data ?? []);
     if (!p.data) setNotFound(true);
     else {
       setProduct(p.data);
-      setData(p.data.data);
+      setData(canonicalizeData(p.data.data, getEffectiveFields(t.data ?? [], c.data ?? [], p.data.category_id)));
       setCategoryId(p.data.category_id);
     }
-    setCategories(c.data ?? []);
-    setTemplates(t.data ?? []);
     setLoading(false);
   }, [supabase, id]);
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product } from "@/types/database";
 import { buildTree, categoryPath, getDescendantIds } from "@/lib/categories";
-import { productTitle } from "@/lib/fields";
+import { normalizeFieldName, productTitle } from "@/lib/fields";
 import ProductTable from "@/components/ProductTable";
 import { IconBox, IconCamera, IconChevronRight, IconDownload, IconGrid, IconSearch, IconTable } from "@/components/ui/Icons";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -57,8 +57,16 @@ export default function ProductsPage() {
     });
   }, [products, categories, filter, search]);
 
-  const priceKey = (p: Product) => ["precio", "precio_venta", "price"].find((k) => p.data[k] !== undefined && p.data[k] !== null && p.data[k] !== "");
-  const stockKey = (p: Product) => ["stock", "cantidad", "existencias"].find((k) => p.data[k] !== undefined && p.data[k] !== null && p.data[k] !== "");
+  const findKey = (p: Product, names: string[]) => {
+    const keys = Object.keys(p.data);
+    for (const n of names) {
+      const k = keys.find((x) => normalizeFieldName(x) === n);
+      if (k && p.data[k] !== undefined && p.data[k] !== null && p.data[k] !== "") return k;
+    }
+    return undefined;
+  };
+  const priceKey = (p: Product) => findKey(p, ["precio", "precio_venta", "price"]);
+  const stockKey = (p: Product) => findKey(p, ["stock", "cantidad", "existencias"]);
 
   return (
     <div className="space-y-4">

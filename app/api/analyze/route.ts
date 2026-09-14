@@ -92,7 +92,17 @@ export async function POST(request: Request) {
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const path = `${user.id}/${productId}.${ext}`;
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const { error: upErr } = await admin.storage.from("product-images").upload(path, bytes, { contentType: file.type, upsert: false });
+
+  // Idempotencia: si la cola reenvía una foto ya procesada (recarga a mitad), devolvemos el producto existente.
+  if (requested === productId) {
+    const { data: existing } = await supabase.from("products").select("*").eq("id", productId).maybeSingle();
+    if (existing) {
+      const eff = getEffectiveFields(tpls, cats, existing.category_id);
+      return NextResponse.json({ product: existing, ai_fields: eff.filter((f) => f.is_ai_fillable).map((f) => f.name), warning: null }, { status: 200 });
+    }
+  }
+
+  const { error: upErr } = await admin.storage.from("product-images").upload(path, bytes, { contentType: file.type, upsert: true });
   if (upErr) return NextResponse.json({ error: `Error subiendo imagen: ${upErr.message}` }, { status: 500 });
   const {
     data: { publicUrl },

@@ -95,7 +95,7 @@ export default function ExportPage() {
           <span>
             Una hoja por subcategoría
             <br />
-            <span className="text-slate-500">Si no, todo va en una sola hoja.</span>
+            <span className="text-slate-500">Cada hoja lleva las columnas de su categoría y una columna Subcategoría. Si no, todo va en una sola hoja.</span>
           </span>
         </label>
 

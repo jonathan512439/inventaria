@@ -40,7 +40,8 @@ export default function ProductTable({ products, categories, templates, mode, on
   const isDirty = (id: string) => !!edits[id];
 
   function setValue(p: Product, field: FieldTemplate, raw: string) {
-    setEdits((prev) => ({ ...prev, [p.id]: { ...(prev[p.id] ?? {}), [field.name]: coerceValue(field, raw) } }));
+    // texto tal cual mientras se edita (permite decimales); se convierte al guardar
+    setEdits((prev) => ({ ...prev, [p.id]: { ...(prev[p.id] ?? {}), [field.name]: raw } }));
   }
 
   async function persist(p: Product, fields: FieldTemplate[], status?: ProductStatus) {

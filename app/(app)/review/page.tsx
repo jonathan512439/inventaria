@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
-import { applyDefaults, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
+import { applyDefaults, canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import { useQueue, queueSummary, removeByProductId } from "@/lib/queue";
 import { getPreset } from "@/lib/presets";
 import CategoryPicker from "@/components/CategoryPicker";
@@ -142,7 +142,7 @@ function Review() {
   useEffect(() => {
     if (!current) return setDraft(null);
     const fields = getEffectiveFields(templates, categories, current.category_id);
-    const data = applyDefaults(fields, { ...current.data });
+    const data = applyDefaults(fields, canonicalizeData(current.data, fields));
     setDraft({ data, categoryId: current.category_id });
   }, [current, templates, categories]);
 
@@ -162,8 +162,9 @@ function Review() {
   const aiFields = fields.filter((f) => f.is_ai_fillable);
   const manualFields = fields.filter((f) => !f.is_ai_fillable);
 
+  // Mientras se escribe guardamos el texto tal cual (permite "12." o "0,5"); se convierte al guardar.
   function setValue(f: FieldTemplate, v: string) {
-    setDraft((d) => (d ? { ...d, data: { ...d.data, [f.name]: coerceValue(f, v) } } : d));
+    setDraft((d) => (d ? { ...d, data: { ...d.data, [f.name]: v } } : d));
   }
 
   async function save(status: "draft" | "confirmed") {

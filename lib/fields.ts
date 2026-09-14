@@ -34,6 +34,42 @@ export function coerceValue(field: FieldTemplate, raw: unknown): string | number
   return String(raw);
 }
 
+/** Nombre de dato normalizado: minúsculas, sin espacios ni acentos raros → clave estable en `data`. */
+export function normalizeFieldName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+}
+
+/** Lee un valor de `data` aunque la clave guardada tenga otra capitalización ("Nombre" vs "nombre"). */
+export function getValue(data: ProductData, name: string): ProductData[string] {
+  if (name in data) return data[name];
+  const target = normalizeFieldName(name);
+  for (const k of Object.keys(data)) if (normalizeFieldName(k) === target) return data[k];
+  return undefined as unknown as ProductData[string];
+}
+
+/** Devuelve `data` con las claves reescritas al nombre canónico de cada campo (une "Nombre" y "nombre"). */
+export function canonicalizeData(data: ProductData, fields: FieldTemplate[]): ProductData {
+  const out: ProductData = { ...data };
+  fields.forEach((f) => {
+    if (f.name in out) return;
+    const v = getValue(data, f.name);
+    if (v !== undefined) {
+      out[f.name] = v;
+      Object.keys(out).forEach((k) => {
+        if (k !== f.name && normalizeFieldName(k) === normalizeFieldName(f.name)) delete out[k];
+      });
+    }
+  });
+  return out;
+}
+
 /** Rellena con el valor por defecto del campo lo que quedó vacío. Muta `data`. */
 export function applyDefaults(fields: FieldTemplate[], data: ProductData): ProductData {
   fields.forEach((f) => {
@@ -71,6 +107,9 @@ export function fieldLabel(name: string): string {
 
 /** Campos que se consideran "el nombre" del producto para títulos y búsquedas. */
 export function productTitle(data: ProductData): string {
-  const v = data.nombre ?? data.name ?? data.producto ?? data.titulo;
-  return v ? String(v) : "";
+  for (const k of ["nombre", "name", "producto", "titulo"]) {
+    const v = getValue(data, k);
+    if (v) return String(v);
+  }
+  return "";
 }
