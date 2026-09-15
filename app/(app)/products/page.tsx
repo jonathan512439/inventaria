@@ -8,7 +8,7 @@ import type { Category, Product } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import { categoryColor } from "@/lib/colors";
-import { computeShelves, fmtMoney, priceOf, stockOf, timeAgo, LOW_STOCK_MAX, type CategoryStats } from "@/lib/inventory";
+import { SUMMARY_COLS, computeShelves, fmtMoney, fromSummary, priceOf, stockOf, timeAgo, LOW_STOCK_MAX, type CategoryStats } from "@/lib/inventory";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Photo from "@/components/ui/Photo";
 import { IllustrationCapture } from "@/components/guide/Illustrations";
@@ -21,17 +21,19 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [results, setResults] = useState<Product[] | null>(null); // null = buscando
   const [salesMonth, setSalesMonth] = useState<{ total: number; count: number } | null>(null);
   const [variantsOf, setVariantsOf] = useState<Map<string, { stock: number }[]>>(new Map());
 
   useEffect(() => {
     (async () => {
+      // Vista ligera (≈200 B por producto): nombre, precio, stock y costo ya resueltos en la base
       const [c, p] = await Promise.all([
         supabase.from("categories").select("*"),
-        supabase.from("products").select("id,user_id,category_id,status,data,ai_meta,image_url,created_at,updated_at").order("updated_at", { ascending: false }),
+        supabase.from("product_summaries").select(SUMMARY_COLS).order("updated_at", { ascending: false }),
       ]);
       setCategories(c.data ?? []);
-      setProducts((p.data ?? []) as Product[]);
+      setProducts((p.data ?? []).map(fromSummary));
       setLoading(false);
       const start = new Date();
       start.setDate(1);
@@ -51,10 +53,23 @@ export default function ProductsPage() {
   const { shelves, orphan, total } = useMemo(() => computeShelves(confirmed, categories, variantsOf), [confirmed, categories, variantsOf]);
   const pendingCount = products.length - confirmed.length;
 
+  // Búsqueda en el servidor (nombre, marca, descripción, etiqueta, código), con espera de 250 ms
   const q = search.trim().toLowerCase();
-  const results = q
-    ? confirmed.filter((p) => (JSON.stringify(p.data) + (p.ai_meta?.etiqueta ?? "") + categoryPath(categories, p.category_id)).toLowerCase().includes(q)).slice(0, 40)
-    : [];
+  useEffect(() => {
+    if (!q) return setResults(null);
+    setResults(null);
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from("product_summaries")
+        .select(SUMMARY_COLS)
+        .eq("status", "confirmed")
+        .ilike("search", `%${q.replace(/[%_]/g, "")}%`)
+        .order("updated_at", { ascending: false })
+        .limit(40);
+      setResults((data ?? []).map(fromSummary));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, supabase]);
 
   return (
     <div className="space-y-5">
@@ -107,7 +122,7 @@ export default function ProductsPage() {
       </div>
 
       {q ? (
-        <SearchResults results={results} categories={categories} />
+        results === null ? <ListSkeleton rows={3} /> : <SearchResults results={results} categories={categories} />
       ) : loading ? (
         <ListSkeleton rows={4} />
       ) : confirmed.length === 0 ? (

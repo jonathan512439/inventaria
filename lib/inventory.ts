@@ -1,4 +1,4 @@
-import type { Category, Product } from "@/types/database";
+import type { Category, Product, ProductSummary } from "@/types/database";
 import { getDescendantIds } from "./categories";
 import { normalizeFieldName } from "./fields";
 
@@ -14,6 +14,24 @@ function num(p: Product, names: string[]): number | null {
     if (Number.isFinite(x)) return x;
   }
   return null;
+}
+
+/** Convierte una fila de `product_summaries` en un Product mínimo (data con nombre/precio/stock) para reutilizar los cálculos. */
+/** Columnas ligeras de la vista (sin `search`, que puede ser largo). */
+export const SUMMARY_COLS = "id,user_id,category_id,status,image_url,created_at,updated_at,nombre,marca,precio,precio_compra,stock,codigo_barras";
+
+export function fromSummary(s: ProductSummary): Product {
+  return {
+    id: s.id,
+    user_id: s.user_id,
+    category_id: s.category_id,
+    status: s.status,
+    image_url: s.image_url,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
+    ai_meta: {},
+    data: { nombre: s.nombre ?? "", marca: s.marca ?? "", precio: s.precio, precio_compra: s.precio_compra, stock: s.stock, codigo_barras: s.codigo_barras ?? "" },
+  };
 }
 
 export const priceOf = (p: Product) => num(p, ["precio", "precio_venta", "price"]);

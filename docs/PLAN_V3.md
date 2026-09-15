@@ -40,10 +40,10 @@ Cierra los huecos de la promesa central, hace confiable el stock, agrega ventas 
 
 Lo que quedó sin culminar de v2 más lo que salga de las pruebas funcionales del usuario.
 
-- Pruebas e2e de variantes y escáner dentro de `npm run test:e2e` (hoy solo `test:variants` a nivel de base de datos): ejes → producto con variantes → `/api/barcode` por código de variante → alta sin IA → movimiento por variante.
-- Verificación de productos existentes (sin variantes → siguen igual) y de los estantes con cientos de productos.
-- Correcciones reportadas en las pruebas funcionales del usuario (lista abierta; se anota aquí al recibirla).
-- Paginación real del inventario y de la búsqueda (hoy el nivel 1 carga todos los productos con todos sus datos): consultas ligeras (`id, category_id, image_url, created_at, stock, precio, precio_compra, nombre`), búsqueda en servidor con `ilike` sobre nombre/marca/etiqueta y `limit`, lista por categoría con `range` + «Ver más».
+- ✅ (10.1) Pruebas e2e de variantes y escáner dentro de `npm run test:e2e` (hoy solo `test:variants` a nivel de base de datos): ejes → producto con variantes → `/api/barcode` por código de variante → alta sin IA → movimiento por variante.
+- ✅ Verificación de productos existentes (sin variantes → siguen igual; cubierto en e2e) y vista ligera para estantes con cientos de productos.
+- ⏳ Correcciones reportadas en las pruebas funcionales del usuario (lista abierta; se anota aquí al recibirla).
+- ✅ (10.2) Paginación real del inventario y de la búsqueda (hoy el nivel 1 carga todos los productos con todos sus datos): consultas ligeras (`id, category_id, image_url, created_at, stock, precio, precio_compra, nombre`), búsqueda en servidor con `ilike` sobre nombre/marca/etiqueta y `limit`, lista por categoría con `range` + «Ver más».
 
 **Acepta cuando** `npm run test:e2e` cubre foto → variantes → escáner por variante, la lista de correcciones queda en cero y un inventario de 500 productos abre en menos de 2 s en 3G.
 

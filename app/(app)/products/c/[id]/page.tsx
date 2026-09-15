@@ -6,9 +6,8 @@ import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { getDescendantIds } from "@/lib/categories";
-import { productTitle } from "@/lib/fields";
 import { categoryColor } from "@/lib/colors";
-import { applyFilters, fmtMoney, priceOf, stockOf, type Filter } from "@/lib/inventory";
+import { SUMMARY_COLS, applyFilters, fromSummary, type Filter } from "@/lib/inventory";
 import { exportToExcel } from "@/lib/export";
 import ProductTable from "@/components/ProductTable";
 import ProductRow from "@/components/ProductRow";
@@ -29,7 +28,9 @@ export default function CategoryInventoryPage() {
   const supabase = createClient();
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
+  // Resúmenes ligeros de toda la categoría (para chips, filtros y conteos) + filas completas solo de la página visible
   const [products, setProducts] = useState<Product[]>([]);
+  const [full, setFull] = useState<Map<string, Product>>(new Map());
   const [loading, setLoading] = useState(true);
   const [sub, setSub] = useState<string | null>(null); // subcategoría elegida (null = toda la categoría)
   const [filters, setFilters] = useState<Set<Filter>>(new Set());
@@ -57,7 +58,7 @@ export default function CategoryInventoryPage() {
       setCategories(cats);
       setTemplates(t.data ?? []);
       setAxes((a.data ?? []) as VariantAxis[]);
-      let query = supabase.from("products").select("*").eq("status", "confirmed").order("updated_at", { ascending: false });
+      let query = supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed").order("updated_at", { ascending: false });
       if (isOrphan) {
         const valid = cats.map((x) => x.id);
         query = valid.length ? query.or(`category_id.is.null,category_id.not.in.(${valid.join(",")})`) : query;
@@ -65,15 +66,35 @@ export default function CategoryInventoryPage() {
         query = query.in("category_id", getDescendantIds(cats, id));
       }
       const { data } = await query;
-      const list = (data ?? []) as Product[];
-      setProducts(list);
+      setProducts((data ?? []).map(fromSummary));
       setLoading(false);
-      if (list.length) {
-        const { data: vs } = await supabase.from("product_variants").select("*").in("product_id", list.map((p) => p.id)).order("created_at");
-        setVariants((vs ?? []) as ProductVariant[]);
-      }
     })();
   }, [supabase, id, isOrphan]);
+
+  /** Trae las filas completas (todos los datos) de los productos indicados que aún no están en caché. */
+  async function loadFull(ids: string[]): Promise<Map<string, Product>> {
+    const missing = ids.filter((x) => !full.has(x));
+    if (!missing.length) return full;
+    const fetched = new Map<string, Product>();
+    for (let i = 0; i < missing.length; i += 100) {
+      const chunk = missing.slice(i, i + 100);
+      const [{ data }, { data: vs }] = await Promise.all([
+        supabase.from("products").select("*").in("id", chunk),
+        supabase.from("product_variants").select("*").in("product_id", chunk).order("created_at"),
+      ]);
+      (data ?? []).forEach((row) => fetched.set(row.id, row as Product));
+      if (vs?.length) setVariants((cur) => [...cur.filter((v) => !chunk.includes(v.product_id)), ...(vs as ProductVariant[])]);
+    }
+    // Fusión con lo que otras cargas hayan traído mientras tanto
+    setFull((cur) => {
+      const merged = new Map(cur);
+      fetched.forEach((row, key) => merged.set(key, row));
+      return merged;
+    });
+    const out = new Map(full);
+    fetched.forEach((row, key) => out.set(key, row));
+    return out;
+  }
 
   const category = categories.find((c) => c.id === id) ?? null;
   const top = category?.parent_id ? categories.find((c) => c.id === category.parent_id) ?? category : category;
@@ -89,6 +110,18 @@ export default function CategoryInventoryPage() {
   const inTop = useMemo(() => (top ? products.filter((p) => p.category_id && getDescendantIds(categories, top.id).includes(p.category_id)) : products), [products, categories, top]);
   const scoped = useMemo(() => (sub ? inTop.filter((p) => p.category_id && getDescendantIds(categories, sub).includes(p.category_id)) : inTop), [inTop, sub, categories]);
   const visible = useMemo(() => applyFilters(scoped, filters, variantsOf), [scoped, filters, variantsOf]);
+  // Página visible: filas completas (datos, variantes) solo para lo que se muestra
+  const pageIds = useMemo(() => visible.slice(0, limit).map((p) => p.id), [visible, limit]);
+  useEffect(() => {
+    if (pageIds.length) loadFull(pageIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageIds.join(",")]);
+  const rowOf = (p: Product) => full.get(p.id) ?? p;
+
+  async function exportVisible() {
+    const map = await loadFull(visible.map((p) => p.id));
+    exportToExcel({ products: visible.map((p) => map.get(p.id) ?? p), categories, templates, fileName: title.toLowerCase().replace(/\s+/g, "-"), variants, axes });
+  }
   const col = categoryColor(top?.name);
   const toggleFilter = (k: Filter) =>
     setFilters((s) => {
@@ -112,7 +145,7 @@ export default function CategoryInventoryPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => exportToExcel({ products: visible, categories, templates, fileName: title.toLowerCase().replace(/\s+/g, "-"), variants, axes })} className="btn-secondary btn-sm" disabled={!visible.length}>
+            <button onClick={exportVisible} className="btn-secondary btn-sm" disabled={!visible.length}>
               <IconDownload size={16} /> Excel de {sub ? "esta subcategoría" : title}
             </button>
             <button onClick={() => setView(view === "list" ? "table" : "list")} className="btn-secondary btn-sm hidden md:inline-flex">
@@ -153,12 +186,12 @@ export default function CategoryInventoryPage() {
           {!filters.size && <Link href="/capture" className="btn-primary mt-4 w-full"><IconCamera size={18} /> Agregar con foto</Link>}
         </div>
       ) : view === "table" ? (
-        <ProductTable products={visible} categories={categories} templates={templates} mode="confirmed" onChanged={() => location.reload()} />
+        <ProductTable products={visible.slice(0, limit).map(rowOf)} categories={categories} templates={templates} mode="confirmed" onChanged={() => location.reload()} />
       ) : (
         <>
           <ul className="stagger grid w-full grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
             {visible.slice(0, limit).map((p) => (
-              <ProductRow key={p.id} product={p} categories={categories} templates={templates} showSub={!sub} variants={variantsOf.get(p.id)} axes={axes} onAdjust={setAdjusting} />
+              <ProductRow key={p.id} product={rowOf(p)} categories={categories} templates={templates} showSub={!sub} variants={variantsOf.get(p.id)} axes={axes} onAdjust={(x) => setAdjusting(rowOf(x))} />
             ))}
           </ul>
           {visible.length > limit && (
@@ -173,7 +206,8 @@ export default function CategoryInventoryPage() {
           variants={variantsOf.get(adjusting.id)}
           onClose={() => setAdjusting(null)}
           onSaved={(u, v) => {
-            setProducts((ps) => ps.map((x) => (x.id === u.id ? u : x)));
+            setFull((m) => new Map(m).set(u.id, u));
+            setProducts((ps) => ps.map((x) => (x.id === u.id ? { ...x, data: { ...x.data, stock: (u.data.stock ?? u.data.cantidad ?? u.data.existencias) as number | null } } : x)));
             if (v) setVariants((vs) => vs.map((x) => (x.id === v.id ? v : x)));
           }}
         />

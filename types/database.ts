@@ -78,6 +78,25 @@ export type ProductVariant = {
   created_at: string;
 };
 
+/** Fila de la vista `product_summaries` (inventario ligero: nombre, precio, stock resueltos en la base). */
+export type ProductSummary = {
+  id: string;
+  user_id: string;
+  category_id: string | null;
+  status: ProductStatus;
+  image_url: string | null;
+  created_at: string;
+  updated_at: string;
+  nombre: string | null;
+  marca: string | null;
+  precio: number | null;
+  precio_compra: number | null;
+  stock: number | null;
+  codigo_barras: string | null;
+  /** Texto de búsqueda (nombre, marca, descripción, etiqueta, código); no se pide en listados */
+  search?: string | null;
+};
+
 export type AiUsage = {
   id: string;
   user_id: string | null;
@@ -198,7 +217,9 @@ export interface Database {
         Relationships: [];
       };
     };
-    Views: { [_ in never]: never };
+    Views: {
+      product_summaries: { Row: ProductSummary; Relationships: [] };
+    };
     Functions: { [_ in never]: never };
     Enums: { field_type: FieldType; product_status: ProductStatus; movement_type: MovementType };
     CompositeTypes: { [_ in never]: never };

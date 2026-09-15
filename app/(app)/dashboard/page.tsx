@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { queueSummary, useQueue } from "@/lib/queue";
-import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
+import { fmtMoney } from "@/lib/inventory";
 import { StepByStep, computeStates, type GuideProgress } from "@/components/guide/Guide";
 import AiUsageCard from "@/components/AiUsageCard";
 import CleanupCard from "@/components/CleanupCard";
@@ -43,7 +43,7 @@ export default function DashboardPage() {
         supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed"),
         supabase.from("categories").select("id", { count: "exact", head: true }).is("parent_id", null),
         supabase.from("profiles").select("business_name, onboarded_at").maybeSingle(),
-        supabase.from("products").select("id,data,image_url,status,category_id,user_id,ai_meta,created_at,updated_at").eq("status", "confirmed"),
+        supabase.from("product_summaries").select("stock,precio").eq("status", "confirmed"),
         supabase.from("stock_movements").select("total").eq("tipo", "venta").gte("created_at", dayStart.toISOString()),
         supabase.from("products").select("id", { count: "exact", head: true }).gte("created_at", dayStart.toISOString()),
       ]);
@@ -54,8 +54,8 @@ export default function DashboardPage() {
         types: t.count ?? 0,
         business: p.data?.business_name ?? null,
         onboarded: !!p.data?.onboarded_at,
-        agotados: list.filter((x) => (stockOf(x) ?? 0) <= 0).length,
-        sinPrecio: list.filter((x) => priceOf(x) === null).length,
+        agotados: list.filter((x) => (x.stock ?? 0) <= 0).length,
+        sinPrecio: list.filter((x) => x.precio === null).length,
         salesToday: { total: (sales.data ?? []).reduce((a, r) => a + (r.total ?? 0), 0), count: (sales.data ?? []).length },
         addedToday: added.count ?? 0,
       };

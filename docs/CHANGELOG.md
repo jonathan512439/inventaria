@@ -3,6 +3,22 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-15 · Plan v3 · Fase 0 — Cierre del Plan v2 y correcciones
+
+### 10.1 Pruebas e2e con variantes y escáner
+- **Qué**: `npm run test:e2e` ahora sigue hasta el final del flujo: instala el catálogo Ropa (ejes Talla + Color), crea un producto con 3 variantes, comprueba el stock derivado, consulta `/api/barcode` con el código de una variante (devuelve producto + variante), con el código del producto (devuelve la lista para elegir) y con uno desconocido; registra una venta por variante y verifica el total, el movimiento y que el stock manual no pise la suma; y que un producto sin variantes siga editable a mano. 22 comprobaciones.
+- **Validar**: `BASE_URL=https://inventaria.pages.dev npm run test:e2e` → «Todo OK».
+
+### 10.2 Inventario ligero (paginación real)
+- **Qué**: nueva vista `product_summaries` en la base (`supabase/008_product_summaries.sql`, aplicada) con nombre, marca, precio, costo, stock y código ya resueltos (funciones `jkey` y `safe_num`, sin importar mayúsculas ni comas decimales) y un campo `search`. **Mi inventario** (estantes) y el **Inicio** leen solo esa vista (≈ la mitad de bytes hoy; 3–5× menos con descripciones reales). La **búsqueda** se hace en el servidor (nombre, marca, descripción, etiqueta, código) con espera de 250 ms y máximo 40 resultados. Dentro de una **categoría** se cargan los resúmenes de toda la categoría (chips, filtros y conteos siguen exactos) y las **filas completas solo de la página visible** (40, luego «Ver más»); el Excel de la categoría descarga las filas completas al momento de exportar.
+- **Validar**: Inventario → los estantes muestran las mismas cifras que antes; buscar «taza» encuentra por nombre, marca o etiqueta; entrar a una categoría con más de 40 productos → «Ver más» carga el resto; filtros Agotados / Sin precio siguen contando sobre toda la categoría.
+- **Verificado**: la vista coincide fila por fila con la tabla `products` para los datos actuales (0 diferencias).
+
+### 10.3 Pendiente de esta fase
+- Correcciones de las pruebas funcionales del usuario (lista abierta en `docs/PLAN_V3.md`, Fase 0).
+
+---
+
 ## 2026-09-15 · Plan v2 · Fase 3 — Rediseño secuencial
 
 > Cambia el **orden**, no el estilo: tres pasos con barra fija, una sola acción principal por pantalla, menú de 3 + Más, Inicio «Hoy» y modo asistido para nuevos usuarios. Se conservan la paleta índigo, la tipografía y los componentes.

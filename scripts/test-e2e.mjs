@@ -1,5 +1,6 @@
 /**
- * Prueba de extremo a extremo: registro → categoría → foto → producto analizado → subcategoría → alta manual.
+ * Prueba de extremo a extremo: registro → categoría → foto → producto analizado → subcategoría → alta manual
+ *   → variantes (ejes del catálogo, stock derivado) → escáner por variante → venta por variante.
  *   npm run test:e2e                 (contra http://localhost:3000)
  *   BASE_URL=https://inventaria.pages.dev npm run test:e2e
  * Crea un usuario temporal y lo elimina al terminar. Consume 1-2 peticiones de IA.
@@ -61,7 +62,57 @@ try {
   const { error: insErr } = await admin.from("products").insert({ user_id: uid, category_id: cats.find((c) => c.name === "Regalos").id, status: "confirmed", data: { nombre: "Taza", precio: 12.5, stock: 3 }, ai_meta: {} });
   check(!insErr, "alta manual guardada con decimales (12.5)");
 
-  // 6. Medidor
+  // 6. Variantes: catálogo Ropa trae ejes; producto con variantes; stock derivado
+  r = await fetch(`${BASE}/api/setup`, { method: "POST", headers: H, body: JSON.stringify({ presets: ["ropa"] }) });
+  check(r.status === 200, `setup ropa: ${r.status}`);
+  const { data: cats2 } = await admin.from("categories").select("id,name,parent_id").eq("user_id", uid);
+  const ropa = cats2.find((c) => c.name === "Ropa" && !c.parent_id);
+  const { data: axes } = await admin.from("variant_axes").select("key,label,options").eq("category_id", ropa.id).order("sort_order");
+  check(axes?.length === 2 && axes[0].key === "talla" && axes[1].key === "color", `ejes de Ropa: ${axes?.map((a) => a.label).join(" + ")}`);
+  const dama = cats2.find((c) => c.parent_id === ropa.id && c.name === "Dama");
+  const { data: polera } = await admin.from("products").insert({ user_id: uid, category_id: dama.id, status: "confirmed", data: { nombre: "Polera básica", precio: 35, stock: 1 }, ai_meta: {} }).select().single();
+  const { error: vErr } = await admin.from("product_variants").insert([
+    { user_id: uid, product_id: polera.id, values: { talla: "S", color: "Rojo" }, label: "S · Rojo", stock: 3 },
+    { user_id: uid, product_id: polera.id, values: { talla: "M", color: "Rojo" }, label: "M · Rojo", stock: 5, codigo_barras: "E2E-7791234567890" },
+    { user_id: uid, product_id: polera.id, values: { talla: "L", color: "Azul" }, label: "L · Azul", stock: 0 },
+  ]);
+  check(!vErr, `variantes creadas ${vErr?.message ?? ""}`);
+  const { data: p1 } = await admin.from("products").select("data").eq("id", polera.id).single();
+  check(p1.data.stock === 8, `stock del producto = suma de variantes (8) → ${p1.data.stock}`);
+
+  // 7. Escáner por variante: el código de la M roja encuentra producto + variante
+  r = await fetch(`${BASE}/api/barcode?code=E2E-7791234567890`, { headers: H });
+  const bc = await r.json();
+  check(r.status === 200 && bc.found === "own" && bc.variant?.label === "M · Rojo" && bc.variants?.length === 3, `barcode variante: ${bc.found} → ${bc.variant?.label ?? "-"} (${bc.variants?.length ?? 0} variantes)`);
+  // Código del producto (no de una variante) con variantes → devuelve la lista para elegir
+  await admin.from("products").update({ data: { ...p1.data, codigo_barras: "E2E-PROD-1" } }).eq("id", polera.id);
+  r = await fetch(`${BASE}/api/barcode?code=E2E-PROD-1`, { headers: H });
+  const bc2 = await r.json();
+  check(r.status === 200 && bc2.found === "own" && bc2.variant === null && bc2.variants?.length === 3, "barcode del producto con variantes → pide elegir variante");
+  // Código desconocido → catálogos públicos o nada, nunca error
+  r = await fetch(`${BASE}/api/barcode?code=0000000000000`, { headers: H });
+  const bc3 = await r.json();
+  check(r.status === 200 && (bc3.found === "none" || bc3.found === "public"), `barcode desconocido: ${bc3.found}`);
+
+  // 8. Venta por variante (como hace +/− Stock): stock de la variante baja, el total también, movimiento con variante
+  const { data: mRoja } = await admin.from("product_variants").select("*").eq("product_id", polera.id).eq("label", "M · Rojo").single();
+  await admin.from("product_variants").update({ stock: mRoja.stock - 2 }).eq("id", mRoja.id);
+  await admin.from("stock_movements").insert({ user_id: uid, product_id: polera.id, product_name: "Polera básica", variant_id: mRoja.id, variant_label: mRoja.label, tipo: "venta", cantidad: 2, precio_unitario: 35, total: 70, stock_resultante: mRoja.stock - 2 });
+  const { data: p2 } = await admin.from("products").select("data").eq("id", polera.id).single();
+  check(p2.data.stock === 6, `venta de 2 M rojas → stock total 6 → ${p2.data.stock}`);
+  const { data: mv } = await admin.from("stock_movements").select("variant_label,total").eq("product_id", polera.id);
+  check(mv?.length === 1 && mv[0].variant_label === "M · Rojo" && Number(mv[0].total) === 70, "movimiento registrado con la variante y el total");
+  // Escribir el stock a mano no pisa la suma
+  await admin.from("products").update({ data: { ...p2.data, stock: 99 } }).eq("id", polera.id);
+  const { data: p3 } = await admin.from("products").select("data").eq("id", polera.id).single();
+  check(p3.data.stock === 6, "el stock manual no pisa la suma de variantes");
+  // Producto sin variantes sigue editable a mano
+  const { data: taza } = await admin.from("products").select("id,data").eq("user_id", uid).eq("data->>nombre", "Taza").single();
+  await admin.from("products").update({ data: { ...taza.data, stock: 7 } }).eq("id", taza.id);
+  const { data: taza2 } = await admin.from("products").select("data").eq("id", taza.id).single();
+  check(taza2.data.stock === 7, "producto sin variantes: el stock se edita a mano como siempre");
+
+  // 9. Medidor
   r = await fetch(`${BASE}/api/usage`, { headers: H });
   const u = await r.json();
   check(r.status === 200 && Array.isArray(u.models) && u.models.length >= 3, `usage: ${u.models?.length} modelos, ${u.totalToday} análisis hoy`);
