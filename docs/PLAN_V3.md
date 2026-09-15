@@ -105,11 +105,11 @@ Depende de: Fase 3.
 
 **Acepta cuando** «¿cuánto debe Juanito y por qué productos?» se responde en una pantalla; un abono parcial deja el saldo correcto; una entrega de 20 unidades con liquidación 15 vendidas / 5 devueltas deja el stock en tienda y las ventas correctas.
 
-## Fase 5 · Información que hoy no existe (1,5 semanas)
+## Fase 5 · Información que hoy no existe (1,5 semanas) — desplegada 2026-09-15 (CHANGELOG 15.x)
 
-- **Reportes:** rotación (qué se vende y qué lleva 60 días sin moverse), margen por categoría y producto, comparativo semana/mes, valor del inventario en el tiempo, por vencer, stock muerto.
-- **Resumen diario** por notificación de la app instalada (Web Push), correo o WhatsApp: ventas del día, agotados, por reponer, por vencer, deudas vencidas.
-- **«Pregúntale a tu inventario»:** chat con la IA sobre los datos propios; el servidor genera consultas de solo lectura sobre vistas seguras, las valida (lista blanca de tablas/columnas) y responde en lenguaje natural; sin imágenes, bajo costo.
+- ✅ (15.1) **Reportes:** rotación (qué se vende y qué lleva 60 días sin moverse), margen por categoría y producto, comparativo semana/mes, valor del inventario en el tiempo, por vencer, stock muerto.
+- ✅ parcial (15.2: pantalla + WhatsApp; el envío automático pasa a la Fase 8) **Resumen diario** por notificación de la app instalada (Web Push), correo o WhatsApp: ventas del día, agotados, por reponer, por vencer, deudas vencidas.
+- ✅ (15.3, con resumen de solo lectura en vez de SQL generado) **«Pregúntale a tu inventario»:** chat con la IA sobre los datos propios; el servidor genera consultas de solo lectura sobre vistas seguras, las valida (lista blanca de tablas/columnas) y responde en lenguaje natural; sin imágenes, bajo costo.
 
 **Acepta cuando** el reporte de rotación y el resumen diario coinciden con los movimientos registrados; 10 preguntas típicas se responden correctamente sin tocar datos.
 
@@ -223,6 +223,7 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
+- 2026-09-15 · Fase 5 (15.1–15.4) desplegada; el envío automático del resumen diario pasa a la Fase 8.
 - 2026-09-15 · Fase 4 (14.1–14.6) desplegada.
 - 2026-09-15 · Fase 3 (13.1–13.6) desplegada.
 - 2026-09-15 · Fase 2 (12.1–12.10) desplegada + ajustes de las pruebas funcionales (12.11–12.16): avisos configurables, descartar deslizando, cámara del conteo, vencimiento por IA y limpieza de datos que sobran.

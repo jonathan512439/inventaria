@@ -248,8 +248,7 @@ try {
   const { count: beforeAsk } = await admin.from("products").select("id", { count: "exact", head: true }).eq("user_id", uid);
   r = await fetch(`${BASE}/api/ask`, { method: "POST", headers: H, body: JSON.stringify({ question: "¿Cuánto vendí en total y quién me debe?" }) });
   const ask = await r.json();
-  check(r.status === 200 && typeof ask.answer === "string" && ask.answer.length > 20, `ask: ${r.status} → «${(ask.answer ?? ask.error ?? "").slice(0, 90).replace(/
-/g, " ")}…»`);
+  check(r.status === 200 && typeof ask.answer === "string" && ask.answer.length > 20, `ask: ${r.status} → «${(ask.answer ?? ask.error ?? "").slice(0, 90).replace(/\s+/g, " ")}…»`);
   check(/37[.,]5|Juanito|17[.,]5/.test(ask.answer ?? ""), "la respuesta usa los datos reales (vendido 37,5 / Juanito / debe 17,5)");
   const { count: afterAsk } = await admin.from("products").select("id", { count: "exact", head: true }).eq("user_id", uid);
   check(beforeAsk === afterAsk, "preguntar no cambia nada");

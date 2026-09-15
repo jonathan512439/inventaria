@@ -3,6 +3,26 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-15 · Plan v3 · Fase 5 — Información que hoy no existe
+
+### 15.1 Cómo va el negocio (`/reports`)
+- **Qué**: **Más → Cómo va el negocio** (también «Cómo va» en el Inicio). Periodo (7 días / este mes / 90 días) y cuatro pestañas: **Ventas** (vendido, ganancia y n.º de ventas **contra el periodo anterior** con ▲▼ %, gráfica de los últimos 14 días, lo que más dinero deja); **Lo que se mueve** (los 10 más vendidos con aviso «por reponer», y **parado**: productos con stock sin venderse en 60 días con el dinero quieto); **Ganancia** (por categoría: vendido − costo, % de margen con barra y aviso si faltan costos); **Lo que tengo** (valor a precio de venta y a costo, ganancia si se vende todo, accesos a por reponer / por vencer / parados, valor por categoría).
+- **Validar**: Cómo va → Ventas → los números coinciden con Ventas y movimientos; Lo que se mueve → un producto con stock y sin ventas aparece en «Parado».
+
+### 15.2 Resumen de hoy (`/digest`)
+- **Qué**: **Más → Resumen de hoy** (y en Inicio → Más herramientas): vendido y ganancia de hoy (con ayer al lado), agotados y por reponer, por vencer (con días), quién debe (y deudas de +30 días), y el **mensaje ya redactado** con **Enviar por WhatsApp** para mandárselo a uno mismo o a un socio.
+- **Validar**: abrir Resumen de hoy → el texto refleja las ventas del día → Enviar por WhatsApp abre el chat con el mensaje.
+- **Nota**: el envío automático (notificación o correo a una hora fija) queda para la Fase 8: en el plan gratuito no hay correo saliente y las notificaciones push requieren claves y un servidor de envío.
+
+### 15.3 Pregúntale a tu inventario (`/ask`)
+- **Qué**: **Más → Pregúntale a tu inventario**: preguntas en lenguaje normal («¿Cuánto vendí esta semana y cuánto gané?», «¿Quién me debe?», «¿Qué tengo parado?») con sugerencias para empezar. El servidor arma un **resumen de solo lectura** de tus datos (productos con stock, precio, costo y mínimo; ventas de 90 días por producto y por día; últimas ventas; deudas) y la IA responde con esas cifras, en español sencillo; si algo no está en los datos, lo dice. **Nunca cambia nada.** Cuenta como 1 análisis (o usa tu clave propia).
+- **Validar**: preguntar «¿cuánto vendí en total y quién me debe?» → responde con las cifras reales; el inventario no cambia.
+
+### 15.4 Pruebas
+- `npm run test:e2e`: pantallas de reportes, resumen y preguntar; la respuesta de la IA usa los datos reales (vendido / cliente / deuda) y no modifica nada. **58/58 en verde contra producción** (una pasada tuvo fallos transitorios de red; las dos siguientes, limpias).
+
+---
+
 ## 2026-09-15 · Plan v3 · Fase 4 — Clientes: fiado, entregas y reportes (sin fidelización)
 
 Migración `supabase/013_clientes.sql` aplicada: `customers`, `payments` (abonos), `consignments` / `consignment_items` (mercadería entregada), ventas ligadas al cliente y movimientos enlazados a la entrega.
