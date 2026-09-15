@@ -3,9 +3,9 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
-## 2026-09-15 · Plan v3 · Fase 6 (parte 1) — El negocio y su equipo
+## 2026-09-15 · Plan v3 · Fase 6 — El negocio y su equipo, importar, respaldos y etiquetas
 
-Migraciones `014_negocios.sql` → `018_pin_privado.sql` aplicadas. **Verificación de la migración:** conteos iguales antes y después en las 20 tablas y todas las filas con negocio; `npm run test:team` 18/18 y `npm run test:e2e` 58/58 en verde contra producción.
+Migraciones `014_negocios.sql` → `019_respaldos.sql` aplicadas. **Verificación de la migración:** conteos iguales antes y después en las 20 tablas y todas las filas con negocio; `npm run test:team` 18/18 y `npm run test:e2e` 58/58 en verde contra producción.
 
 ### 16.1 El negocio como unidad de datos
 - **Qué**: cada cuenta existente pasó a ser un **negocio** propio (con su dueño) sin que nada cambie a la vista. Todas las tablas llevan `business_id` y la seguridad (RLS) es **por negocio**: quien es miembro ve y edita lo del negocio; nadie más. La base rellena el negocio en cada alta (no depende de la app) y crea el negocio al registrarse. El número de venta es por negocio y el cierre de caja es uno por negocio y día. Las rutas que escriben con la clave del servidor (foto → producto, alta por código) envían el negocio; Ordenar y limpiar trabaja por negocio.
@@ -23,8 +23,18 @@ Migraciones `014_negocios.sql` → `018_pin_privado.sql` aplicadas. **Verificaci
 - **Qué**: precio de compra, ganancia (Inventario, Ventas, Caja, tickets, Resumen de hoy, Pregúntale), historial de precios y las pantallas del dueño: Cómo va el negocio, Anotar una compra, Cambiar precios, Descargar en Excel, Mi tienda, Cuándo avisarme, Ordenar y limpiar (muestran «Esto lo maneja el dueño»). En la base, la vista del inventario ya **no entrega el costo** a un vendedor; el ocultamiento completo del costo en `products.data` se remata en la Fase 7 con la matriz de acceso.
 - **Validar**: entrar como vendedor → Más no muestra esas opciones; Inventario no muestra ganancia; la ficha no muestra precio de compra.
 
-### 16.5 Pendiente de la fase (parte 2)
-- Importar Excel con mapeo guiado, respaldos automáticos y exportación total, etiquetas imprimibles con código/QR.
+### 16.5 Importar desde Excel (`/import`) — parte 2
+- **Qué**: **Más → Traer desde Excel** (dueño). Se elige la planilla (.xlsx, .xls o .csv; si tiene varias hojas, se elige una), la app **adivina qué es cada columna** por su título (Producto/Nombre, Rubro/Categoría, Sección/Subcategoría, Precio de venta, Costo, Cantidad/Stock, Código, Vence, Marca, Stock mínimo, Precio por mayor, Unidades por paquete, Descripción) y se puede corregir columna por columna; lo que no se reconoce se guarda como «otro dato» con el nombre de la columna o se ignora. La **vista previa** dice cuántos son nuevos, cuántos **ya existen** (mismo código de barras o mismo nombre, sin importar mayúsculas ni acentos), qué filas se saltan (sin nombre, repetidas dentro de la planilla) y qué **categorías o subcategorías se crearán**. Con los que ya existen se elige: actualizar precio, costo, código y stock, o dejarlos. Acepta precios con coma, códigos numéricos largos, fechas en texto, de Excel o «sin fecha». Importa por tandas de 100; el stock inicial queda como **entrada** «importado de Excel» y los cambios de stock como **ajuste**; los productos con variantes no cambian de stock desde la planilla. Lógica probada con `npm run test:import`.
+- **Validar**: Exportar a Excel → editar precios y agregar filas → Traer desde Excel → la vista previa muestra «ya existen» para los editados y «nuevos» para las filas agregadas → Importar → el inventario refleja los cambios y Ventas y movimientos muestra las entradas.
+
+### 16.6 Respaldos (`/backup`) y exportación total
+- **Qué**: **Más → Respaldos** (dueño). Un solo Excel con **todo el negocio**: portada con conteos, Inventario (mismo formato que Exportar, con variantes), Papelera, Ventas y su detalle, Clientes, Abonos, Entregas, Movimientos, Compras, Proveedores, Conteos, Cierres de caja, Caja, Historial de precios, Categorías, Datos definidos, Ejes de variantes y Equipo (con nombres en vez de ids). **Guardar respaldo ahora** lo sube al bucket privado `backups/<negocio>/<fecha>-manual.xlsx`; **Descargar copia completa** lo baja al celular. **Automático:** GitHub Actions (`backup.yml`, sábados 23:00 Bolivia, o a mano desde Actions) ejecuta `npm run backup` con la clave de servicio y sube `<fecha>-auto.xlsx` de cada negocio; se conservan las **últimas 8** copias. La lista muestra fecha, origen y tamaño, con descarga por enlace firmado (2 min) y borrado. Seguridad: bucket privado, lectura para miembros del negocio, subida/borrado solo para el dueño (migración `019_respaldos.sql`); probado con `npm run test:backup` (genera, descarga, hojas presentes, y sin sesión no se ve nada). El envío por correo queda para la Fase 8 (SMTP).
+- **Validar**: Respaldos → Guardar respaldo ahora → aparece en la lista → Descargar → el Excel abre con todas las hojas. En GitHub → Actions → «Respaldo semanal» → Run workflow → aparece la copia «Automático».
+
+### 16.7 Etiquetas para imprimir (`/labels`)
+- **Qué**: **Más → Etiquetas para imprimir** (todo el equipo). Se filtra por categoría, búsqueda o «solo sin código»; se marcan productos (o variantes) y cuántas etiquetas de cada uno (o «= stock»). **Crear códigos internos** asigna a los que no tienen código un **IA + 6 números** único en el negocio, guardado como su código de barras (en la variante si corresponde), así la cámara de la app los reconoce al vender, contar o escanear. Cada etiqueta lleva nombre, variante · negocio, **código de barras Code 128** (`jsbarcode`, carga bajo demanda) y precio (opcional). Formatos: **Hoja A4** (3 × 8 = 24 por hoja, papel adhesivo) o **Rollo 50 × 30 mm** (una por etiqueta); vista previa en pantalla y **Imprimir** (solo salen las etiquetas).
+- **Validar**: marcar 3 productos sin código → Crear códigos internos → Imprimir (o Guardar como PDF) → escanear una etiqueta impresa con «Escanear un código» → abre el producto.
+
 
 ---
 

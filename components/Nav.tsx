@@ -7,7 +7,7 @@ import { enqueue } from "@/lib/queue";
 import { resizeImage } from "@/lib/image";
 import { useFlow } from "./FlowProvider";
 import WhatsNew from "./WhatsNew";
-import { IconAlert, IconBox, IconCamera, IconCheckCircle, IconDownload, IconFolder, IconHome, IconImages, IconList, IconSettings, IconSparkles, IconTag, IconTrash, IconX } from "./ui/Icons";
+import { IconAlert, IconBox, IconCamera, IconCheckCircle, IconDownload, IconFolder, IconHome, IconImages, IconList, IconRefresh, IconSettings, IconSparkles, IconTable, IconTag, IconTrash, IconX } from "./ui/Icons";
 import { LogoWordmark } from "./ui/Logo";
 
 /** Barra inferior: Inicio · Revisar · Agregar (centro) · Inventario · Más ▾ */
@@ -56,6 +56,8 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
       { href: "/count", label: "Contar lo que tengo", hint: "Revisa el estante y corrige lo que no coincide", Icon: IconCheckCircle },
       { href: "/prices", label: "Cambiar precios", hint: "Sube o baja el precio de muchos productos a la vez", Icon: IconTag, ownerOnly: true },
       { href: "/export", label: "Descargar en Excel", hint: "Tu inventario en una planilla para ver o compartir", Icon: IconDownload, ownerOnly: true },
+      { href: "/import", label: "Traer desde Excel", hint: "Carga tu inventario desde una planilla que ya tienes", Icon: IconTable, ownerOnly: true },
+      { href: "/labels", label: "Etiquetas para imprimir", hint: "Código de barras, nombre y precio para pegar en cada producto", Icon: IconTag },
     ],
   },
   {
@@ -64,6 +66,7 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
       { href: "/store", label: "Mi tienda", hint: "Qué vendes y cómo se ordena tu inventario", Icon: IconFolder, ownerOnly: true },
       { href: "/alerts", label: "Cuándo avisarme", hint: "Desde cuántas unidades quieres que te avise", Icon: IconAlert, ownerOnly: true },
       { href: "/team", label: "Equipo", hint: "Quiénes usan el negocio, invitaciones y tu PIN", Icon: IconHome },
+      { href: "/backup", label: "Respaldos", hint: "Copia completa de tu negocio cada semana, para descargar", Icon: IconRefresh, ownerOnly: true },
       { href: "/settings", label: "Ajustes", hint: "Nombre del negocio, tu cuenta y ayuda", Icon: IconSettings },
     ],
   },

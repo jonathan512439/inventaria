@@ -17,13 +17,17 @@
     "test:variants": "node scripts/test-variants.mjs",
     "test:team": "node scripts/test-team.mjs",
     "ai:probe": "node scripts/gemini-probe.mjs",
-    "storage:clean": "node scripts/cleanup-orphans.mjs"
+    "storage:clean": "node scripts/cleanup-orphans.mjs",
+    "backup": "tsx scripts/backup.mts",
+    "test:backup": "node scripts/test-backup.mjs",
+    "test:import": "tsx scripts/test-import.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.45.4",
     "barcode-detector": "^3.2.2",
     "heic2any": "^0.0.4",
+    "jsbarcode": "^3.12.3",
     "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -32,6 +36,7 @@
   "devDependencies": {
     "@cloudflare/next-on-pages": "1.13.15",
     "@cloudflare/workers-types": "^4.20240909.0",
+    "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -41,6 +46,7 @@
     "eslint-plugin-next-on-pages": "1.13.15",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
+    "tsx": "^4.23.13",
     "typescript": "^5.5.2",
     "vercel": "^37.14.0",
     "wrangler": "^3.90.0"

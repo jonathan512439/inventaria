@@ -90,12 +90,21 @@ function autoWidth(rows: Record<string, unknown>[], headers: string[]) {
   }));
 }
 
+export type XlsxLib = typeof import("xlsx");
+
 /** Genera y descarga un .xlsx en el navegador con las columnas definidas por el usuario. */
-export async function exportToExcel({ products, categories, templates, fileName = "inventario", sheetPerCategory = false, variants = [], axes = [] }: ExportArgs) {
+export async function exportToExcel(args: ExportArgs) {
   // Carga bajo demanda: la librería (7 MB) no entra en el bundle del servidor ni en la carga inicial
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
-  const usedNames = new Set<string>();
+  addInventorySheets(XLSX, wb, args);
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `${args.fileName ?? "inventario"}-${stamp}.xlsx`);
+}
+
+/** Añade al libro las hojas del inventario (Inventario o una por categoría, y Resumen si hay variantes). Sirve en navegador y en Node. */
+export function addInventorySheets(XLSX: XlsxLib, wb: import("xlsx").WorkBook, { products, categories, templates, sheetPerCategory = false, variants = [], axes = [] }: ExportArgs) {
+  const usedNames = new Set<string>(wb.SheetNames);
   const variantsOf = new Map<string, ProductVariant[]>();
   variants.forEach((v) => variantsOf.set(v.product_id, [...(variantsOf.get(v.product_id) ?? []), v]));
   const hasVariants = products.some((p) => variantsOf.has(p.id));
@@ -177,7 +186,4 @@ export async function exportToExcel({ products, categories, templates, fileName 
   if (wb.SheetNames.length === 0) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Sin productos"]]), "Inventario");
   }
-
-  const stamp = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `${fileName}-${stamp}.xlsx`);
 }

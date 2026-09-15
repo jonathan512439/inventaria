@@ -113,13 +113,13 @@ Depende de: Fase 3.
 
 **Acepta cuando** el reporte de rotación y el resumen diario coinciden con los movimientos registrados; 10 preguntas típicas se responden correctamente sin tocar datos.
 
-## Fase 6 · Equipo y datos (2 semanas) — parte 1 desplegada 2026-09-15 (CHANGELOG 16.x)
+## Fase 6 · Equipo y datos (2 semanas) — ✅ desplegada 2026-09-15 (CHANGELOG 16.1–16.7)
 
 - ✅ (16.1) **Negocio con varios usuarios:** `businesses`, `business_members(role dueño|vendedor, pin_hash)`; todas las tablas ganan `business_id` con RLS por pertenencia (`is_member(business_id)`). Migración: un negocio por usuario existente, verificación de conteos antes/después, despliegue en horario de baja actividad.
 - ✅ (16.2, 16.3) **Roles y PIN:** PIN de 4 dígitos para cambiar de persona en el mismo celular (bloqueo tras 5 intentos); cada venta, ajuste, conteo o abono queda firmado (`created_by`).
 - ✅ (16.2) **Invitaciones** por enlace o código; el dueño puede quitar a alguien y ver su actividad.
-- **Importar Excel** con mapeo de columnas guiado y vista previa; **respaldos automáticos** semanales (Excel completo al correo, Cron de GitHub Actions) y **exportación total** de datos.
-- **Etiquetas imprimibles** con código interno / QR para productos sin código de barras (hoja A4 o rollo).
+- ✅ (16.5, 16.6) **Importar Excel** con mapeo de columnas guiado y vista previa; **respaldos automáticos** semanales (Excel completo al bucket privado, Cron de GitHub Actions; el correo se conecta en la Fase 8) y **exportación total** de datos.
+- ✅ (16.7) **Etiquetas imprimibles** con código interno (Code 128, que la cámara ya lee; no hizo falta QR) para productos sin código de barras (hoja A4 o rollo).
 - Sucursales y traspasos: fuera de este plan; el modelo de negocio los deja preparados.
 
 **Acepta cuando** dos personas trabajan sobre el mismo inventario desde dos celulares y cada movimiento muestra quién lo hizo; el vendedor no ve costos ni ganancia; un Excel de 300 filas se importa sin errores.
@@ -223,7 +223,7 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
-- 2026-09-15 · Fase 6 parte 1 (16.1–16.4) desplegada: negocio, equipo, roles, PIN y firma. Queda la parte 2 (importar, respaldos, etiquetas).
+- 2026-09-15 · Fase 6 completa (16.1–16.7): negocio, equipo, roles, PIN, firma, importar Excel, respaldos semanales y etiquetas. El respaldo por correo pasa a la Fase 8 junto con el resumen diario.
 - 2026-09-15 · Fase 5 (15.1–15.4) desplegada; el envío automático del resumen diario pasa a la Fase 8.
 - 2026-09-15 · Fase 4 (14.1–14.6) desplegada.
 - 2026-09-15 · Fase 3 (13.1–13.6) desplegada.

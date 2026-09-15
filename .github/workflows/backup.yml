@@ -1,0 +1,24 @@
+name: Respaldo semanal
+
+on:
+  schedule:
+    # Domingos 03:00 UTC (sábado 23:00 en Bolivia)
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Un .xlsx completo por negocio al bucket privado `backups` (se conservan los últimos 8)
+      - name: Generar y subir respaldos
+        run: npx tsx scripts/backup.mts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

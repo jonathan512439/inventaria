@@ -9,7 +9,7 @@ import { resetCoach, resetTour } from "@/lib/coach";
 import WhatsNew from "@/components/WhatsNew";
 import AiKeyCard from "@/components/AiKeyCard";
 import { useFlow } from "@/components/FlowProvider";
-import { IconAlert, IconCheckCircle, IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
+import { IconAlert, IconCheckCircle, IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconRefresh, IconSparkles, IconTable, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -82,6 +82,9 @@ export default function SettingsPage() {
         {flow.isOwner && <Row href="/alerts" icon={<IconAlert />} title="Avisos de reposición" subtitle="Desde cuántas unidades avisar y de qué categorías o productos" />}
         <Row href="/movements" icon={<IconList />} title="Ventas y movimientos" subtitle="Ingresos, entradas y retiros de stock" />
         {flow.isOwner && <Row href="/export" icon={<IconDownload />} title="Exportar a Excel" subtitle="Descarga tu inventario" />}
+        {flow.isOwner && <Row href="/import" icon={<IconTable />} title="Importar desde Excel" subtitle="Carga tu inventario desde una planilla" />}
+        {flow.isOwner && <Row href="/backup" icon={<IconRefresh />} title="Respaldos" subtitle="Copia completa cada semana; guarda o descarga una ahora" />}
+        <Row href="/labels" icon={<IconTag />} title="Etiquetas para imprimir" subtitle="Código de barras, nombre y precio para pegar en cada producto" />
         <Row href="/dashboard#guia" icon={<IconList />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" />
         <Row href="/dashboard#limpiar" icon={<IconTrash />} title="Ordenar y limpiar" subtitle="Pendientes viejos, categorías vacías y fotos sueltas" />
       </section>
