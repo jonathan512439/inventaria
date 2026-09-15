@@ -73,16 +73,16 @@ Que el número de stock sea creíble y avise antes de que falte.
 
 **Acepta cuando** una categoría de 40 productos se cuenta físicamente en menos de 5 minutos y las diferencias quedan registradas; la lista de reposición sale correcta contra los mínimos; un producto que vence en 7 días aparece en Inicio; un producto borrado se recupera intacto.
 
-## Fase 3 · Ventas para decidir (2 semanas)
+## Fase 3 · Ventas para decidir (2 semanas) — desplegada 2026-09-15 (CHANGELOG 13.x)
 
 Registrar la venta como ocurre en el mostrador, sin convertirse en un punto de venta completo.
 
-- **Venta con carrito** (`sales`, `sale_items`): varios productos y variantes en una sola venta (escáner o búsqueda), cantidad, descuento simple, total.
-- **Medio de pago** (efectivo, QR, transferencia) y **estado de pago** (pagado, parcial, fiado; el fiado se completa en la Fase 4 con el cliente).
-- **Cierre de caja diario** (`cash_closings`): ventas por medio de pago, retiros, diferencia contra lo contado; historial de cierres.
-- **Ticket** compartible por WhatsApp o imprimible (texto simple; sin impresora fiscal).
-- **Ganancia real:** `sale_items.unit_cost` = precio de compra vigente al vender; los reportes dejan de estimar por stock.
-- Los movimientos actuales (+/− Stock) se mantienen como atajo y quedan ligados a la venta (`stock_movements.sale_id`).
+- ✅ (13.1) **Venta con carrito** (`sales`, `sale_items`): varios productos y variantes en una sola venta (escáner o búsqueda), cantidad, descuento simple, total.
+- ✅ (13.1) **Medio de pago** (efectivo, QR, transferencia) y **estado de pago** (pagado, parcial, fiado; el fiado se completa en la Fase 4 con el cliente).
+- ✅ (13.3) **Cierre de caja diario** (`cash_closings`): ventas por medio de pago, retiros, diferencia contra lo contado; historial de cierres.
+- ✅ (13.1) **Ticket** compartible por WhatsApp o imprimible (texto simple; sin impresora fiscal).
+- ✅ (13.2) **Ganancia real:** `sale_items.unit_cost` = precio de compra vigente al vender; los reportes dejan de estimar por stock.
+- ✅ (13.5) Los movimientos actuales (+/− Stock) se mantienen como atajo y quedan ligados a la venta (`stock_movements.sale_id`).
 
 Depende de: Fase 2 (costos de compra) para la ganancia real.
 
@@ -223,6 +223,7 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
+- 2026-09-15 · Fase 3 (13.1–13.6) desplegada.
 - 2026-09-15 · Fase 2 (12.1–12.10) desplegada + ajustes de las pruebas funcionales (12.11–12.16): avisos configurables, descartar deslizando, cámara del conteo, vencimiento por IA y limpieza de datos que sobran.
 - 2026-09-15 · Fase 0 (10.1–10.2) y Fase 1 (11.1–11.6) desplegadas; queda abierta la lista de correcciones de las pruebas funcionales.
 - 2026-09-15 · v3.0 · Plan inicial (sustituye a la página externa publicada el mismo día; a partir de ahora toda planificación vive en este archivo).

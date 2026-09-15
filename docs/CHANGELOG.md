@@ -3,6 +3,37 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-15 · Plan v3 · Fase 3 — Ventas para decidir
+
+Migración `supabase/012_ventas.sql` aplicada: tickets (`sales`, `sale_items`), dinero de caja (`cash_movements`), cierres (`cash_closings`), movimientos de stock enlazados al ticket y número correlativo por negocio.
+
+### 13.1 Vender (`/sell`)
+- **Qué**: nueva pantalla **Vender** (Inicio, Inventario y Más → Del día a día): agrega productos **escaneando o buscando** (con «los más vendidos» a mano; si tiene variantes pregunta cuál), ajusta cantidades con +/−, cambia el precio por línea (y **Mayorista** a un toque si el producto lo tiene), descuento en Bs, **¿Cómo paga?** (Efectivo / QR / Transferencia) y **¿Paga todo ahora?** (Sí, todo / Una parte / Fiado, con el nombre de quién debe y cuánto paga ahora). Avisa si se vende por encima del stock. Al cobrar: ticket numerado, el stock baja producto por producto (o por variante) y queda un movimiento por línea enlazado al ticket. Pantalla final con el ticket en texto, **Enviar por WhatsApp**, Imprimir y Nueva venta.
+- **Validar**: Vender → escanear 2 productos → cantidad 3 en uno → Efectivo → *Cobrar Bs X* → ventana de confirmación con el resumen → ticket N.º 1 con las líneas; el stock de esos productos bajó y en Ventas y movimientos aparece el ticket con su detalle.
+
+### 13.2 Ganancia real
+- **Qué**: cada línea guarda el **costo de compra vigente** al vender (`unit_cost`) y el ticket su `cost_total`; la ganancia deja de estimarse por stock: **Ganancia real = vendido − lo que te costó**, en Ventas y movimientos (por periodo), en cada ticket («gana Bs 5») y en la Caja. Si faltan costos de compra, lo dice.
+- **Validar**: producto con precio de compra 10 y venta 12,50 × 2 → el ticket muestra «gana Bs 5».
+
+### 13.3 Caja de hoy (`/cash`)
+- **Qué**: **Vendido hoy** (con ganancia), **Cobrado** (y cuánto quedó fiado), lo cobrado **por cada medio de pago**, **dinero que salió o entró aparte** (retiros para gastos, cambio inicial), **efectivo que debería haber** = efectivo cobrado + ingresos − retiros, casilla para escribir **cuánto hay en la caja** con el veredicto (cuadra / de más / faltan) y **Cerrar caja de hoy** (uno por día; si vendes más después se vuelve a cerrar y se actualiza). Historial de cierres con si cuadró.
+- **Validar**: anotar un retiro de Bs 5 → el efectivo esperado baja 5; escribir el efectivo contado → mensaje «Cuadra perfecto» o la diferencia; Cerrar caja → aparece en cierres anteriores.
+
+### 13.4 Ventas y movimientos con tickets
+- **Qué**: la pestaña **Ventas** muestra los tickets (N.º, hora, medio, estado, total y ganancia) y al tocar uno, sus líneas. Resumen: **Vendido**, **Ganancia real** y **Por cobrar** (fiadas o a medias). Las ventas rápidas hechas **sin conexión** (que no tienen ticket) se muestran aparte y se suman al total. Accesos a Vender y Caja.
+- **Validar**: `/movements` → tocar un ticket → se despliegan sus productos.
+
+### 13.5 +/− Stock «Sí, es una venta» pasa por el mismo camino
+- **Qué**: la venta rápida desde la fila del producto crea un ticket de 1 línea (con número, costo y movimiento), así todo cuenta igual en Caja, ganancia y reportes. Sin conexión sigue guardándose en el celular y se envía al reconectar.
+- **Validar**: +/− Stock → Restar → Sí, es venta → el aviso dice «Venta N.º N» y aparece en Ventas y movimientos.
+
+### 13.6 Pruebas
+- `npm run test:e2e`: tickets numerados por negocio, vendido/ganancia/por cobrar, movimiento enlazado al ticket, cierre único por día que se actualiza, pantallas Vender/Caja/Ventas. **45/45 en verde contra producción.**
+
+Pendiente para la Fase 4: el fiado pasa a estar ligado a un **cliente** con saldo, abonos y recordatorio (hoy se guarda el nombre y lo pendiente por ticket).
+
+---
+
 ## 2026-09-15 · Ajustes tras las pruebas funcionales (Fase 2)
 
 ### 12.11 Avisos de reposición configurables (Ajustes → Avisos)
