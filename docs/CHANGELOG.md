@@ -32,6 +32,20 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
 ---
 
+### 12.24 El botón verde deja de tapar las listas (Contar, Nueva compra y el resto)
+- **Qué**: el botón «pegado» seguía flotando sobre las últimas filas porque compartía el flujo de la página. Ahora es una **barra fija** sobre el menú inferior (móvil) y **cada pantalla reserva su altura** al final, así la última fila siempre queda visible por encima del botón. Aplica a *Terminar y corregir…* (Contar lo que tengo), *Registrar compra*, *Aplicar a N productos*, *Confirmar y pasar al siguiente* y *Guardar cambios*. En computadora se mantiene el botón al final del contenido.
+- **Validar**: en *Contar lo que tengo*, bajar hasta el final de una categoría larga → la última fila se ve completa encima del botón verde.
+
+### 12.25 Ventanas de confirmación con el diseño de la app
+- **Qué**: se sustituyen todos los avisos grises del navegador por una **ventana propia**: título en pregunta, explicación en una frase, **resumen en filas** cuando hay cifras (p. ej. al terminar un conteo: productos contados, coinciden, falta mercadería, hay de más, diferencia total) y botón de color según lo que se hace (verde para confirmar, rojo para borrar). Está en: terminar o abandonar un conteo, registrar o abandonar una compra, quitar proveedor, cambiar precios, papelera (borrar uno / vaciar), enviar a la papelera, eliminar pendiente, volver a analizar con IA, Ordenar y limpiar, quitar variante o eje, quitar la clave de IA, cancelar el lote de fotos, quitar un dato y eliminar categoría.
+- **Validar**: Contar lo que tengo → escribir un contado distinto → *Terminar y corregir* → aparece la ventana con el resumen (coinciden / falta mercadería / hay de más) y los botones *Sí, corregir N* / *Seguir contando*.
+
+### 12.26 Mi tienda: el nombre de la categoría ya no queda tapado
+- **Qué**: en el celular, el botón **Eliminar** se superponía al nombre. Ahora es un icono de papelera alineado a la derecha (con texto solo en computadora) y el nombre ocupa su espacio, con un lápiz que indica que se puede renombrar.
+- **Validar**: Ajustes → Mi tienda → los nombres largos se leen completos y la papelera queda a la derecha.
+
+---
+
 ### 12.21 Ficha del producto en el celular: mínimo y vencimiento
 - **Qué**: el campo del mínimo ocupaba toda la columna y empujaba el botón **Sin fecha** fuera de la pantalla. Ahora se lee como una frase —**«Avisarme cuando queden [ 3 ] unidades o menos»** con casilla estrecha— y la fecha con su botón **Sin fecha** se acomodan solos (se apilan si no caben). Nada se sale del borde.
 - **Validar**: en el celular, abrir un producto → poner una fecha de vencimiento → el botón *Sin fecha* sigue visible y se puede tocar.
