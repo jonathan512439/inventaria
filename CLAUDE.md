@@ -1,0 +1,21 @@
+# Reglas de trabajo en InventarIA (leer primero)
+
+## Documentación y planificación
+- **No crear páginas ni informes externos** (artefactos, documentos fuera del repo). Toda planificación nueva o modificación de una planificación anterior se documenta en los `.md` del repo que correspondan (`docs/PLAN_V3.md`, `docs/CHANGELOG.md`, `docs/AUDITORIA.md`, `README.md`), redactada para que pueda leerse, interpretarse e implementarse directamente en el código.
+- Además de escribirla en el `.md`, la planificación (o el cambio) **se lista en el chat**; si el usuario pide correcciones, se aplican **antes** de comenzar el despliegue.
+
+## Ciclo de cada cambio
+1. Implementar.
+2. `npx tsc --noEmit`, `npm run lint`, `npx next build`; pruebas (`npm run test:variants`, `npm run test:e2e` cuando aplique).
+3. Documentar en `docs/CHANGELOG.md` con **Qué** y **Validar**.
+4. `git commit` + `git push origin main` → GitHub Actions despliega a Cloudflare Pages. Migraciones: `npm run db:sql supabase/<archivo>.sql`.
+5. Sin preguntar entre pasos; el usuario valida cada despliegue.
+
+## Restricciones técnicas
+- Nunca construir para Cloudflare desde Windows (`vercel build` mezcla bundles): el despliegue es solo por GitHub Actions.
+- Nunca usar `wrangler login` / `supabase login` globales: tokens por proyecto en `.env.local` (el usuario tiene otras cuentas para otro proyecto).
+- Gemini solo desde el servidor; cupo gratuito de 20 peticiones/día por modelo (cadena de modelos en `lib/gemini`).
+- Prioridad móvil; el escritorio debe seguir funcional. Lenguaje sin tecnicismos para usuarios no técnicos; vocabulario fijo: Categoría, Subcategoría, Variante, Pendiente, En inventario, Agotado.
+
+## Plan vigente
+- `docs/PLAN_V3.md` (Fases 0–8). Cada fase se despliega y documenta por separado.

@@ -10,6 +10,8 @@ MVP SaaS de inventario: el usuario define sus propias columnas por categoría, t
 
 - [docs/AUDITORIA.md](docs/AUDITORIA.md): trazabilidad por endpoint/pantalla, riesgos y plan de depuración.
 - [docs/CHANGELOG.md](docs/CHANGELOG.md): cada cambio con su forma de validación.
+- [docs/PLAN_V3.md](docs/PLAN_V3.md): plan vigente (Fases 0–8): promesa central, stock real, ventas, clientes, información, equipo, planes con acceso controlado, lanzamiento.
+- [CLAUDE.md](CLAUDE.md): reglas de trabajo (documentación en el repo, ciclo de cada cambio, restricciones).
 
 ## Estructura del proyecto
 
