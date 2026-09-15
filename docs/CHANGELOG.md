@@ -3,6 +3,34 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-15 · Plan v3 · Fase 4 — Clientes: fiado, entregas y reportes (sin fidelización)
+
+Migración `supabase/013_clientes.sql` aplicada: `customers`, `payments` (abonos), `consignments` / `consignment_items` (mercadería entregada), ventas ligadas al cliente y movimientos enlazados a la entrega.
+
+### 14.1 Clientes (`/customers`)
+- **Qué**: **Más → Clientes**. Ficha mínima (nombre, teléfono, nota, límite de fiado); se crea desde aquí o en 5 segundos desde la venta. Lista con última compra, total comprado, **cuánto debe y desde hace cuántos días**, y unidades entregadas. Pestañas **Deben**, **Sin venir** (30 días) y **Resumen**: deuda en la calle, deuda de más de 30 días, mercadería entregada sin liquidar, clientes sin venir y **mejores clientes del mes**. El cliente sigue siendo opcional: la mayoría de ventas son sin nombre.
+- **Validar**: crear un cliente → aparece en la lista; tras fiarle algo, pasa a *Deben* con el monto y los días.
+
+### 14.2 Vender con cliente y fiado ligado
+- **Qué**: en Vender, **Cliente (opcional)** con buscador y creación rápida. Para **Fiado** o **Una parte** es obligatorio elegirlo; muestra lo que ya debe y avisa si con esta venta pasaría su **límite de fiado**. El ticket queda a su nombre.
+- **Validar**: Vender → Fiado sin cliente → pide elegirlo; con cliente que ya debe → aviso del límite en la confirmación.
+
+### 14.3 Ficha del cliente: saldo, abonos y recordatorio (`/customers/detail`)
+- **Qué**: saldo con **desde hace N días**, límite; **Lo que se llevó y aún debe** por ticket con sus productos; **Abonar** (monto y medio; se aplica a lo más antiguo y marca los tickets como pagados; si paga de más queda anotado); **Recordar por WhatsApp** con el mensaje armado («Hola Juanito… saldo Bs 85: 12 sep · Bs 25 (2 Coca 2 L)…»); compras con detalle, historial de abonos; editar datos, límite y quitar (borrado suave; sus ventas se conservan).
+- **Validar**: cliente con 2 tickets fiados → *Abonar* 10 → el más antiguo queda pagado y el otro parcial; *Recordar por WhatsApp* abre el chat con el detalle.
+
+### 14.4 Mercadería entregada (`/consign`)
+- **Qué**: **Más → Mercadería entregada**. *Nueva entrega*: cliente + productos (escáner o búsqueda, con variantes) con cantidad y precio → **salen del estante** (movimiento «entregado a X») pero **siguen siendo tuyas**. En la ficha del cliente se ve lo que tiene. **Rendir cuentas**: por producto, cuánto **vendió** (se registra como venta a su nombre, cobrada o fiada) y cuánto **devuelve** (vuelve al estante); lo que falta sigue afuera hasta que se liquide todo. Historial de entregas liquidadas.
+- **Validar**: entregar 5 unidades → el stock baja 5 y el cliente muestra «5 unid. entregadas»; rendir 3 vendidas + 1 devuelta → venta N.º nueva a su nombre, stock +1, queda 1 afuera.
+
+### 14.5 Inicio
+- **Qué**: la tarjeta *Ventas de hoy* muestra **«te deben Bs X»** cuando hay fiados y lleva a la pestaña *Deben*.
+
+### 14.6 Pruebas
+- `npm run test:e2e`: cliente con deuda en 2 tickets, abono aplicado a lo más antiguo, entrega con vendido/devuelto/afuera, movimiento enlazado a la entrega, pantallas. **53/53 en verde contra producción.**
+
+---
+
 ## 2026-09-15 · Plan v3 · Fase 3 — Ventas para decidir
 
 Migración `supabase/012_ventas.sql` aplicada: tickets (`sales`, `sale_items`), dinero de caja (`cash_movements`), cierres (`cash_closings`), movimientos de stock enlazados al ticket y número correlativo por negocio.

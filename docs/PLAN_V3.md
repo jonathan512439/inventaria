@@ -88,17 +88,17 @@ Depende de: Fase 2 (costos de compra) para la ganancia real.
 
 **Acepta cuando** una venta de 4 productos se registra en menos de 30 segundos con el escáner; el cierre del día cuadra con la suma de tickets; la ganancia del mes se calcula con costos reales.
 
-## Fase 4 · Clientes: fiado, entregas y reportes (2 semanas) — sin fidelización
+## Fase 4 · Clientes: fiado, entregas y reportes (2 semanas) — sin fidelización — desplegada 2026-09-15 (CHANGELOG 14.x)
 
 Saber a quién se vendió qué, cuánto debe y qué mercadería está en manos de terceros.
 
-- **Ficha de cliente** mínima (`customers`: nombre, teléfono WhatsApp, nota, límite de crédito). Se crea desde la propia venta en 5 segundos.
-- **Venta con cliente opcional** (`sales.customer_id`) → historial por cliente con productos y variantes («a quién se vendió qué»).
-- **Fiado con detalle:** la venta queda como deuda con sus líneas («2 Coca 2 L, 1 Ace → Bs 85»); el stock baja al momento. Aviso al superar el límite de crédito.
-- **Abonos** (`payments`) contra el saldo del cliente (no contra una venta concreta); saldo vivo y antigüedad (7 / 30 / 60 días).
-- **Recordatorio por WhatsApp** con el mensaje armado (saldo + productos) y registro de cuándo se envió.
-- **Entregas en consignación** (`consignments`, `consignment_items`): mercadería entregada a un revendedor sigue siendo inventario propio en estado «en manos de X»; el producto muestra *en tienda* y *entregado* (`products.stock_out`); liquidación = vendió N (cobrado o fiado) + devolvió M (vuelve al estante).
-- **Reportes de clientes:** mejores clientes del mes, inactivos (30 días sin comprar), deuda total en la calle y por vencer, mercadería entregada por persona y por categoría.
+- ✅ (14.1) **Ficha de cliente** mínima (`customers`: nombre, teléfono WhatsApp, nota, límite de crédito). Se crea desde la propia venta en 5 segundos.
+- ✅ (14.2) **Venta con cliente opcional** (`sales.customer_id`) → historial por cliente con productos y variantes («a quién se vendió qué»).
+- ✅ (14.2, 14.3) **Fiado con detalle:** la venta queda como deuda con sus líneas («2 Coca 2 L, 1 Ace → Bs 85»); el stock baja al momento. Aviso al superar el límite de crédito.
+- ✅ (14.3) **Abonos** (`payments`) contra el saldo del cliente (no contra una venta concreta); saldo vivo y antigüedad (7 / 30 / 60 días).
+- ✅ (14.3) **Recordatorio por WhatsApp** con el mensaje armado (saldo + productos) y registro de cuándo se envió.
+- ✅ (14.4) **Entregas en consignación** (`consignments`, `consignment_items`): mercadería entregada a un revendedor sigue siendo inventario propio en estado «en manos de X»; el producto muestra *en tienda* y *entregado* (`products.stock_out`); liquidación = vendió N (cobrado o fiado) + devolvió M (vuelve al estante).
+- ✅ (14.1) **Reportes de clientes:** mejores clientes del mes, inactivos (30 días sin comprar), deuda total en la calle y por vencer, mercadería entregada por persona y por categoría.
 - Privacidad: solo nombre y teléfono; exportable y borrable por el dueño (borrado suave).
 
 Depende de: Fase 3.
@@ -223,6 +223,7 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
+- 2026-09-15 · Fase 4 (14.1–14.6) desplegada.
 - 2026-09-15 · Fase 3 (13.1–13.6) desplegada.
 - 2026-09-15 · Fase 2 (12.1–12.10) desplegada + ajustes de las pruebas funcionales (12.11–12.16): avisos configurables, descartar deslizando, cámara del conteo, vencimiento por IA y limpieza de datos que sobran.
 - 2026-09-15 · Fase 0 (10.1–10.2) y Fase 1 (11.1–11.6) desplegadas; queda abierta la lista de correcciones de las pruebas funcionales.
