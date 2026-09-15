@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useConfirm } from "@/components/ui/Confirm";
 import type { Category } from "@/types/database";
 import { buildTree, getDescendantIds, type CategoryNode } from "@/lib/categories";
 import CategorySelect from "@/components/CategorySelect";
@@ -10,6 +11,7 @@ import { IconArrowLeft } from "@/components/ui/Icons";
 
 export default function CategoriesPage() {
   const supabase = createClient();
+  const ask = useConfirm();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export default function CategoriesPage() {
       `¿Eliminar "${c.name}"` +
       (descendants > 0 ? ` y sus ${descendants} subcategoría(s)` : "") +
       `? Sus productos quedarán sin categoría.`;
-    if (!confirm(msg)) return;
+    if (!(await ask({ title: "¿Eliminar esta categoría?", body: msg, confirmLabel: "Eliminar", tone: "danger" }))) return;
     const { error } = await supabase.from("categories").delete().eq("id", c.id);
     if (error) return setError(error.message);
     load();

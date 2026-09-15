@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useToast } from "./ui/Toast";
+import { useConfirm } from "./ui/Confirm";
 import { IconCheck, IconSparkles, IconTrash, Spinner } from "./ui/Icons";
 
 /** Ajustes → clave de IA propia (BYOK): el usuario usa su cupo de Gemini en lugar del compartido. */
 export default function AiKeyCard() {
   const toast = useToast();
+  const ask = useConfirm();
   const [state, setState] = useState<{ configured: boolean; last4: string | null } | null>(null);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -32,7 +34,8 @@ export default function AiKeyCard() {
     load();
   }
   async function remove() {
-    if (!confirm("¿Quitar tu clave? La app volverá a usar el cupo compartido.")) return;
+    const ok = await ask({ title: "¿Quitar tu clave?", body: "La app volverá a usar el cupo compartido con los demás usuarios.", confirmLabel: "Quitar clave", tone: "danger" });
+    if (!ok) return;
     setBusy(true);
     await fetch("/api/ai-key", { method: "DELETE" });
     setBusy(false);

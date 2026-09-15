@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { VariantAxis } from "@/types/database";
 import { AXIS_LIBRARY, MAX_AXES, axisKey } from "@/lib/variants";
 import { useToast } from "./ui/Toast";
+import { useConfirm } from "./ui/Confirm";
 import { IconPlus, IconTrash, IconX, Spinner } from "./ui/Icons";
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
 export default function AxisEditor({ categoryId, axes, suggested = [], onChanged }: Props) {
   const supabase = createClient();
   const toast = useToast();
+  const ask = useConfirm();
   const [adding, setAdding] = useState(false);
   const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,7 +43,13 @@ export default function AxisEditor({ categoryId, axes, suggested = [], onChanged
   }
 
   async function remove(a: VariantAxis) {
-    if (!confirm(`¿Quitar "${a.label}"? Las variantes ya creadas no se borran, pero no podrás crear nuevas por ${a.label.toLowerCase()}.`)) return;
+    const ok = await ask({
+      title: `¿Quitar ${a.label}?`,
+      body: `Las variantes que ya creaste se conservan, pero no podrás crear nuevas por ${a.label.toLowerCase()}.`,
+      confirmLabel: "Quitar",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error } = await supabase.from("variant_axes").delete().eq("id", a.id);
     if (error) return toast("error", error.message);
     onChanged();

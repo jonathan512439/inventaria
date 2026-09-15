@@ -9,6 +9,7 @@ import { SUMMARY_COLS, fmtMoney, fromSummary, priceOf } from "@/lib/inventory";
 import CoachTip from "@/components/CoachTip";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Confirm";
 import { IconArrowLeft, IconCheck, Spinner } from "@/components/ui/Icons";
 
 type Field = "precio" | "precio_mayorista";
@@ -19,6 +20,7 @@ type Round = "none" | "0.5" | "1";
 export default function PricesPage() {
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,12 +68,25 @@ export default function PricesPage() {
 
   async function apply() {
     if (!preview.length) return;
-    if (!confirm(`Se cambiará el ${field === "precio" ? "precio de venta" : "precio mayorista"} de ${preview.length} producto${preview.length === 1 ? "" : "s"}. ¿Continuar?`)) return;
+    const sube = preview.filter((r) => (r.next ?? 0) > (r.base ?? 0)).length;
+    const ok = await confirm({
+      title: "¿Cambiamos los precios?",
+      body: "Puedes ver antes el precio nuevo de cada producto en la lista. Todo queda en el historial por si quieres revisarlo.",
+      details: [
+        { label: "Productos", value: String(preview.length) },
+        { label: sube >= preview.length - sube ? "Suben de precio" : "Bajan de precio", value: String(sube >= preview.length - sube ? sube : preview.length - sube), tone: "warn" },
+        { label: "Qué precio", value: field === "precio" ? "De venta" : "Mayorista" },
+      ],
+      confirmLabel: `Sí, cambiar ${preview.length}`,
+      cancelLabel: "Revisar otra vez",
+      tone: "primary",
+    });
+    if (!ok) return;
     setSaving(true);
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    let ok = 0;
+    let done = 0;
     for (const r of preview) {
       const { data: p } = await supabase.from("products").select("data").eq("id", r.p.id).single();
       if (!p) continue;
@@ -80,10 +95,10 @@ export default function PricesPage() {
       const { error } = await supabase.from("products").update({ data: { ...p.data, [key]: r.next } }).eq("id", r.p.id);
       if (error) continue;
       await supabase.from("price_history").insert({ user_id: user!.id, product_id: r.p.id, field, old_value: r.base, new_value: r.next, source: "masivo" });
-      ok++;
+      done++;
     }
     setSaving(false);
-    toast("success", `${ok} precio${ok === 1 ? "" : "s"} actualizado${ok === 1 ? "" : "s"}`);
+    toast("success", `${done} precio${done === 1 ? "" : "s"} actualizado${done === 1 ? "" : "s"}`);
     setProducts((ps) => ps.map((p) => {
       const r = preview.find((x) => x.p.id === p.id);
       return r ? { ...p, data: { ...p.data, [field]: r.next } } : p;
@@ -91,7 +106,7 @@ export default function PricesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="has-action mx-auto max-w-3xl space-y-4">
       <header className="animate-in">
         <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Cambiar precios</h1>

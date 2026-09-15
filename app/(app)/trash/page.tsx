@@ -9,6 +9,7 @@ import { productTitle } from "@/lib/fields";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Photo from "@/components/ui/Photo";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Confirm";
 import { IconArrowLeft, IconBox, IconRefresh, IconTrash, Spinner } from "@/components/ui/Icons";
 
 const TRASH_DAYS = 30;
@@ -17,6 +18,7 @@ const TRASH_DAYS = 30;
 export default function TrashPage() {
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [items, setItems] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +44,8 @@ export default function TrashPage() {
     setItems((l) => l.filter((x) => x.id !== p.id));
   }
   async function purgeOne(p: Product) {
-    if (!confirm(`¿Borrar definitivamente «${productTitle(p.data) || "Producto"}» y su foto? No se puede deshacer.`)) return;
+    const ok = await confirm({ title: "¿Borrar para siempre?", body: `«${productTitle(p.data) || "Producto"}» y su foto se borran definitivamente. Esto no se puede deshacer.`, confirmLabel: "Borrar para siempre", tone: "danger" });
+    if (!ok) return;
     if (p.image_url) {
       const i = p.image_url.indexOf("/product-images/");
       if (i >= 0) await supabase.storage.from("product-images").remove([p.image_url.slice(i + "/product-images/".length)]);
@@ -52,7 +55,14 @@ export default function TrashPage() {
     setItems((l) => l.filter((x) => x.id !== p.id));
   }
   async function emptyAll() {
-    if (!confirm(`¿Vaciar la papelera? Se borran definitivamente ${items.length} producto${items.length === 1 ? "" : "s"} con sus fotos.`)) return;
+    const ok = await confirm({
+      title: "¿Vaciar la papelera?",
+      body: "Se borran definitivamente, con sus fotos. Esto no se puede deshacer.",
+      details: [{ label: "Productos que se borran", value: String(items.length), tone: "danger" }],
+      confirmLabel: "Vaciar papelera",
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     const res = await fetch("/api/cleanup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actions: ["emptyTrash"] }) });
     setBusy(false);

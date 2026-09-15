@@ -14,6 +14,7 @@ import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import { IconArrowLeft, IconCheck, IconEdit, IconRefresh, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Confirm";
 import StockAdjust from "@/components/StockAdjust";
 import ProductVariants from "@/components/ProductVariants";
 import { fmtMoney } from "@/lib/inventory";
@@ -43,14 +44,21 @@ export default function ProductDetailClient() {
   const [axes, setAxes] = useState<VariantAxis[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const toast = useToast();
+  const ask = useConfirm();
 
   /** Vuelve a analizar la foto con la IA (1 petición). Conserva precio, stock y datos manuales. */
   async function reanalyze(keepCategory: boolean) {
     if (!product) return;
-    const msg = keepCategory
-      ? "La IA volverá a leer la foto y actualizará nombre, marca, descripción… (se conservan precio, stock y la categoría actual)."
-      : "La IA volverá a leer la foto, actualizará los datos y podrá cambiar la categoría y subcategoría. Se conservan precio y stock.";
-    if (!confirm(`${msg}\n\nConsume 1 análisis de tu cupo diario. ¿Continuar?`)) return;
+    const ok = await ask({
+      title: "¿Que la IA lea la foto otra vez?",
+      body: keepCategory
+        ? "Actualiza nombre, marca y descripción. No toca el precio, el stock ni la categoría."
+        : "Actualiza los datos y puede cambiarlo de categoría. No toca el precio ni el stock.",
+      details: [{ label: "Análisis que usa", value: "1 de tu cupo diario", tone: "warn" }],
+      confirmLabel: "Sí, analizar de nuevo",
+      tone: "primary",
+    });
+    if (!ok) return;
     setReanalyzing(true);
     const res = await fetch("/api/reanalyze", {
       method: "POST",
@@ -139,14 +147,21 @@ export default function ProductDetailClient() {
     if (!product) return;
     if (product.status === "confirmed") {
       // Papelera: se puede recuperar durante 30 días (la foto se conserva)
-      if (!confirm("¿Enviar este producto a la papelera? Podrás recuperarlo durante 30 días desde Ordenar y limpiar → Papelera.")) return;
+      const ok = await ask({
+        title: "¿Enviar a la papelera?",
+        body: "Sale del inventario pero no se borra: puedes recuperarlo durante 30 días desde Ordenar y limpiar → Papelera.",
+        confirmLabel: "Sí, a la papelera",
+        tone: "danger",
+      });
+      if (!ok) return;
       const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", product.id);
       if (error) return setError(error.message);
       toast("success", "Enviado a la papelera", { label: "Deshacer", onClick: async () => { await supabase.from("products").update({ deleted_at: null }).eq("id", product.id); } });
       router.push("/products");
       return;
     }
-    if (!confirm("¿Eliminar este pendiente y su foto?")) return;
+    const okDraft = await ask({ title: "¿Eliminar este pendiente?", body: "Se borra junto con su foto. Como todavía no estaba en el inventario, no se puede recuperar.", confirmLabel: "Eliminar", tone: "danger" });
+    if (!okDraft) return;
     if (product.image_url) {
       const idx = product.image_url.indexOf("/product-images/");
       if (idx >= 0) await supabase.storage.from("product-images").remove([product.image_url.slice(idx + "/product-images/".length)]);
@@ -175,7 +190,7 @@ export default function ProductDetailClient() {
   const isDraft = product.status === "draft";
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-5 overflow-x-hidden">
+    <div className="has-action mx-auto w-full max-w-4xl space-y-5 overflow-x-hidden">
       <div className="animate-in flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <Link href={isDraft ? "/review" : "/products"} className="mb-1 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700">

@@ -9,6 +9,7 @@ import { BASIC_TEMPLATE, fieldLabel, getEffectiveFields, normalizeFieldName } fr
 import CategorySelect from "@/components/CategorySelect";
 import Link from "next/link";
 import { IconArrowLeft, IconSparkles } from "@/components/ui/Icons";
+import { useConfirm } from "@/components/ui/Confirm";
 
 const TYPE_LABEL: Record<FieldType, string> = { text: "Texto", number: "Número", select: "Opciones" };
 
@@ -23,6 +24,7 @@ export default function TemplatesPage() {
 function Templates() {
   const supabase = createClient();
   const params = useSearchParams();
+  const ask = useConfirm();
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,7 +136,13 @@ function Templates() {
   }
 
   async function remove(t: FieldTemplate) {
-    if (!confirm(`¿Eliminar "${t.name}"? Lo ya guardado en tus productos no se borra.`)) return;
+    const ok = await ask({
+      title: `¿Quitar el dato «${fieldLabel(t.name)}»?`,
+      body: "Deja de pedirse en los formularios y de salir en el Excel. Lo que ya guardaste en tus productos no se borra.",
+      confirmLabel: "Quitar dato",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error } = await supabase.from("field_templates").delete().eq("id", t.id);
     if (error) return setError(error.message);
     load();

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import CoachTip from "@/components/CoachTip";
+import { useConfirm } from "@/components/ui/Confirm";
 import ShelfDetect from "@/components/ShelfDetect";
 import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/types/database";
@@ -16,6 +17,7 @@ import { IconAlert, IconCamera, IconCheck, IconImages, IconRefresh, IconSparkles
 
 export default function CapturePage() {
   const supabase = createClient();
+  const ask = useConfirm();
   const toast = useToast();
   const queue = useQueue();
   const summary = queueSummary(queue.items);
@@ -220,7 +222,11 @@ export default function CapturePage() {
             {summary.error > 0 && <Stat n={summary.error} label="con error" tone="text-rose-600" />}
             <span className="ml-auto flex gap-2">
               {summary.queued + summary.processing > 0 && (
-                <button onClick={() => confirm("¿Cancelar las fotos que faltan por analizar?") && cancelAll()} className="btn-destructive btn-sm">
+                <button
+                  onClick={async () => {
+                    if (await ask({ title: "¿Cancelar lo que falta?", body: "Las fotos que todavía no se analizaron se descartan. Las que ya se analizaron quedan en Revisar.", confirmLabel: "Sí, cancelar", cancelLabel: "Seguir analizando", tone: "danger" })) cancelAll();
+                  }}
+                  className="btn-destructive btn-sm">
                   <IconX size={14} /> Cancelar pendientes
                 </button>
               )}

@@ -19,6 +19,7 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import Photo from "@/components/ui/Photo";
 import { categoryColor } from "@/lib/colors";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Confirm";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -49,6 +50,7 @@ export default function ReviewPage() {
 function Review() {
   const supabase = createClient();
   const toast = useToast();
+  const ask = useConfirm();
   const router = useRouter();
   const params = useSearchParams();
   const queue = useQueue();
@@ -130,7 +132,14 @@ function Review() {
   /** Vuelve a analizar la foto del producto actual (1 petición de IA). */
   async function reanalyze() {
     if (!current) return;
-    if (!confirm("La IA volverá a leer la foto y actualizará los datos y la categoría. Precio y stock se conservan.\n\nConsume 1 análisis de tu cupo diario. ¿Continuar?")) return;
+    const ok = await ask({
+      title: "¿Que la IA lea la foto otra vez?",
+      body: "Vuelve a llenar los datos y puede cambiar la categoría. No toca el precio ni el stock.",
+      details: [{ label: "Análisis que usa", value: "1 de tu cupo diario", tone: "warn" }],
+      confirmLabel: "Sí, analizar de nuevo",
+      tone: "primary",
+    });
+    if (!ok) return;
     setReanalyzing(true);
     const res = await fetch("/api/reanalyze", {
       method: "POST",
@@ -370,7 +379,9 @@ function Review() {
   }
 
   async function remove() {
-    if (!current || !confirm("¿Eliminar este producto y su foto?")) return;
+    if (!current) return;
+    const ok = await ask({ title: "¿Eliminar este producto?", body: "Se borra junto con su foto. Todavía no estaba en el inventario, así que no se puede recuperar.", confirmLabel: "Eliminar", tone: "danger" });
+    if (!ok) return;
     if (current.image_url) {
       const i = current.image_url.indexOf("/product-images/");
       if (i >= 0) await supabase.storage.from("product-images").remove([current.image_url.slice(i + "/product-images/".length)]);
@@ -493,7 +504,7 @@ function Review() {
   const generalName = meta.categoria_nueva_general || meta.categoria_nueva || null;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="has-action mx-auto max-w-2xl space-y-4">
       <Header count={products.length} index={index} onToggle={() => router.replace("/review?view=table")} />
       <CoachTip screen="review" title="¿Está bien este producto?">
         Arriba, lo que reconoció la IA (corrige solo si se equivocó). Abajo, <b>precio</b> y <b>stock</b>. Luego el botón verde fijo: <b>Confirmar y pasar al siguiente</b>. Desliza la tarjeta a la derecha para confirmar más rápido.

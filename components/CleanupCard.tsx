@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useToast } from "./ui/Toast";
+import { useConfirm } from "./ui/Confirm";
 import { IconAlert, IconCheck, IconChevronRight, IconTrash, Spinner } from "./ui/Icons";
 
 interface Counts {
@@ -29,6 +30,7 @@ type Key = "oldDrafts" | "emptySubs" | "emptyTops" | "orphanPhotos" | "emptyFiel
 /** Tarjeta "Ordenar y limpiar": muestra lo que sobra o falta y borra solo lo marcado. */
 export default function CleanupCard() {
   const toast = useToast();
+  const ask = useConfirm();
   const [counts, setCounts] = useState<Counts | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [oldDays, setOldDays] = useState(7);
@@ -83,8 +85,15 @@ export default function CleanupCard() {
   async function run() {
     const actions = Array.from(sel);
     if (!actions.length) return;
-    const detail = removable.filter((r) => sel.has(r.key)).map((r) => `• ${r.title}`).join("\n");
-    if (!confirm(`Se va a eliminar definitivamente:\n\n${detail}\n\n¿Continuar?`)) return;
+    const chosen = removable.filter((r) => sel.has(r.key));
+    const ok = await ask({
+      title: "¿Limpiamos esto?",
+      body: "Se quita solo lo que marcaste. Tus productos y su información no se tocan.",
+      details: chosen.map((r) => ({ label: r.title, value: String(r.n), tone: "warn" as const })),
+      confirmLabel: "Sí, limpiar",
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     const res = await fetch("/api/cleanup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actions }) });
     const j = (await res.json().catch(() => ({}))) as { counts?: Counts; error?: string };

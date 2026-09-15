@@ -9,7 +9,8 @@ import PresetPicker from "@/components/PresetPicker";
 import AxisEditor from "@/components/AxisEditor";
 import { PRESETS } from "@/lib/presets";
 import { useToast } from "@/components/ui/Toast";
-import { IconArrowLeft, IconChevronRight, IconPlus, IconSparkles, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
+import { useConfirm } from "@/components/ui/Confirm";
+import { IconArrowLeft, IconChevronRight, IconEdit, IconPlus, IconSparkles, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 import { categoryColor } from "@/lib/colors";
 import { findSibling, getDescendantIds } from "@/lib/categories";
 
@@ -20,6 +21,7 @@ import { findSibling, getDescendantIds } from "@/lib/categories";
 export default function StorePage() {
   const supabase = createClient();
   const toast = useToast();
+  const ask = useConfirm();
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
   const [axes, setAxes] = useState<VariantAxis[]>([]);
@@ -36,7 +38,14 @@ export default function StorePage() {
 
   async function cleanEmpty() {
     if (!emptySubs.length) return;
-    if (!confirm(`¿Eliminar ${emptySubs.length} subcategorías sin productos? (Las categorías principales se conservan.)`)) return;
+    const ok = await ask({
+      title: "¿Quitar las subcategorías vacías?",
+      body: "Solo se quitan las que no tienen ningún producto. Las categorías principales se conservan.",
+      details: [{ label: "Subcategorías que se quitan", value: String(emptySubs.length), tone: "warn" }],
+      confirmLabel: "Sí, quitar",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error } = await supabase.from("categories").delete().in("id", emptySubs.map((c) => c.id));
     if (error) return toast("error", error.message);
     toast("success", `${emptySubs.length} subcategorías vacías eliminadas`);
@@ -162,12 +171,23 @@ export default function StorePage() {
                       </div>
                     ) : (
                       <>
-                        <button className="block truncate text-left text-lg font-bold text-ink hover:text-brand-700" onClick={() => setRenaming({ id: t.id, name: t.name })} title="Cambiar nombre">{t.name}</button>
+                        <button className="flex w-full items-center gap-1.5 text-left text-lg font-bold leading-tight text-ink hover:text-brand-700" onClick={() => setRenaming({ id: t.id, name: t.name })} title="Tocar para cambiar el nombre">
+                          <span className="min-w-0 break-words">{t.name}</span>
+                          <IconEdit size={14} className="mt-0.5 shrink-0 text-slate-300" />
+                        </button>
                         <p className="text-xs text-slate-500">{secs.length} subcategorías · {countOf(t.id)} productos</p>
                       </>
                     )}
                   </div>
-                  <button className="btn-destructive btn-sm shrink-0" onClick={() => remove(t, true)}><IconTrash size={16} /> Eliminar</button>
+                  <button
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-rose-600 transition hover:bg-rose-50 md:h-auto md:w-auto md:gap-1.5 md:px-3 md:py-2"
+                    onClick={() => remove(t, true)}
+                    title={`Eliminar ${t.name}`}
+                    aria-label={`Eliminar ${t.name}`}
+                  >
+                    <IconTrash size={18} />
+                    <span className="hidden text-sm font-semibold md:inline">Eliminar</span>
+                  </button>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">

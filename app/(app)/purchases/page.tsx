@@ -9,6 +9,7 @@ import BarcodeCamera from "@/components/BarcodeCamera";
 import CoachTip from "@/components/CoachTip";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Confirm";
 import { IconArrowLeft, IconCheck, IconPlus, IconSearch, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 
 interface Line {
@@ -24,6 +25,7 @@ interface Line {
 export default function PurchasesPage() {
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,6 +96,22 @@ export default function PurchasesPage() {
 
   async function save() {
     if (!lines.length) return;
+    const unidades = lines.reduce((s, l) => s + (parseInt(l.qty, 10) || 0), 0);
+    const proveedor = newSupplier?.name.trim() || suppliers.find((s) => s.id === supplierId)?.name || "Sin proveedor";
+    const ok = await confirm({
+      title: "¿Registramos esta compra?",
+      body: "Se sumará al stock lo que llegó y se guardará a qué precio lo compraste.",
+      details: [
+        { label: "Proveedor", value: proveedor },
+        { label: "Productos", value: String(lines.length) },
+        { label: "Unidades que entran", value: `+${unidades}`, tone: "ok" },
+        { label: "Total de la compra", value: `Bs ${fmtMoney(total)}` },
+      ],
+      confirmLabel: "Sí, registrar",
+      cancelLabel: "Revisar otra vez",
+      tone: "success",
+    });
+    if (!ok) return;
     setSaving(true);
     const {
       data: { user },
@@ -182,16 +200,28 @@ export default function PurchasesPage() {
     load();
   }
   async function removeSupplier(s: Supplier) {
-    if (!confirm(`¿Quitar al proveedor «${s.name}»? Las compras anteriores conservan su nombre.`)) return;
+    const ok = await confirm({ title: `¿Quitar a ${s.name}?`, body: "Las compras que ya registraste conservan su nombre; solo deja de aparecer en la lista.", confirmLabel: "Quitar proveedor", tone: "danger" });
+    if (!ok) return;
     await supabase.from("suppliers").delete().eq("id", s.id);
     load();
   }
 
   if (mode === "new") {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
+      <div className="has-action mx-auto max-w-2xl space-y-4">
         <header className="animate-in">
-          <button onClick={() => (lines.length && !confirm("¿Salir sin guardar la compra?") ? null : setMode("list"))} className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Compras</button>
+          <button
+            onClick={async () => {
+              if (lines.length) {
+                const ok = await confirm({ title: "¿Salir sin registrar?", body: "Todavía no se guardó nada de esta compra.", confirmLabel: "Salir y descartar", cancelLabel: "Seguir aquí", tone: "danger" });
+                if (!ok) return;
+              }
+              setMode("list");
+            }}
+            className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"
+          >
+            <IconArrowLeft size={16} /> Compras
+          </button>
           <h1 className="text-2xl font-bold tracking-tight text-ink">Nueva compra</h1>
           <p className="text-sm text-slate-500">Llegó mercadería: suma el stock, guarda el costo y el vencimiento.</p>
         </header>

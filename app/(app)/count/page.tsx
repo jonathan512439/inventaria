@@ -11,6 +11,7 @@ import BarcodeCamera from "@/components/BarcodeCamera";
 import CoachTip from "@/components/CoachTip";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Confirm";
 import { IconArrowLeft, IconCheck, IconChevronRight, IconTag, IconX, Spinner } from "@/components/ui/Icons";
 
 interface Row {
@@ -29,6 +30,7 @@ const REASONS = ["Conteo físico", "Merma o rotura", "Robo o pérdida", "Error d
 export default function CountPage() {
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [categories, setCategories] = useState<Category[]>([]);
   const [history, setHistory] = useState<StockCount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,7 +155,25 @@ export default function CountPage() {
     if (!rows || !top) return;
     const toApply = rows.filter((r) => parsed(r) !== null);
     if (!toApply.length) return toast("info", "Escribe cuántas unidades hay de al menos un producto");
-    if (!confirm(`Se corregirá el stock de ${stats.diffs} producto${stats.diffs === 1 ? "" : "s"} que no coincidían (${stats.units} unidades de diferencia) y quedará anotado. ¿Terminar el conteo?`)) return;
+    const faltan = toApply.filter((r) => (parsed(r) ?? 0) < r.expected).length;
+    const sobran = toApply.filter((r) => (parsed(r) ?? 0) > r.expected).length;
+    const ok = await confirm({
+      title: "¿Terminamos el conteo?",
+      body: stats.diffs
+        ? "Vamos a dejar el stock igual a lo que contaste. Los productos que coincidían no se tocan."
+        : "Todo coincidió con lo que dice la app: no hay nada que corregir. Igual queda anotado que contaste.",
+      details: [
+        { label: "Productos contados", value: String(toApply.length) },
+        { label: "Coinciden", value: String(toApply.length - stats.diffs), tone: "ok" },
+        ...(faltan ? [{ label: "Falta mercadería", value: `${faltan} producto${faltan === 1 ? "" : "s"}`, tone: "danger" as const }] : []),
+        ...(sobran ? [{ label: "Hay de más", value: `${sobran} producto${sobran === 1 ? "" : "s"}`, tone: "warn" as const }] : []),
+        ...(stats.units ? [{ label: "Diferencia total", value: `${stats.units} unidades`, tone: "warn" as const }] : []),
+      ],
+      confirmLabel: stats.diffs ? `Sí, corregir ${stats.diffs}` : "Terminar",
+      cancelLabel: "Seguir contando",
+      tone: "success",
+    });
+    if (!ok) return;
     setSaving(true);
     const {
       data: { user },
@@ -209,9 +229,27 @@ export default function CountPage() {
   if (top) {
     const col = categoryColor(top.name);
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="has-action mx-auto max-w-3xl space-y-4">
         <header className="animate-in">
-          <button onClick={() => (stats.done && !confirm("¿Salir sin cerrar el conteo? Se perderá lo contado.") ? null : (setTop(null), setRows(null)))} className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Elegir otra categoría</button>
+          <button
+            onClick={async () => {
+              if (stats.done) {
+                const ok = await confirm({
+                  title: "¿Salir sin terminar?",
+                  body: `Contaste ${stats.done} producto${stats.done === 1 ? "" : "s"} y todavía no se guardó nada. Si sales, se pierde ese avance.`,
+                  confirmLabel: "Salir y perder lo contado",
+                  cancelLabel: "Seguir contando",
+                  tone: "danger",
+                });
+                if (!ok) return;
+              }
+              setTop(null);
+              setRows(null);
+            }}
+            className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"
+          >
+            <IconArrowLeft size={16} /> Elegir otra categoría
+          </button>
           <div className="flex items-center gap-3">
             <span className={`grid h-12 w-12 place-items-center rounded-2xl text-2xl ring-1 ${col.bg} ${col.ring}`}>{top.icon || "🏷️"}</span>
             <div>

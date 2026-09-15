@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useConfirm } from "./ui/Confirm";
 import type { Category, FieldTemplate, Product, ProductData, ProductStatus } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { coerceValue, fieldLabel, getEffectiveFields } from "@/lib/fields";
@@ -28,6 +29,7 @@ export default function ProductTable({ products, categories, templates, mode, on
   const [edits, setEdits] = useState<Record<string, ProductData>>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const ask = useConfirm();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggleGroup = (k: string) =>
     setCollapsed((c) => {
@@ -83,7 +85,12 @@ export default function ProductTable({ products, categories, templates, mode, on
 
   async function remove(p: Product) {
     const soft = p.status === "confirmed";
-    if (!confirm(soft ? "¿Enviar este producto a la papelera? Podrás recuperarlo durante 30 días." : "¿Eliminar este pendiente? La foto también se borrará.")) return;
+    const ok = await ask(
+      soft
+        ? { title: "¿Enviar a la papelera?", body: "Sale del inventario pero puedes recuperarlo durante 30 días.", confirmLabel: "Sí, a la papelera", tone: "danger" as const }
+        : { title: "¿Eliminar este pendiente?", body: "Se borra junto con su foto y no se puede recuperar.", confirmLabel: "Eliminar", tone: "danger" as const }
+    );
+    if (!ok) return;
     setBusy((b) => ({ ...b, [p.id]: true }));
     if (soft) {
       const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);

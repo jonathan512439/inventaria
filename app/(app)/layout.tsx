@@ -4,6 +4,7 @@ import OfflineBar from "@/components/OfflineBar";
 import AuthGuard from "@/components/AuthGuard";
 import WhatsNew from "@/components/WhatsNew";
 import { FlowProvider } from "@/components/FlowProvider";
+import { ConfirmProvider } from "@/components/ui/Confirm";
 
 /**
  * Capa de la app. No consulta la sesión en el servidor: el middleware valida al usuario en cada
@@ -13,6 +14,7 @@ import { FlowProvider } from "@/components/FlowProvider";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <FlowProvider>
+      <ConfirmProvider>
       <div className="min-h-screen overflow-x-hidden pb-28 md:pb-10">
         <AuthGuard />
         <Nav />
@@ -23,6 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
         <WhatsNew />
       </div>
+      </ConfirmProvider>
     </FlowProvider>
   );
 }

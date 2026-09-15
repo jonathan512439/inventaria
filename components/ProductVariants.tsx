@@ -9,6 +9,7 @@ import { fmtMoney } from "@/lib/inventory";
 import VariantGrid from "./VariantGrid";
 import StockAdjust from "./StockAdjust";
 import { useToast } from "./ui/Toast";
+import { useConfirm } from "./ui/Confirm";
 import { IconTrash, Spinner } from "./ui/Icons";
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
 export default function ProductVariants({ product, categories, axes, variants, onChanged }: Props) {
   const supabase = createClient();
   const toast = useToast();
+  const ask = useConfirm();
   const axesHere = useMemo(() => axesFor(axes, categories, product.category_id), [axes, categories, product.category_id]);
   const [chosen, setChosen] = useState<Record<string, string[]>>({});
   const [adjusting, setAdjusting] = useState<ProductVariant | null>(null);
@@ -64,7 +66,14 @@ export default function ProductVariants({ product, categories, axes, variants, o
   }
 
   async function removeVariant(v: ProductVariant) {
-    if (!confirm(`¿Quitar la variante "${v.label}"? Su stock (${v.stock}) dejará de contarse.`)) return;
+    const ok = await ask({
+      title: `¿Quitar ${v.label}?`,
+      body: "Esa combinación desaparece del producto y su stock deja de contarse.",
+      details: [{ label: "Stock que deja de contarse", value: String(v.stock), tone: "warn" }],
+      confirmLabel: "Quitar variante",
+      tone: "danger",
+    });
+    if (!ok) return;
     const { error } = await supabase.from("product_variants").delete().eq("id", v.id);
     if (error) return toast("error", error.message);
     onChanged();

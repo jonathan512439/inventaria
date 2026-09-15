@@ -111,35 +111,33 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
   /* Acción principal fija abajo (sobre la barra inferior en móvil) */
-  /* Acción principal fija sobre la barra inferior. Fondo sólido para que no se lea el contenido
-     por debajo, y separada del contenido anterior para no taparlo. */
+  /* Acción principal: barra fija sobre el menú inferior (móvil). La página reserva su altura
+     con .has-action, así ninguna fila queda nunca debajo del botón. */
   .sticky-action {
-    position: sticky;
-    bottom: calc(4.75rem + env(safe-area-inset-bottom));
-    z-index: 20;
-    margin-left: -1rem;
-    margin-right: -1rem;
-    margin-top: 0.75rem;
-    padding: 0.75rem 1rem;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(4.25rem + env(safe-area-inset-bottom));
+    z-index: 25;
+    padding: 0.6rem 1rem;
     background: theme(colors.surface);
     border-top: 1px solid rgb(226 232 240);
-    box-shadow: 0 -10px 20px -12px rgb(15 23 42 / 0.25);
+    box-shadow: 0 -12px 24px -14px rgb(15 23 42 / 0.35);
   }
-  /* Espacio al final para que la última fila de la lista no quede debajo del botón */
-  .sticky-action::after {
-    content: "";
-    display: block;
-    height: 0;
+  .has-action {
+    padding-bottom: 5.5rem;
   }
   @media (min-width: 768px) {
     .sticky-action {
+      position: sticky;
       bottom: 1rem;
-      margin-left: 0;
-      margin-right: 0;
       padding: 0.5rem 0 0;
       background: none;
       border-top: 0;
       box-shadow: none;
+    }
+    .has-action {
+      padding-bottom: 0;
     }
   }
   .animate-in {
