@@ -104,6 +104,17 @@ export type AiUsage = {
   purpose: string;
   status: string;
   quota_limit: number | null;
+  own_key: boolean; // hecho con la clave propia del usuario (no cuenta contra el cupo del servicio)
+  created_at: string;
+};
+
+/** Clave de IA propia del usuario, cifrada. Solo la lee el servidor. */
+export type AiKey = {
+  user_id: string;
+  provider: string;
+  key_ciphertext: string;
+  iv: string;
+  last4: string;
   created_at: string;
 };
 
@@ -116,6 +127,7 @@ export type AiMeta = {
   etiqueta?: string | null; // texto visible: marca, modelo, código, precio impreso
   modelo?: string | null; // modelo de Gemini usado
   variantes_propuestas?: Record<string, string[]> | null; // {"talla":["S","M","L"],"color":["Rojo"]} leídas de la foto; solo propuesta
+  posible_duplicado?: { product_id: string; nombre: string; motivo: string } | null; // otro producto del inventario que parece el mismo
 };
 
 export type Product = {
@@ -198,8 +210,14 @@ export interface Database {
       };
       ai_usage: {
         Row: AiUsage;
-        Insert: Omit<AiUsage, "id" | "created_at" | "quota_limit"> & { id?: string; created_at?: string; quota_limit?: number | null };
+        Insert: Omit<AiUsage, "id" | "created_at" | "quota_limit" | "own_key"> & { id?: string; created_at?: string; quota_limit?: number | null; own_key?: boolean };
         Update: Partial<AiUsage>;
+        Relationships: [];
+      };
+      ai_keys: {
+        Row: AiKey;
+        Insert: Omit<AiKey, "created_at" | "provider"> & { created_at?: string; provider?: string };
+        Update: Partial<AiKey>;
         Relationships: [];
       };
       products: {

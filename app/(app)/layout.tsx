@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Nav from "@/components/Nav";
 import StepBar from "@/components/StepBar";
+import OfflineBar from "@/components/OfflineBar";
 import WhatsNew from "@/components/WhatsNew";
 import { FlowProvider } from "@/components/FlowProvider";
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen overflow-x-hidden pb-28 md:pb-10">
         <Nav />
         <main className="mx-auto w-full px-4 py-4 md:px-6 md:py-6 xl:px-10 2xl:px-14">
+          <OfflineBar />
           <StepBar />
           {children}
         </main>

@@ -14,9 +14,12 @@ import {
 } from "@/lib/gemini";
 import { PRESETS } from "@/lib/presets";
 import { logUsage } from "@/lib/aiUsage";
+import { resolveAiKey } from "@/lib/aiKey";
 import { getEffectiveFields, coerceValue, applyDefaults } from "@/lib/fields";
 import { categoryPath } from "@/lib/categories";
 import { parseProposals } from "@/lib/variants";
+import { userExamples } from "@/lib/aiExamples";
+import { findDuplicate } from "@/lib/duplicates";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
 
 export const runtime = "edge";
@@ -117,24 +120,29 @@ export async function POST(request: Request) {
     : unionAiFields(tpls, cats);
   const topNames = new Set(cats.filter((c) => !c.parent_id).map((c) => c.name.toLowerCase()));
   const catalogs = PRESETS.filter((p) => !topNames.has(p.name.toLowerCase())).map((p) => ({ name: p.name, description: p.description }));
-  const ctx = { categoryPaths: Array.from(idByPath.keys()), fixedCategoryPath: fixedCategoryId ? pathById.get(fixedCategoryId) : null, catalogs };
+  const examples = await userExamples(supabase, cats);
+  const ctx = { categoryPaths: Array.from(idByPath.keys()), fixedCategoryPath: fixedCategoryId ? pathById.get(fixedCategoryId) : null, catalogs, examples };
 
   let categoryId: string | null = fixedCategoryId;
   const aiMeta: AiMeta = {};
   let result: Record<string, unknown> = {};
   let aiWarning: string | null = null;
+  const key = await resolveAiKey(admin, user.id);
 
   try {
-    const out = await analyzeImage({
-      imageBase64: bytesToBase64(bytes),
-      mimeType: file.type,
-      prompt: buildPrompt(aiFields, ctx),
-      schema: buildResponseSchema(aiFields, ctx),
-    });
+    const out = await analyzeImage(
+      {
+        imageBase64: bytesToBase64(bytes),
+        mimeType: file.type,
+        prompt: buildPrompt(aiFields, ctx),
+        schema: buildResponseSchema(aiFields, ctx),
+      },
+      key
+    );
     result = out.result;
     aiMeta.modelo = out.model;
   } catch (e) {
-    await logUsage(admin, user.id, "analyze");
+    await logUsage(admin, user.id, "analyze", key.own);
     if (e instanceof QuotaError) {
       // Cupo diario agotado en todos los modelos: el cliente pausa hasta el reinicio.
       await admin.storage.from("product-images").remove([path]);
@@ -149,7 +157,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error analizando la imagen" }, { status: e instanceof GeminiError ? e.status : 500 });
   }
 
-  await logUsage(admin, user.id, "analyze");
+  await logUsage(admin, user.id, "analyze", key.own);
 
   // Subcategoría elegida por la IA
   if (!categoryId) {
@@ -195,6 +203,13 @@ export async function POST(request: Request) {
     data[nameField.name] = etiqueta.replace(/\s+/g, " ").slice(0, 60);
   }
   applyDefaults(effective, data);
+
+  // ¿Ya existe este producto? (código de barras, mismo nombre o muy parecido) → solo se avisa; el usuario decide en Revisar
+  const { data: others } = await supabase.from("product_summaries").select("id,nombre,marca,codigo_barras,status").neq("id", productId).limit(2000);
+  const nameKeyField = effective.find((f) => /^(nombre|name|producto|titulo)$/i.test(f.name))?.name ?? "nombre";
+  const codeField = Object.keys(data).find((k) => /^(codigo_barras|codigo|sku|barcode|ean)$/i.test(k));
+  const dup = findDuplicate(others ?? [], { nombre: String(data[nameKeyField] ?? ""), marca: String(data.marca ?? ""), codigo: codeField ? String(data[codeField] ?? "") : null }, productId);
+  if (dup) aiMeta.posible_duplicado = { product_id: dup.product_id, nombre: dup.nombre, motivo: dup.motivo };
 
   // 5. Crear pendiente
   const { data: product, error: insErr } = await admin

@@ -14,9 +14,11 @@ import {
 } from "@/lib/gemini";
 import { PRESETS } from "@/lib/presets";
 import { logUsage } from "@/lib/aiUsage";
+import { resolveAiKey } from "@/lib/aiKey";
 import { applyDefaults, coerceValue, getEffectiveFields } from "@/lib/fields";
 import { categoryPath } from "@/lib/categories";
 import { parseProposals } from "@/lib/variants";
+import { userExamples } from "@/lib/aiExamples";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
 
 export const runtime = "edge";
@@ -86,26 +88,31 @@ export async function POST(request: Request) {
   const aiFields = fixedCategoryId ? getEffectiveFields(tpls, cats, fixedCategoryId).filter((f) => f.is_ai_fillable) : unionAiFields(tpls, cats);
   const topNames = new Set(cats.filter((c) => !c.parent_id).map((c) => c.name.toLowerCase()));
   const catalogs = PRESETS.filter((p) => !topNames.has(p.name.toLowerCase())).map((p) => ({ name: p.name, description: p.description }));
-  const ctx = { categoryPaths: Array.from(idByPath.keys()), fixedCategoryPath: fixedCategoryId ? pathById.get(fixedCategoryId) : null, catalogs };
+  const examples = await userExamples(supabase, cats);
+  const ctx = { categoryPaths: Array.from(idByPath.keys()), fixedCategoryPath: fixedCategoryId ? pathById.get(fixedCategoryId) : null, catalogs, examples };
 
   let result: Record<string, unknown>;
   const aiMeta: AiMeta = {};
+  const key = await resolveAiKey(admin, user.id);
   try {
-    const out = await analyzeImage({
-      imageBase64: bytesToBase64(bytes),
-      mimeType: mime,
-      prompt: buildPrompt(aiFields, ctx),
-      schema: buildResponseSchema(aiFields, ctx),
-    });
+    const out = await analyzeImage(
+      {
+        imageBase64: bytesToBase64(bytes),
+        mimeType: mime,
+        prompt: buildPrompt(aiFields, ctx),
+        schema: buildResponseSchema(aiFields, ctx),
+      },
+      key
+    );
     result = out.result;
     aiMeta.modelo = out.model;
   } catch (e) {
-    await logUsage(admin, user.id, "reanalyze");
+    await logUsage(admin, user.id, "reanalyze", key.own);
     if (e instanceof QuotaError) return NextResponse.json({ error: e.message, retry_after: e.retryAfterSec, daily: true }, { status: 429 });
     const status = e instanceof GeminiError ? e.status : 500;
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error analizando la imagen" }, { status });
   }
-  await logUsage(admin, user.id, "reanalyze");
+  await logUsage(admin, user.id, "reanalyze", key.own);
 
   // Categoría
   let categoryId: string | null = fixedCategoryId;

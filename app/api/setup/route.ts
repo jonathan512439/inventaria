@@ -5,6 +5,7 @@ import { getPreset, type PresetAxis, type PresetField } from "@/lib/presets";
 import { nameKey } from "@/lib/categories";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logUsage } from "@/lib/aiUsage";
+import { resolveAiKey } from "@/lib/aiKey";
 
 export const runtime = "edge";
 
@@ -65,9 +66,11 @@ export async function POST(request: Request) {
   }
 
   if (body.description?.trim()) {
+    const admin = createAdminClient();
+    const key = await resolveAiKey(admin, user.id);
     try {
-      const g = await generatePreset(body.description.trim());
-      await logUsage(createAdminClient(), user.id, "setup");
+      const g = await generatePreset(body.description.trim(), key);
+      await logUsage(admin, user.id, "setup", key.own);
       specs.push({
         name: g.name,
         icon: g.icon || "🏪",
@@ -93,7 +96,7 @@ export async function POST(request: Request) {
         ],
       });
     } catch (e) {
-      await logUsage(createAdminClient(), user.id, "setup");
+      await logUsage(admin, user.id, "setup", key.own);
       const status = e instanceof GeminiError ? e.status : 500;
       return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo generar la categoría" }, { status });
     }

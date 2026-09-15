@@ -4,6 +4,7 @@ import { pickSubcategory } from "@/lib/gemini";
 import { productTitle } from "@/lib/fields";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logUsage } from "@/lib/aiUsage";
+import { resolveAiKey } from "@/lib/aiKey";
 
 export const runtime = "edge";
 
@@ -49,13 +50,15 @@ export async function POST(request: Request) {
 
   // 2) IA (solo texto)
   if (!chosen) {
+    const admin = createAdminClient();
+    const key = await resolveAiKey(admin, user.id);
     try {
-      const name = await pickSubcategory(`${title}. ${desc}. Etiqueta: ${product.ai_meta?.etiqueta ?? ""}`, subs.map((s) => s.name));
+      const name = await pickSubcategory(`${title}. ${desc}. Etiqueta: ${product.ai_meta?.etiqueta ?? ""}`, subs.map((s) => s.name), key);
       chosen = subs.find((s) => s.name === name);
     } catch {
       /* si la IA falla, queda en la categoría general */
     }
-    await logUsage(createAdminClient(), user.id, "classify");
+    await logUsage(admin, user.id, "classify", key.own);
   }
 
   const target = chosen?.id ?? category_id;

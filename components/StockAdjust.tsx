@@ -7,6 +7,7 @@ import type { MovementType, Product, ProductVariant } from "@/types/database";
 import { normalizeFieldName, productTitle } from "@/lib/fields";
 import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
 import { useToast } from "./ui/Toast";
+import { isNetworkError, queueMove } from "@/lib/offline";
 import { IconCheck, IconPlus, IconX, Spinner } from "./ui/Icons";
 
 interface Props {
@@ -53,17 +54,41 @@ export default function StockAdjust({ product, variants = [], variant = null, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel]);
 
+  /** Sin conexión: se guarda en el celular y se envía al reconectar (el delta se aplica sobre el stock real de ese momento). */
+  async function saveOffline(key: string) {
+    const tipo: MovementType = mode === "add" ? "entrada" : asSale ? "venta" : "salida";
+    const delta = mode === "add" ? qty : -Math.min(qty, current);
+    await queueMove({
+      product_id: product.id,
+      product_name: productTitle(product.data) || null,
+      variant_id: sel?.id ?? null,
+      variant_label: sel?.label ?? null,
+      delta,
+      tipo,
+      precio_unitario: asSale ? Number(salePrice) || 0 : null,
+      total: asSale ? total : null,
+      motivo: mode === "remove" && !asSale ? motivo : null,
+    });
+    setSaving(false);
+    toast("info", "Sin conexión: el cambio quedó guardado en el celular y se enviará al reconectar");
+    const totalStock = sel ? variants.reduce((t, v) => t + (v.id === sel.id ? newStock : v.stock), 0) : newStock;
+    onSaved({ ...product, data: { ...product.data, [key]: totalStock } }, sel ? { ...sel, stock: newStock } : undefined);
+    onClose();
+  }
+
   async function save() {
     if (!canSave) return;
     setSaving(true);
     const keys = Object.keys(product.data);
     const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => normalizeFieldName(x) === k)).find(Boolean) ?? "stock";
+    if (typeof navigator !== "undefined" && !navigator.onLine) return saveOffline(key);
     let data = { ...product.data, [key]: newStock };
     let updatedVariant: ProductVariant | undefined;
     if (sel) {
       // Stock por variante: el total del producto lo recalcula la base de datos (suma de variantes)
       const { error: ev } = await supabase.from("product_variants").update({ stock: newStock }).eq("id", sel.id);
       if (ev) {
+        if (isNetworkError(ev)) return saveOffline(key);
         setSaving(false);
         return toast("error", ev.message);
       }
@@ -73,6 +98,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
     } else {
       const { error: e1 } = await supabase.from("products").update({ data }).eq("id", product.id);
       if (e1) {
+        if (isNetworkError(e1)) return saveOffline(key);
         setSaving(false);
         return toast("error", e1.message);
       }

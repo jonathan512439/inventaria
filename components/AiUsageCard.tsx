@@ -9,6 +9,7 @@ interface UsageData {
   models: ModelUsage[];
   resetAt: string;
   totalToday: number;
+  ownKey?: boolean;
 }
 
 /** Medidor de consumo de IA de hoy, por modelo, con barras y cupo restante. */
@@ -58,6 +59,7 @@ export default function AiUsageCard() {
           <div>
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-white/60">
               <IconSparkles size={14} className="text-amber-300" /> Consumo de IA hoy
+              {data?.ownKey && <span className="rounded-full bg-emerald-500/25 px-2 py-0.5 text-[10px] normal-case tracking-normal text-emerald-200">con tu clave propia</span>}
             </p>
             {loading || !data ? (
               <Skeleton className="mt-2 h-8 w-40 bg-white/10" />
@@ -83,6 +85,11 @@ export default function AiUsageCard() {
             </span>
             <span>Se renueva a las <b className="text-white">{resetLabel}</b></span>
           </div>
+          {!data?.ownKey && (
+            <p className="mt-2 text-[11px] text-white/60">
+              Este cupo lo comparten todos los usuarios de la app. <a href="/settings#ia" className="font-semibold text-brand-200 hover:text-white">Usa tu propia clave</a> para tener el tuyo.
+            </p>
+          )}
         </div>
 
         <button onClick={() => setOpen((v) => !v)} className="mt-3 text-xs font-semibold text-brand-200 hover:text-white">

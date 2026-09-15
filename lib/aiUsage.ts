@@ -19,11 +19,11 @@ export function labelFor(model: string) {
 }
 
 /** Guarda en la BD los intentos de IA acumulados (llamar al final de cada ruta que use Gemini). */
-export async function logUsage(admin: SupabaseClient<Database>, userId: string | null, purpose: string) {
+export async function logUsage(admin: SupabaseClient<Database>, userId: string | null, purpose: string, ownKey = false) {
   const attempts = drainUsage();
   if (!attempts.length) return;
   await admin.from("ai_usage").insert(
-    attempts.map((a) => ({ user_id: userId, model: a.model, purpose, status: a.status, quota_limit: a.quota_limit ?? null }))
+    attempts.map((a) => ({ user_id: userId, model: a.model, purpose, status: a.status, quota_limit: a.quota_limit ?? null, own_key: ownKey }))
   );
 }
 
@@ -50,9 +50,12 @@ export interface ModelUsage {
 }
 
 /** Agrega el consumo de hoy por modelo (global de la app: el cupo lo comparte toda la app). */
-export async function usageToday(admin: SupabaseClient<Database>): Promise<{ models: ModelUsage[]; resetAt: string; totalToday: number }> {
+export async function usageToday(admin: SupabaseClient<Database>, own?: { userId: string }): Promise<{ models: ModelUsage[]; resetAt: string; totalToday: number }> {
   const since = pacificDayStart();
-  const { data } = await admin.from("ai_usage").select("model,status,quota_limit,created_at").gte("created_at", since.toISOString());
+  // Con clave propia el cupo es del usuario (solo sus filas own_key); con la del servicio, el cupo lo comparte toda la app
+  let q = admin.from("ai_usage").select("model,status,quota_limit,created_at").gte("created_at", since.toISOString());
+  q = own ? q.eq("own_key", true).eq("user_id", own.userId) : q.eq("own_key", false);
+  const { data } = await q;
   const rows = data ?? [];
   const chain = modelChain();
   const models: ModelUsage[] = chain.map((model, i) => {

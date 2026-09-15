@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import CoachTip from "@/components/CoachTip";
+import ShelfDetect from "@/components/ShelfDetect";
 import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/types/database";
 import { resizeImage } from "@/lib/image";
@@ -123,6 +124,9 @@ export default function CapturePage() {
           <span className="text-xs font-normal text-slate-500">elige varias a la vez</span>
         </button>
       </div>
+
+      {/* Foto de estante: varios productos de una vez */}
+      <div className="animate-in"><ShelfDetect categoryId={categoryId} /></div>
 
       {/* Código de barras: alta sin gastar IA */}
       <Link href="/scan" className="animate-in press flex items-center gap-3 rounded-3xl border-2 border-emerald-300 bg-white p-4 shadow-card transition hover:border-emerald-500 hover:bg-emerald-50">

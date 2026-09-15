@@ -13,6 +13,7 @@ import ProductTable from "@/components/ProductTable";
 import ProductRow from "@/components/ProductRow";
 import StockAdjust from "@/components/StockAdjust";
 import { ListSkeleton } from "@/components/ui/Skeleton";
+import { cacheGet, cacheSet, isNetworkError } from "@/lib/offline";
 import { IconArrowLeft, IconCamera, IconDownload, IconList, IconTable } from "@/components/ui/Icons";
 
 const FILTERS: { key: Filter; label: string }[] = [
@@ -32,6 +33,7 @@ export default function CategoryInventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [full, setFull] = useState<Map<string, Product>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [sub, setSub] = useState<string | null>(null); // subcategoría elegida (null = toda la categoría)
   const [filters, setFilters] = useState<Set<Filter>>(new Set());
   const [view, setView] = useState<"list" | "table">("list");
@@ -54,6 +56,20 @@ export default function CategoryInventoryPage() {
         supabase.from("field_templates").select("*").order("sort_order"),
         supabase.from("variant_axes").select("*").order("sort_order"),
       ]);
+      if (c.error && isNetworkError(c.error)) {
+        const cached = await cacheGet<{ categories: Category[]; templates: FieldTemplate[]; axes: VariantAxis[]; products: Product[]; full: [string, Product][]; variants: ProductVariant[] }>(`category:${id}`);
+        if (cached) {
+          setCategories(cached.data.categories);
+          setTemplates(cached.data.templates);
+          setAxes(cached.data.axes);
+          setProducts(cached.data.products);
+          setFull(new Map(cached.data.full));
+          setVariants(cached.data.variants);
+          setCachedAt(cached.at);
+        }
+        setLoading(false);
+        return;
+      }
       const cats = c.data ?? [];
       setCategories(cats);
       setTemplates(t.data ?? []);
@@ -117,6 +133,10 @@ export default function CategoryInventoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIds.join(",")]);
   const rowOf = (p: Product) => full.get(p.id) ?? p;
+  // Copia para consultar sin conexión (resúmenes + filas ya cargadas)
+  useEffect(() => {
+    if (!loading && !cachedAt && products.length) cacheSet(`category:${id}`, { categories, templates, axes, products, full: Array.from(full.entries()), variants });
+  }, [loading, cachedAt, id, categories, templates, axes, products, full, variants]);
 
   async function exportVisible() {
     const map = await loadFull(visible.map((p) => p.id));
@@ -134,6 +154,11 @@ export default function CategoryInventoryPage() {
 
   return (
     <div className="w-full space-y-4 overflow-x-hidden">
+      {cachedAt && (
+        <p className="animate-in rounded-2xl bg-slate-800 px-3 py-2 text-center text-xs font-semibold text-white">
+          Sin conexión · datos guardados a las {new Date(cachedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
+        </p>
+      )}
       <header className="animate-in">
         <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
         <div className="flex flex-wrap items-end justify-between gap-3">

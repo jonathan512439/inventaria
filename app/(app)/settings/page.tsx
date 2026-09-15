@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import { resetCoach, resetTour } from "@/lib/coach";
 import WhatsNew from "@/components/WhatsNew";
+import AiKeyCard from "@/components/AiKeyCard";
 import { IconCheckCircle, IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
 
 export default function SettingsPage() {
@@ -79,6 +80,8 @@ export default function SettingsPage() {
         <Row href="/dashboard#guia" icon={<IconList />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" />
         <Row href="/dashboard#limpiar" icon={<IconTrash />} title="Ordenar y limpiar" subtitle="Pendientes viejos, categorías vacías y fotos sueltas" />
       </section>
+
+      <AiKeyCard />
 
       <section className="animate-in card space-y-2">
         <p className="text-sm font-bold text-ink">Ayuda</p>

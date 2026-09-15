@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import CoachTip from "@/components/CoachTip";
+import { cacheGet, cacheSet, isNetworkError } from "@/lib/offline";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, Product } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
@@ -22,6 +23,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Product[] | null>(null); // null = buscando
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [salesMonth, setSalesMonth] = useState<{ total: number; count: number } | null>(null);
   const [variantsOf, setVariantsOf] = useState<Map<string, { stock: number }[]>>(new Map());
 
@@ -32,9 +34,23 @@ export default function ProductsPage() {
         supabase.from("categories").select("*"),
         supabase.from("product_summaries").select(SUMMARY_COLS).order("updated_at", { ascending: false }),
       ]);
-      setCategories(c.data ?? []);
-      setProducts((p.data ?? []).map(fromSummary));
+      if ((c.error && isNetworkError(c.error)) || (p.error && isNetworkError(p.error))) {
+        // Sin conexión: última copia guardada en el celular
+        const cached = await cacheGet<{ categories: Category[]; products: Product[] }>("inventory");
+        if (cached) {
+          setCategories(cached.data.categories);
+          setProducts(cached.data.products);
+          setCachedAt(cached.at);
+        }
+        setLoading(false);
+        return;
+      }
+      const cats = c.data ?? [];
+      const list = (p.data ?? []).map(fromSummary);
+      setCategories(cats);
+      setProducts(list);
       setLoading(false);
+      cacheSet("inventory", { categories: cats, products: list });
       const start = new Date();
       start.setDate(1);
       start.setHours(0, 0, 0, 0);
@@ -86,6 +102,11 @@ export default function ProductsPage() {
         </div>
       </header>
 
+      {cachedAt && (
+        <p className="animate-in rounded-2xl bg-slate-800 px-3 py-2 text-center text-xs font-semibold text-white">
+          Sin conexión · mostrando el inventario guardado a las {new Date(cachedAt).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
+        </p>
+      )}
       <CoachTip screen="products" title="Tu inventario, estante por estante">
         Cada tarjeta es una categoría: toca para ver sus productos y subcategorías. Dentro, <b>+/− Stock</b> registra ventas y reposiciones sin editar nada.
       </CoachTip>

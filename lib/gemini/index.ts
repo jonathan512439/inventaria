@@ -6,6 +6,19 @@ import type { FieldTemplate } from "@/types/database";
  */
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+
+/** Con qué clave se llama a Gemini: la del servicio (por defecto) o la propia del usuario (BYOK). */
+export interface KeyContext {
+  apiKey: string;
+  /** Identificador para llevar el cupo agotado por clave ("service" o el id del usuario) */
+  keyId: string;
+  own: boolean;
+}
+export function serviceKey(): KeyContext {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new GeminiError(500, "Falta GEMINI_API_KEY en el entorno del servidor");
+  return { apiKey, keyId: "service", own: false };
+}
 const DEFAULT_MODEL = "gemini-3.6-flash";
 
 export class GeminiError extends Error {
@@ -21,13 +34,15 @@ export const UNKNOWN_OPTION = "no_determinado";
 
 /** Sub-conjunto de OpenAPI schema que acepta Gemini en responseSchema. */
 interface GeminiSchema {
-  type: "OBJECT" | "STRING" | "NUMBER";
+  type: "OBJECT" | "STRING" | "NUMBER" | "INTEGER" | "ARRAY";
   description?: string;
   enum?: string[];
   nullable?: boolean;
   properties?: Record<string, GeminiSchema>;
   required?: string[];
   propertyOrdering?: string[];
+  items?: GeminiSchema;
+  maxItems?: number;
 }
 
 /** Claves reservadas que la IA devuelve además de los campos del usuario. */
@@ -53,6 +68,8 @@ export interface PromptContext {
   fixedCategoryPath?: string | null;
   /** Catálogos preconfigurados disponibles (nombre → descripción) que el usuario aún no tiene */
   catalogs?: Array<{ name: string; description: string }>;
+  /** Productos que el usuario ya confirmó ("Ropa > Dama → «Polera básica Adidas» (marca Adidas)") para imitar su estilo */
+  examples?: string[];
 }
 
 /** Construye el JSON Schema dinámico: campos is_ai_fillable + categoría + texto de etiqueta. */
@@ -146,6 +163,9 @@ export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string
     `Si en la foto se ven varias tallas, colores o edades del MISMO producto (etiqueta con S/M/L, prendas iguales de varios colores, caja "3-5 años"), enuméralas en "${META_KEYS.variantes}" con el formato "eje: valor, valor; eje: valor". Nunca inventes variantes que no se vean.`,
     "Prefiere SIEMPRE una subcategoría existente aunque no sea perfecta; propón una nueva solo si ninguna tiene relación. Las subcategorías nuevas deben ser genéricas (agrupan muchos productos), nunca el nombre de un producto.",
     catalogLine,
+    ctx.examples?.length
+      ? `Así escribe este usuario sus productos (imita el estilo de nombre y marca, y respeta cómo ubica cosas parecidas):\n${ctx.examples.map((e) => `- ${e}`).join("\n")}`
+      : "",
     `Campos a completar:\n${fieldList}`,
   ].join("\n");
 }
@@ -172,8 +192,9 @@ export function modelChain(): string[] {
   return Array.from(new Set(list));
 }
 
-/** Modelos con cupo diario agotado (por instancia del servidor) → hasta cuándo evitarlos. */
+/** Modelos con cupo diario agotado (por instancia del servidor y por clave) → hasta cuándo evitarlos. */
 const exhaustedUntil = new Map<string, number>();
+const exKey = (keyId: string, model: string) => `${keyId}:${model}`;
 
 /** Próximo reinicio del cupo diario de Google (medianoche, hora del Pacífico). */
 export function nextQuotaReset(): Date {
@@ -246,11 +267,10 @@ export function drainUsage(): UsageAttempt[] {
   return usageLog.splice(0, usageLog.length);
 }
 
-export async function generateContent(parts: unknown[], generationConfig: Record<string, unknown>): Promise<{ text: string; model: string }> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new GeminiError(500, "Falta GEMINI_API_KEY en el entorno del servidor");
+export async function generateContent(parts: unknown[], generationConfig: Record<string, unknown>, key: KeyContext = serviceKey()): Promise<{ text: string; model: string }> {
+  const apiKey = key.apiKey;
   const now = Date.now();
-  const chain = modelChain().filter((m) => (exhaustedUntil.get(m) ?? 0) < now);
+  const chain = modelChain().filter((m) => (exhaustedUntil.get(exKey(key.keyId, m)) ?? 0) < now);
   if (chain.length === 0) {
     const reset = nextQuotaReset();
     throw new QuotaError("Se agotó el cupo diario gratuito de la IA en todos los modelos.", Math.max(60, Math.ceil((reset.getTime() - now) / 1000)));
@@ -279,7 +299,7 @@ export async function generateContent(parts: unknown[], generationConfig: Record
       usageLog.push({ model, status: f.daily ? "quota" : res.status === 429 ? "limited" : "error", quota_limit: f.quotaLimit ?? null });
       if (res.status === 404) break; // modelo inexistente → siguiente
       if (res.status === 429 && f.daily) {
-        exhaustedUntil.set(model, nextQuotaReset().getTime());
+        exhaustedUntil.set(exKey(key.keyId, model), nextQuotaReset().getTime());
         break; // siguiente modelo
       }
       if (res.status === 503 || f.demand) break; // siguiente modelo
@@ -295,7 +315,7 @@ export async function generateContent(parts: unknown[], generationConfig: Record
   }
 
   // Todos fallaron
-  const allDaily = modelChain().every((m) => (exhaustedUntil.get(m) ?? 0) > Date.now());
+  const allDaily = modelChain().every((m) => (exhaustedUntil.get(exKey(key.keyId, m)) ?? 0) > Date.now());
   if (allDaily || last?.daily) {
     const reset = nextQuotaReset();
     throw new QuotaError("Se agotó el cupo diario gratuito de la IA. Tus fotos quedan guardadas y se analizarán cuando se renueve.", Math.max(60, Math.ceil((reset.getTime() - Date.now()) / 1000)));
@@ -304,10 +324,11 @@ export async function generateContent(parts: unknown[], generationConfig: Record
 }
 
 /** Analiza una imagen con structured output. Devuelve el JSON parseado y el modelo usado. */
-export async function analyzeImage({ imageBase64, mimeType, prompt, schema }: AnalyzeArgs): Promise<{ result: Record<string, unknown>; model: string }> {
+export async function analyzeImage({ imageBase64, mimeType, prompt, schema }: AnalyzeArgs, key?: KeyContext): Promise<{ result: Record<string, unknown>; model: string }> {
   const { text, model } = await generateContent(
     [{ inline_data: { mime_type: mimeType, data: imageBase64 } }, { text: prompt }],
-    { temperature: 0.2, responseMimeType: "application/json", responseSchema: schema }
+    { temperature: 0.2, responseMimeType: "application/json", responseSchema: schema },
+    key
   );
   try {
     return { result: JSON.parse(text) as Record<string, unknown>, model };
@@ -357,7 +378,7 @@ const PRESET_SCHEMA = {
 };
 
 /** Pide a Gemini una categoría completa (subcategorías + datos) a partir de "vendo repuestos de moto y aceites". */
-export async function generatePreset(description: string): Promise<GeneratedPreset> {
+export async function generatePreset(description: string, key?: KeyContext): Promise<GeneratedPreset> {
   const { text } = await generateContent(
     [
       {
@@ -366,7 +387,8 @@ export async function generatePreset(description: string): Promise<GeneratedPres
           `Diseña cómo organizaría su inventario: nombre de la categoría, un emoji, las subcategorías (estantes) y 2-4 datos específicos por producto. Todo en español, breve y práctico.`,
       },
     ],
-    { temperature: 0.4, responseMimeType: "application/json", responseSchema: PRESET_SCHEMA }
+    { temperature: 0.4, responseMimeType: "application/json", responseSchema: PRESET_SCHEMA },
+    key
   );
   try {
     return JSON.parse(text) as GeneratedPreset;
@@ -376,7 +398,7 @@ export async function generatePreset(description: string): Promise<GeneratedPres
 }
 
 /** Elige la subcategoría más adecuada para un producto (solo texto, sin imagen). */
-export async function pickSubcategory(productText: string, options: string[]): Promise<string | null> {
+export async function pickSubcategory(productText: string, options: string[], key?: KeyContext): Promise<string | null> {
   if (!options.length) return null;
   const NONE = "ninguna";
   try {
@@ -386,11 +408,61 @@ export async function pickSubcategory(productText: string, options: string[]): P
         temperature: 0,
         responseMimeType: "application/json",
         responseSchema: { type: "OBJECT", properties: { subcategoria: { type: "STRING", enum: [...options, NONE] } }, required: ["subcategoria"] },
-      }
+      },
+      key
     );
     const v = (JSON.parse(text) as { subcategoria?: string }).subcategoria;
     return v && v !== NONE ? v : null;
   } catch {
     return null;
+  }
+}
+
+/** Producto detectado en una foto de estante: recuadro normalizado 0–1000 [ymin, xmin, ymax, xmax]. */
+export interface DetectedProduct {
+  nombre_visible: string;
+  box_2d: [number, number, number, number];
+}
+
+const DETECT_SCHEMA: GeminiSchema = {
+  type: "OBJECT",
+  properties: {
+    productos: {
+      type: "ARRAY",
+      maxItems: 25,
+      items: {
+        type: "OBJECT",
+        properties: {
+          nombre_visible: { type: "STRING", description: "Nombre corto del producto tal como se lee o se reconoce (marca + producto)" },
+          box_2d: { type: "ARRAY", items: { type: "INTEGER" }, description: "[ymin, xmin, ymax, xmax] en escala 0-1000 sobre la imagen" },
+        },
+        required: ["nombre_visible", "box_2d"],
+      },
+    },
+  },
+  required: ["productos"],
+};
+
+/** Detecta los productos distintos visibles en una foto de estante o vitrina (una sola petición). */
+export async function detectProducts(imageBase64: string, mimeType: string, key?: KeyContext): Promise<{ items: DetectedProduct[]; model: string }> {
+  const { text, model } = await generateContent(
+    [
+      { inline_data: { mime_type: mimeType, data: imageBase64 } },
+      {
+        text:
+          "Esta es una foto de un estante, vitrina o mesa de una tienda. Detecta cada PRODUCTO DISTINTO a la venta que se vea completo y reconocible " +
+          "(si hay varias unidades iguales, un solo recuadro sobre la más visible). Ignora productos cortados, borrosos o demasiado pequeños para leer. " +
+          "Devuelve para cada uno un nombre corto y su recuadro box_2d [ymin, xmin, ymax, xmax] en escala 0-1000. Máximo 25.",
+      },
+    ],
+    { temperature: 0.1, responseMimeType: "application/json", responseSchema: DETECT_SCHEMA },
+    key
+  );
+  try {
+    const json = JSON.parse(text) as { productos?: DetectedProduct[] };
+    const items = (json.productos ?? []).filter((p) => Array.isArray(p.box_2d) && p.box_2d.length === 4 && p.box_2d.every((n) => Number.isFinite(n)));
+    return { items, model };
+  } catch {
+    throw new GeminiError(502, "La IA no devolvió una respuesta válida.");
   }
 }

@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
+import { syncMoves } from "@/lib/offline";
+import { useToast } from "./ui/Toast";
 
 /** Estado del flujo ① Agregar → ② Revisar → ③ Inventario, compartido por la barra de pasos, el menú y el Inicio. */
 export interface FlowState {
@@ -27,6 +29,7 @@ export function stepOf(pathname: string): 0 | 1 | 2 | 3 {
 
 export function FlowProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const toast = useToast();
   const queue = useQueue();
   const q = queueSummary(queue.items);
   const [counts, setCounts] = useState({ pending: 0, confirmed: 0, loaded: false });
@@ -43,6 +46,21 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     hydrateQueue();
   }, []);
+  // Movimientos de stock hechos sin conexión: se envían al abrir la app y al reconectar
+  useEffect(() => {
+    const run = async () => {
+      if (!navigator.onLine) return;
+      const { sent, failed } = await syncMoves(createClient());
+      if (sent) {
+        toast("success", `${sent} cambio${sent === 1 ? "" : "s"} de stock hecho${sent === 1 ? "" : "s"} sin conexión ya se enviaron`);
+        refresh();
+      }
+      if (failed && !sent) toast("error", "Algunos cambios sin conexión no se pudieron enviar; se reintentará");
+    };
+    run();
+    window.addEventListener("online", run);
+    return () => window.removeEventListener("online", run);
+  }, [refresh, toast]);
   // Se refresca al navegar y cuando termina un análisis
   useEffect(() => {
     refresh();

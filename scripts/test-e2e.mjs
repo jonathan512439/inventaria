@@ -1,6 +1,7 @@
 /**
  * Prueba de extremo a extremo: registro → categoría → foto → producto analizado → subcategoría → alta manual
- *   → variantes (ejes del catálogo, stock derivado) → escáner por variante → venta por variante.
+ *   → variantes (ejes del catálogo, stock derivado) → escáner por variante → venta por variante
+ *   → duplicado detectado → foto de estante (detect) → clave de IA propia (BYOK).
  *   npm run test:e2e                 (contra http://localhost:3000)
  *   BASE_URL=https://inventaria.pages.dev npm run test:e2e
  * Crea un usuario temporal y lo elimina al terminar. Consume 1-2 peticiones de IA.
@@ -10,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadEnvLocal, requireEnv } from "./env.mjs";
 loadEnvLocal();
-requireEnv("NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY");
+requireEnv("NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "GEMINI_API_KEY");
 const BASE = process.env.BASE_URL || "http://localhost:3000";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
@@ -112,7 +113,43 @@ try {
   const { data: taza2 } = await admin.from("products").select("data").eq("id", taza.id).single();
   check(taza2.data.stock === 7, "producto sin variantes: el stock se edita a mano como siempre");
 
-  // 9. Medidor
+  // 9. Duplicados: la misma foto con otro id → aviso "posible duplicado" (mismo nombre)
+  const form2 = new FormData();
+  const id2 = crypto.randomUUID();
+  form2.append("image", new Blob([fs.readFileSync(path.join("scripts", "fixtures", "producto.jpg"))], { type: "image/jpeg" }), "p2.jpg");
+  form2.append("product_id", id2);
+  r = await fetch(`${BASE}/api/analyze`, { method: "POST", body: form2, headers: { cookie: H.cookie } });
+  const j2 = await r.json();
+  check(r.status === 201, `analyze (2.ª vez): ${r.status} ${j2.error ?? ""}`);
+  check(!!j2.product?.ai_meta?.posible_duplicado?.product_id, `posible duplicado detectado: ${j2.product?.ai_meta?.posible_duplicado?.motivo ?? "(no)"} → «${j2.product?.ai_meta?.posible_duplicado?.nombre ?? ""}»`);
+
+  // 10. Foto de estante: detección de productos (1 análisis, no crea nada)
+  const form3 = new FormData();
+  form3.append("image", new Blob([fs.readFileSync(path.join("scripts", "fixtures", "producto.jpg"))], { type: "image/jpeg" }), "estante.jpg");
+  r = await fetch(`${BASE}/api/detect`, { method: "POST", body: form3, headers: { cookie: H.cookie } });
+  const det = await r.json();
+  check(r.status === 200 && Array.isArray(det.items), `detect: ${r.status} → ${det.items?.length ?? 0} producto(s) (${det.items?.[0]?.nombre_visible ?? "-"})`);
+  const { count: nProducts } = await admin.from("products").select("id", { count: "exact", head: true }).eq("user_id", uid);
+  check(nProducts === 4, `detect no crea productos (siguen ${nProducts})`);
+
+  // 11. Clave de IA propia (BYOK): inválida → 400; válida → guardada cifrada; análisis marcado con own_key; quitar
+  r = await fetch(`${BASE}/api/ai-key`, { method: "POST", headers: H, body: JSON.stringify({ key: "AIzaNOVALIDA_0000000000000000000" }) });
+  check(r.status === 400, `clave inválida rechazada: ${r.status}`);
+  r = await fetch(`${BASE}/api/ai-key`, { method: "POST", headers: H, body: JSON.stringify({ key: process.env.GEMINI_API_KEY }) });
+  const k1 = await r.json();
+  check(r.status === 200 && k1.last4, `clave válida guardada (…${k1.last4})`);
+  const { data: krow } = await admin.from("ai_keys").select("key_ciphertext,last4").eq("user_id", uid).maybeSingle();
+  check(!!krow && krow.key_ciphertext !== process.env.GEMINI_API_KEY && !krow.key_ciphertext.includes(krow.last4), "la clave se guarda cifrada (no en claro)");
+  r = await fetch(`${BASE}/api/usage`, { headers: H });
+  const u1 = await r.json();
+  check(u1.ownKey === true && u1.totalToday === 0, `medidor con clave propia: ${u1.totalToday} análisis hoy (cupo propio)`);
+  r = await fetch(`${BASE}/api/classify`, { method: "POST", headers: H, body: JSON.stringify({ product_id: id2, category_id: top.id }) });
+  const { data: own } = await admin.from("ai_usage").select("own_key").eq("user_id", uid).eq("purpose", "classify").order("created_at", { ascending: false }).limit(1);
+  check(r.status === 200 && (own?.length === 0 || own?.[0]?.own_key === true), "el consumo con clave propia no cuenta contra el cupo compartido");
+  r = await fetch(`${BASE}/api/ai-key`, { method: "DELETE", headers: H });
+  check(r.status === 200, "clave quitada");
+
+  // 12. Medidor
   r = await fetch(`${BASE}/api/usage`, { headers: H });
   const u = await r.json();
   check(r.status === 200 && Array.isArray(u.models) && u.models.length >= 3, `usage: ${u.models?.length} modelos, ${u.totalToday} análisis hoy`);

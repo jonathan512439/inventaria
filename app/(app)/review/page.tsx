@@ -71,6 +71,53 @@ function Review() {
   const [openIn, setOpenIn] = useState<{ id: string; nonce: number } | null>(null);
   const [openPicker, setOpenPicker] = useState<{ step: string | null; nonce: number } | null>(null);
   const [reanalyzing, setReanalyzing] = useState(false);
+  const [merging, setMerging] = useState(false);
+
+  /** Duplicado: sumar el stock del pendiente al producto existente y borrar el pendiente (y su foto). */
+  async function mergeIntoExisting(existingId: string) {
+    if (!current || !draft) return;
+    setMerging(true);
+    const { data: existing } = await supabase.from("products").select("*").eq("id", existingId).maybeSingle();
+    if (!existing) {
+      setMerging(false);
+      return toast("error", "El producto original ya no existe");
+    }
+    const { count: nVariants } = await supabase.from("product_variants").select("id", { count: "exact", head: true }).eq("product_id", existingId);
+    const qty = Math.max(1, parseInt(String(draft.data.stock ?? draft.data.cantidad ?? 1), 10) || 1);
+    if (!nVariants) {
+      const keys = Object.keys(existing.data);
+      const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "stock";
+      const cur = Number(existing.data[key] ?? 0) || 0;
+      const { error } = await supabase.from("products").update({ data: { ...existing.data, [key]: cur + qty } }).eq("id", existingId);
+      if (error) {
+        setMerging(false);
+        return toast("error", error.message);
+      }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      await supabase.from("stock_movements").insert({ user_id: user!.id, product_id: existingId, product_name: productTitle(existing.data) || null, tipo: "entrada", cantidad: qty, motivo: "foto repetida", stock_resultante: cur + qty });
+    }
+    // Borrar el pendiente y su foto
+    if (current.image_url) {
+      const i = current.image_url.indexOf("/product-images/");
+      if (i >= 0) await supabase.storage.from("product-images").remove([current.image_url.slice(i + "/product-images/".length)]);
+    }
+    await supabase.from("products").delete().eq("id", current.id);
+    removeByProductId(current.id);
+    setProducts((list) => list.filter((p) => p.id !== current.id));
+    setMerging(false);
+    navigator.vibrate?.(20);
+    toast("success", nVariants ? "Pendiente descartado. Ese producto tiene variantes: suma el stock desde su ficha." : `+${qty} al stock de «${productTitle(existing.data)}». Pendiente descartado.`, nVariants ? { label: "Abrir ficha", onClick: () => router.push(`/products/${existingId}`) } : undefined);
+  }
+
+  /** Duplicado: el usuario dice que es otro producto → se quita el aviso. */
+  async function notDuplicate() {
+    if (!current) return;
+    const ai_meta = { ...(current.ai_meta ?? {}), posible_duplicado: null };
+    await supabase.from("products").update({ ai_meta }).eq("id", current.id);
+    setProducts((list) => list.map((p) => (p.id === current.id ? { ...p, ai_meta } : p)));
+  }
   // Variantes: ejes de la categoría, opciones marcadas y stock escrito por celda
   const [axes, setAxes] = useState<VariantAxis[]>([]);
   const [variantsOn, setVariantsOn] = useState<boolean | null>(null);
@@ -486,6 +533,23 @@ function Review() {
         </button>
 
         <div className="stagger space-y-5 px-5 pb-5">
+          {/* ¿Ya lo tienes? (posible duplicado detectado al analizar) */}
+          {meta.posible_duplicado && (
+            <section className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm font-bold text-amber-900">¿Es el mismo producto que ya tienes?</p>
+              <p className="mt-0.5 text-xs text-amber-800">
+                <b>«{meta.posible_duplicado.nombre}»</b> · {meta.posible_duplicado.motivo}.{" "}
+                <Link href={`/products/${meta.posible_duplicado.product_id}`} className="font-semibold underline">Ver ese producto</Link>
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button type="button" disabled={merging} onClick={() => mergeIntoExisting(meta.posible_duplicado!.product_id)} className="btn-success btn-sm">
+                  {merging ? <Spinner size={14} /> : <IconCheck size={14} />} Sí, sumar {Math.max(1, parseInt(String(draft.data.stock ?? 1), 10) || 1)} al stock
+                </button>
+                <button type="button" disabled={merging} onClick={notDuplicate} className="btn-secondary btn-sm">No, es otro</button>
+              </div>
+            </section>
+          )}
+
           {/* ¿Dónde va este producto? */}
           <section className={`rounded-2xl border-2 p-3 ${locState.border}`}>
             <div className="mb-2 flex items-center justify-between gap-2">
