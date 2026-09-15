@@ -32,6 +32,24 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
 ---
 
+### 12.17 Menú «Más»: se abría mal y hablaba en técnico
+- **Qué**: en el celular el panel crecía más que la pantalla, así que la primera opción quedaba **debajo de la barra del navegador** y la barra de desplazamiento mostraba un recorrido que no existía. Ahora es una hoja inferior con **cabecera fija y su propio desplazamiento** (máx. 82 % de la pantalla, con espacio para la barra de abajo); en computadora el desplegable también tiene su scroll. Además las opciones están **agrupadas** y explicadas en lenguaje cotidiano: *Del día a día* (Escanear un código · Ventas y movimientos · Qué falta y qué caduca), *Ordenar el inventario* (Anotar una compra · Contar lo que tengo · Cambiar precios · Descargar en Excel), *Configurar* (Mi tienda · Cuándo avisarme · Ajustes) y *Ayuda* (Guía paso a paso · Ordenar y limpiar · Cómo usar la herramienta).
+- **Validar**: en el celular, tocar **Más** → se ve el título «Más opciones» y la primera opción completa; la lista se desplaza dentro del panel y la última opción es accesible.
+
+### 12.18 El botón verde ya no tapa la lista
+- **Qué**: la acción principal fija (p. ej. *Terminar y corregir…* al contar, *Registrar compra*, *Aplicar a N productos*, *Guardar cambios*) tenía fondo degradado y dejaba ver el contenido por debajo, dando sensación de solapamiento. Ahora tiene **fondo sólido, línea superior y sombra**, y está separada del contenido; al llegar al final de la lista, la última fila queda por encima del botón.
+- **Validar**: en *Contar lo que tengo*, desplazar una categoría larga → el botón se ve nítido sobre la lista y no se lee texto detrás.
+
+### 12.19 «Deslizar para quitar el aviso» ahora se ve
+- **Qué**: en *Qué falta y qué caduca* aparece una tarjeta con el gesto animado —«¿Alguno no te interesa? Desliza esa fila hacia la izquierda…»— y la **primera fila muestra sola** el fondo oscuro «No avisar» un momento al abrir, para que el gesto se entienda sin leer. El fondo del deslizamiento es más ancho y legible, y el enlace lleva a *Cuándo avisarme* para reactivar lo descartado.
+- **Validar**: abrir *Qué falta y qué caduca* → se ve la tarjeta con el dedo animado y la primera fila insinúa el gesto.
+
+### 12.20 «Contar lo que tengo» en lenguaje de tienda
+- **Qué**: la pantalla se llama **Contar lo que tengo** (antes «Toma de inventario») y todos sus textos explican lo que pasa: «Revisa cuántas unidades hay de verdad en el estante. Si no coincide con lo que dice la app, se corrige al instante y queda anotado»; en cada fila «La app dice 8 · faltan 2» / «hay 1 de más»; la casilla pide «¿cuántos?»; el botón dice **Terminar y corregir N productos**; el historial es «Veces que contaste» con «todo coincidía» o «3 corregidos». Desaparecen «acta», «esperado», «ajuste» y «sistema».
+- **Validar**: Más → *Contar lo que tengo* → los textos se entienden sin explicación previa.
+
+---
+
 ## 2026-09-15 · Plan v3 · Fase 2 — Control real de stock
 
 Migración `supabase/010_control_stock.sql` aplicada: mínimos y vencimientos, papelera, proveedores y compras, toma de inventario, historial de precios; la vista `product_summaries` excluye la papelera y expone mínimo, vencimiento, precio mayorista y unidades por paquete.
