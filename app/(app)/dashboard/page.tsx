@@ -203,7 +203,7 @@ export default function DashboardPage() {
       <div className="animate-in grid grid-cols-3 gap-2">
         <Shortcut href="/sell" Icon={IconTag} label="Vender" hint="cobrar y ticket" primary tone="emerald" />
         <Shortcut href="/capture" Icon={IconCamera} label="Agregar" hint="foto o galería" primary />
-        <Shortcut href="/cash" Icon={IconList} label="Caja" hint="cerrar el día" />
+        <Shortcut href="/reports" Icon={IconList} label="Cómo va" hint="ventas y ganancia" />
       </div>
 
       {/* Más: guía, IA, limpieza, exportar, ajustes (plegado) */}
@@ -212,13 +212,21 @@ export default function DashboardPage() {
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"><IconList size={18} /></span>
           <span className="min-w-0 flex-1">
             <span className="block">{moreOpen ? "Ocultar herramientas" : "Más herramientas"}</span>
-            <span className="block truncate text-xs font-normal text-slate-500">Guía paso a paso · consumo de IA · ordenar y limpiar · Excel · ajustes</span>
+            <span className="block truncate text-xs font-normal text-slate-500">Resumen de hoy · pregúntale a tu inventario · guía · consumo de IA · limpiar · Excel</span>
           </span>
           <IconChevronRight className={`shrink-0 text-brand-600 transition ${moreOpen ? "rotate-90" : ""}`} />
         </button>
         {moreOpen && (
           <div className="stagger mt-3 space-y-4">
             <div className="grid grid-cols-2 gap-3">
+              <Link href="/digest" className="press flex items-center gap-3 rounded-3xl border-2 border-brand-300 bg-white p-4 shadow-card transition hover:border-brand-500 hover:bg-brand-50">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-100 text-brand-700"><IconCheckCircle size={22} /></span>
+                <span className="min-w-0"><span className="block font-bold text-ink">Resumen de hoy</span><span className="block text-xs text-slate-500">para WhatsApp</span></span>
+              </Link>
+              <Link href="/ask" className="press flex items-center gap-3 rounded-3xl border-2 border-violet-300 bg-white p-4 shadow-card transition hover:border-violet-500 hover:bg-violet-50">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-700"><IconSparkles size={22} /></span>
+                <span className="min-w-0"><span className="block font-bold text-ink">Pregúntale</span><span className="block text-xs text-slate-500">a tu inventario</span></span>
+              </Link>
               <Link href="/export" className="press flex items-center gap-3 rounded-3xl border-2 border-emerald-300 bg-white p-4 shadow-card transition hover:border-emerald-500 hover:bg-emerald-50">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><IconDownload size={22} /></span>
                 <span className="min-w-0"><span className="block font-bold text-ink">Exportar</span><span className="block text-xs text-slate-500">a Excel</span></span>

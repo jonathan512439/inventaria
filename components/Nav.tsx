@@ -40,6 +40,14 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
     ],
   },
   {
+    title: "Cómo va el negocio",
+    items: [
+      { href: "/reports", label: "Cómo va el negocio", hint: "Qué se vende, qué no, cuánto ganas y cuánto vale lo que tienes", Icon: IconList },
+      { href: "/digest", label: "Resumen de hoy", hint: "Lo importante del día, listo para mandar por WhatsApp", Icon: IconCheckCircle },
+      { href: "/ask", label: "Pregúntale a tu inventario", hint: "«¿Cuánto vendí esta semana?» y te responde con tus datos", Icon: IconSparkles },
+    ],
+  },
+  {
     title: "Ordenar el inventario",
     items: [
       { href: "/purchases", label: "Anotar una compra", hint: "Llegó mercadería: cuánta y a qué precio la compraste", Icon: IconBox },

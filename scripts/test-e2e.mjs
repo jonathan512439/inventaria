@@ -3,7 +3,7 @@
  *   → variantes (ejes del catálogo, stock derivado) → escáner por variante → venta por variante
  *   → duplicado detectado → foto de estante (detect) → clave de IA propia (BYOK)
  *   → control de stock (mínimo, papelera, compra, conteo) → ventas (tickets, ganancia, caja)
- *   → clientes (fiado, abono, consignación).
+ *   → clientes (fiado, abono, consignación) → información (reportes, resumen, preguntar a la IA).
  *   npm run test:e2e                 (contra http://localhost:3000)
  *   BASE_URL=https://inventaria.pages.dev npm run test:e2e
  * Crea un usuario temporal y lo elimina al terminar. Consume 1-2 peticiones de IA.
@@ -240,7 +240,21 @@ try {
     check(rp.status === 200, `${path.split("?")[0]} → ${rp.status}`);
   }
 
-  // 15. Medidor
+  // 15. Información: reportes, resumen y «pregúntale a tu inventario» (solo lectura, 1 análisis)
+  for (const path of ["/reports", "/digest", "/ask"]) {
+    const rp = await fetch(`${BASE}${path}`, { headers: { cookie: H.cookie } });
+    check(rp.status === 200, `${path} → ${rp.status}`);
+  }
+  const { count: beforeAsk } = await admin.from("products").select("id", { count: "exact", head: true }).eq("user_id", uid);
+  r = await fetch(`${BASE}/api/ask`, { method: "POST", headers: H, body: JSON.stringify({ question: "¿Cuánto vendí en total y quién me debe?" }) });
+  const ask = await r.json();
+  check(r.status === 200 && typeof ask.answer === "string" && ask.answer.length > 20, `ask: ${r.status} → «${(ask.answer ?? ask.error ?? "").slice(0, 90).replace(/
+/g, " ")}…»`);
+  check(/37[.,]5|Juanito|17[.,]5/.test(ask.answer ?? ""), "la respuesta usa los datos reales (vendido 37,5 / Juanito / debe 17,5)");
+  const { count: afterAsk } = await admin.from("products").select("id", { count: "exact", head: true }).eq("user_id", uid);
+  check(beforeAsk === afterAsk, "preguntar no cambia nada");
+
+  // 16. Medidor
   r = await fetch(`${BASE}/api/usage`, { headers: H });
   const u = await r.json();
   check(r.status === 200 && Array.isArray(u.models) && u.models.length >= 3, `usage: ${u.models?.length} modelos, ${u.totalToday} análisis hoy`);
