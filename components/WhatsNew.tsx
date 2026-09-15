@@ -6,7 +6,7 @@ import { markTourSeen, tourSeen } from "@/lib/coach";
 import { IconArrowRight, IconBox, IconCamera, IconCheck, IconCheckCircle, IconHome, IconList, IconX } from "./ui/Icons";
 
 interface Props {
-  /** Abrir aunque ya se haya visto (desde «Más → ¿Qué hay de nuevo?») */
+  /** Abrir aunque ya se haya visto (desde «Más → Cómo usar la herramienta») */
   force?: boolean;
   onClose?: () => void;
 }
@@ -19,7 +19,7 @@ const SLIDES = [
   },
   {
     title: "Menú más simple",
-    text: "Abajo solo hay Inicio, Agregar, Inventario y Más. «Revisar» vive en la barra de pasos y en el Inicio, con su contador. Escáner, ventas, Excel, Mi tienda y la guía están en Más.",
+    text: "Abajo: Inicio, Revisar (con su contador), Agregar en el centro, Inventario y Más. Escáner, ventas, Excel, Mi tienda y la guía están en Más.",
     Art: ArtMenu,
   },
   {
@@ -50,7 +50,7 @@ export default function WhatsNew({ force, onClose }: Props) {
       <div className="animate-in relative w-full max-w-md overflow-hidden rounded-t-3xl bg-white shadow-2xl md:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="bg-gradient-to-br from-brand-600 via-violet-600 to-fuchsia-600 px-5 pb-5 pt-4 text-white">
           <div className="flex items-center justify-between">
-            <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">Nuevo diseño · {i + 1}/{SLIDES.length}</span>
+            <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">Cómo usar la herramienta · {i + 1}/{SLIDES.length}</span>
             <button onClick={close} className="rounded-full p-1.5 text-white/80 hover:bg-white/20" aria-label="Cerrar"><IconX size={18} /></button>
           </div>
           <div className="mt-3 h-36"><s.Art /></div>
@@ -98,6 +98,7 @@ function ArtSteps() {
 function ArtMenu() {
   const items = [
     { Icon: IconHome, t: "Inicio" },
+    { Icon: IconCheckCircle, t: "Revisar" },
     { Icon: IconCamera, t: "Agregar", primary: true },
     { Icon: IconBox, t: "Inventario" },
     { Icon: IconList, t: "Más" },

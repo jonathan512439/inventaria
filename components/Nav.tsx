@@ -10,16 +10,16 @@ import WhatsNew from "./WhatsNew";
 import { IconBox, IconCamera, IconCheckCircle, IconDownload, IconFolder, IconHome, IconImages, IconList, IconSettings, IconSparkles, IconTag, IconTrash, IconX } from "./ui/Icons";
 import { LogoWordmark } from "./ui/Logo";
 
-/** Barra inferior de 3 + Más: Inicio · Agregar · Inventario · Más ▾ */
+/** Barra inferior: Inicio · Revisar · Agregar (centro) · Inventario · Más ▾ */
 const MAIN = [
   { href: "/dashboard", label: "Inicio", Icon: IconHome },
+  { href: "/review", label: "Revisar", Icon: IconCheckCircle },
   { href: "/capture", label: "Agregar", Icon: IconCamera, primary: true },
   { href: "/products", label: "Inventario", Icon: IconBox },
 ] as const;
 
 /** Lo secundario vive en «Más» */
 const MORE: { href: string; label: string; hint: string; Icon: (p: { size?: number; className?: string }) => JSX.Element }[] = [
-  { href: "/review", label: "Revisar pendientes", hint: "confirma lo que la IA reconoció", Icon: IconCheckCircle },
   { href: "/scan", label: "Escanear código de barras", hint: "repetidos y reposición sin IA", Icon: IconTag },
   { href: "/movements", label: "Ventas y movimientos", hint: "ingresos, entradas y retiros", Icon: IconList },
   { href: "/export", label: "Exportar a Excel", hint: "todo o por categoría", Icon: IconDownload },
@@ -135,9 +135,9 @@ export default function Nav() {
         </div>
       )}
 
-      {/* Móvil: barra inferior de 3 + Más, con botón central de cámara */}
+      {/* Móvil: barra inferior Inicio · Revisar · Agregar (centro) · Inventario · Más */}
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/95 backdrop-blur-md md:hidden">
-        <div className="grid grid-cols-4 items-end">
+        <div className="grid grid-cols-5 items-end">
           {MAIN.map(({ href, label, Icon, ...rest }) =>
             "primary" in rest ? (
               <Link
@@ -164,13 +164,13 @@ export default function Nav() {
               <Link key={href} href={href} className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${isActive(href) || (href === "/products" && isActive("/movements")) ? "text-brand-700" : "text-slate-500"}`}>
                 <Icon size={22} strokeWidth={isActive(href) ? 2.4 : 2} />
                 {label}
+                {href === "/review" && flow.pending > 0 && <Badge n={flow.pending} className="absolute right-2 top-1" />}
               </Link>
             )
           )}
           <button onClick={() => setMore((v) => !v)} className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${more || moreActive ? "text-brand-700" : "text-slate-500"}`}>
             <IconList size={22} strokeWidth={more ? 2.4 : 2} />
             Más
-            {flow.pending > 0 && !isActive("/review") && <Badge n={flow.pending} className="absolute right-3 top-1" />}
           </button>
         </div>
       </nav>
@@ -181,7 +181,6 @@ export default function Nav() {
 }
 
 function MoreList({ onTour }: { onTour: () => void }) {
-  const flow = useFlow();
   return (
     <ul className="grid gap-0.5">
       {MORE.map(({ href, label, hint, Icon }) => (
@@ -192,7 +191,6 @@ function MoreList({ onTour }: { onTour: () => void }) {
               <span className="block text-sm font-semibold text-ink">{label}</span>
               <span className="block truncate text-[11px] text-slate-500">{hint}</span>
             </span>
-            {href === "/review" && flow.pending > 0 && <Badge n={flow.pending} />}
           </Link>
         </li>
       ))}
@@ -200,8 +198,8 @@ function MoreList({ onTour }: { onTour: () => void }) {
         <button onClick={onTour} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-brand-50">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><IconSparkles size={18} /></span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-ink">¿Qué hay de nuevo?</span>
-            <span className="block text-[11px] text-slate-500">recorrido del nuevo diseño</span>
+            <span className="block text-sm font-semibold text-ink">Cómo usar la herramienta</span>
+            <span className="block text-[11px] text-slate-500">recorrido de 3 pantallas</span>
           </span>
         </button>
       </li>

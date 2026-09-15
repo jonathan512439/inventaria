@@ -12,8 +12,8 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 - **Validar**: abrir Agregar → la barra marca ① en índigo; tomar una foto → ① muestra el contador ámbar; ir a Revisar → ② en índigo con el número de pendientes; confirmar todo → ② queda con ✓.
 
 ### 9.2 Menú de 3 + Más
-- **Qué**: barra inferior con **Inicio · Agregar (cámara, centro) · Inventario · Más**. En **Más** viven: Revisar pendientes (con contador), Escanear código, Ventas y movimientos, Exportar a Excel, Mi tienda, Guía paso a paso, Ordenar y limpiar, Ajustes y **¿Qué hay de nuevo?**. Mantener pulsado Agregar sigue abriendo Cámara/Galería. En escritorio: Inicio · Agregar · Revisar (N) · Inventario · Más ▾ (desplegable).
-- **Validar**: en el celular, tocar **Más** → se despliega el panel con las 9 opciones y se cierra al elegir una o tocar fuera. Con pendientes, «Más» muestra la bolita roja con el número.
+- **Qué**: barra inferior con **Inicio · Revisar (con contador) · Agregar (cámara, centro) · Inventario · Más**. En **Más** viven: Escanear código, Ventas y movimientos, Exportar a Excel, Mi tienda, Guía paso a paso, Ordenar y limpiar, Ajustes y **Cómo usar la herramienta** (recorrido de 3 pantallas). Mantener pulsado Agregar sigue abriendo Cámara/Galería. En escritorio: Inicio · Agregar · Revisar (N) · Inventario · Más ▾ (desplegable).
+- **Validar**: en el celular, tocar **Más** → se despliega el panel con las 8 opciones y se cierra al elegir una o tocar fuera. Con pendientes, «Revisar» muestra la bolita roja con el número.
 
 ### 9.3 Inicio «Hoy»
 - **Qué**: la pantalla de inicio responde una sola pregunta, **¿Qué hay que hacer hoy?**, con una tarjeta de color y un único botón que cambia según el estado: fotos analizándose → *Ver el avance*; pendientes → *Revisar ahora*; sin categorías → *Elegir mis categorías*; sin productos → *Tomar la primera foto*; agotados → *Ver agotados*; todo al día → *Agregar productos*. Debajo, los tres pasos con estado; 4 números de hoy (En inventario, Por revisar, Ventas de hoy, Por atender) que son enlaces; 3 accesos (Agregar, Escanear, Inventario). La guía, el consumo de IA, Ordenar y limpiar, Exportar y Ajustes quedan plegados en **Más herramientas** (los enlaces de Más → Guía / Limpiar la abren directo).
@@ -27,9 +27,9 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 - **Qué**: burbujas violetas **💡** en Agregar, Escanear, Revisar, Inventario y ficha, con una frase de qué hacer. Aparecen las **primeras 3 veces** que se abre cada pantalla y desaparecen (o antes, con la ✕ «Entendido»). En Ajustes → Ayuda: **Reactivar burbujas de ayuda**.
 - **Validar**: abrir Agregar 3 veces → a la 4.ª ya no sale la burbuja; Ajustes → Reactivar → vuelve.
 
-### 9.6 Recorrido «Nuevo diseño» (una sola vez)
-- **Qué**: al entrar por primera vez tras esta versión se abre un recorrido de 3 pantallas: **Un camino de 3 pasos**, **Menú más simple** y **Variantes con stock propio**, con mini-ilustraciones. Se puede saltar y reabrir desde **Más → ¿Qué hay de nuevo?** o Ajustes → Ayuda.
-- **Validar**: la primera vez aparece el recorrido; tras «Empezar» no vuelve; Más → ¿Qué hay de nuevo? lo reabre.
+### 9.6 Recorrido «Cómo usar la herramienta» (una sola vez)
+- **Qué**: al entrar por primera vez tras esta versión se abre un recorrido de 3 pantallas: **Un camino de 3 pasos**, **Menú más simple** y **Variantes con stock propio**, con mini-ilustraciones. Se puede saltar y reabrir desde **Más → Cómo usar la herramienta** o Ajustes → Ayuda.
+- **Validar**: la primera vez aparece el recorrido; tras «Empezar» no vuelve; Más → Cómo usar la herramienta lo reabre.
 
 ### 9.7 Textos y guía al nuevo orden
 - **Qué**: la guía paso a paso y «¿Qué quieres hacer?» usan el vocabulario fijo (Categoría, Subcategoría, Variante, Pendiente, En inventario, Agotado) y las rutas nuevas (Más → Mi tienda, ② Revisar, +/− Stock). Dos preguntas nuevas: *Registrar una venta o reponer stock* y *Manejar tallas o colores (variantes)*. Ajustes lista también Revisar y Escanear.

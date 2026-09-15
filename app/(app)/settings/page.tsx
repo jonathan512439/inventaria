@@ -83,7 +83,7 @@ export default function SettingsPage() {
       <section className="animate-in card space-y-2">
         <p className="text-sm font-bold text-ink">Ayuda</p>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => setTour(true)} className="btn-secondary btn-sm"><IconSparkles size={14} /> ¿Qué hay de nuevo?</button>
+          <button onClick={() => setTour(true)} className="btn-secondary btn-sm"><IconSparkles size={14} /> Cómo usar la herramienta</button>
           <button
             onClick={() => {
               resetCoach();
