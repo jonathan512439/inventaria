@@ -1,7 +1,8 @@
 /**
  * Prueba de extremo a extremo: registro → categoría → foto → producto analizado → subcategoría → alta manual
  *   → variantes (ejes del catálogo, stock derivado) → escáner por variante → venta por variante
- *   → duplicado detectado → foto de estante (detect) → clave de IA propia (BYOK).
+ *   → duplicado detectado → foto de estante (detect) → clave de IA propia (BYOK)
+ *   → control de stock (mínimo, papelera, compra, conteo) → ventas (tickets, ganancia, caja).
  *   npm run test:e2e                 (contra http://localhost:3000)
  *   BASE_URL=https://inventaria.pages.dev npm run test:e2e
  * Crea un usuario temporal y lo elimina al terminar. Consume 1-2 peticiones de IA.
@@ -176,7 +177,34 @@ try {
   const { error: cie } = await admin.from("stock_count_items").insert({ count_id: cnt.id, user_id: uid, product_id: taza.id, product_name: "Taza", expected: 10, counted: 8, reason: "Merma o rotura" });
   check(!cie, "acta de conteo con diferencia guardada");
 
-  // 13. Medidor
+  // 13. Ventas: ticket con número correlativo, líneas, ganancia real y cierre de caja
+  const { data: v1 } = await admin.from("sales").insert({ user_id: uid, method: "efectivo", status: "pagado", subtotal: 25, discount: 0, total: 25, paid: 25, cost_total: 20, items: 1 }).select().single();
+  const { data: v2 } = await admin.from("sales").insert({ user_id: uid, method: "qr", status: "parcial", customer_name: "Juanito", subtotal: 12.5, discount: 0, total: 12.5, paid: 5, cost_total: 0, items: 1 }).select().single();
+  check(v1.number === 1 && v2.number === 2, `tickets numerados: N.º ${v1.number} y N.º ${v2.number}`);
+  await admin.from("sale_items").insert([
+    { sale_id: v1.id, user_id: uid, product_id: taza.id, product_name: "Taza", qty: 2, unit_price: 12.5, unit_cost: 10, line_total: 25 },
+    { sale_id: v2.id, user_id: uid, product_id: taza.id, product_name: "Taza", qty: 1, unit_price: 12.5, unit_cost: null, line_total: 12.5 },
+  ]);
+  const { data: sold } = await admin.from("sales").select("total,cost_total,paid,status").eq("user_id", uid);
+  const vendido = sold.reduce((x, y) => x + Number(y.total), 0);
+  const ganancia = sold.reduce((x, y) => x + Number(y.total) - Number(y.cost_total), 0);
+  const porCobrar = sold.filter((y) => y.status !== "pagado").reduce((x, y) => x + Number(y.total) - Number(y.paid), 0);
+  check(vendido === 37.5 && ganancia === 17.5 && porCobrar === 7.5, `vendido Bs ${vendido} · ganancia real Bs ${ganancia} · por cobrar Bs ${porCobrar}`);
+  await admin.from("stock_movements").insert({ user_id: uid, product_id: taza.id, product_name: "Taza", tipo: "venta", cantidad: 2, precio_unitario: 12.5, total: 25, stock_resultante: 8, sale_id: v1.id });
+  const { data: mvs } = await admin.from("stock_movements").select("sale_id").eq("product_id", taza.id).eq("tipo", "venta");
+  check(mvs.some((m) => m.sale_id === v1.id), "movimiento de stock enlazado al ticket");
+  const today = new Date(); const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  await admin.from("cash_movements").insert({ user_id: uid, tipo: "retiro", amount: 5, note: "bolsas" });
+  const { error: ce1 } = await admin.from("cash_closings").upsert({ user_id: uid, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 20, difference: 0, profit: 17.5 }, { onConflict: "user_id,day" });
+  const { error: ce2 } = await admin.from("cash_closings").upsert({ user_id: uid, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 18, difference: -2, profit: 17.5 }, { onConflict: "user_id,day" });
+  const { data: cls } = await admin.from("cash_closings").select("difference").eq("user_id", uid);
+  check(!ce1 && !ce2 && cls.length === 1 && Number(cls[0].difference) === -2, "cierre de caja: uno por día, se actualiza al volver a cerrar");
+  for (const path of ["/sell", "/cash", "/movements"]) {
+    const rp = await fetch(`${BASE}${path}`, { headers: { cookie: H.cookie } });
+    check(rp.status === 200, `${path} → ${rp.status}`);
+  }
+
+  // 14. Medidor
   r = await fetch(`${BASE}/api/usage`, { headers: H });
   const u = await r.json();
   check(r.status === 200 && Array.isArray(u.models) && u.models.length >= 3, `usage: ${u.models?.length} modelos, ${u.totalToday} análisis hoy`);

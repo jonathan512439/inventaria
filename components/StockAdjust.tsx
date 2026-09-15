@@ -8,6 +8,7 @@ import { normalizeFieldName, productTitle } from "@/lib/fields";
 import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
 import { useToast } from "./ui/Toast";
 import { isNetworkError, queueMove } from "@/lib/offline";
+import { registerSale } from "@/lib/sales";
 import { IconCheck, IconPlus, IconX, Spinner } from "./ui/Icons";
 
 interface Props {
@@ -85,6 +86,25 @@ export default function StockAdjust({ product, variants = [], variant = null, on
     if (typeof navigator !== "undefined" && !navigator.onLine) return saveOffline(key);
     let data = { ...product.data, [key]: newStock };
     let updatedVariant: ProductVariant | undefined;
+    if (mode === "remove" && asSale) {
+      // Venta rápida: pasa por el mismo camino que el carrito (ticket de 1 línea, stock y movimiento)
+      try {
+        const sold = Math.min(qty, current);
+        if (sold <= 0) throw new Error("No hay stock para vender");
+        const { sale } = await registerSale(supabase, [{ key: sel?.id ?? product.id, product, variant: sel, qty: sold, unitPrice: Number(salePrice) || 0 }], { method: "efectivo", status: "pagado", paid: 0, discount: 0 });
+        setSaving(false);
+        navigator.vibrate?.(20);
+        toast("success", `Venta N.º ${sale.number} · ${sold} × Bs ${fmtMoney(Number(salePrice) || 0)} = Bs ${fmtMoney(Number(sale.total))} · stock ${current} → ${newStock}`);
+        if (sel) updatedVariant = { ...sel, stock: newStock };
+        onSaved({ ...product, data: sel ? { ...product.data, [key]: variants.reduce((t, v) => t + (v.id === sel.id ? newStock : v.stock), 0) } : data }, updatedVariant);
+        onClose();
+      } catch (e) {
+        if (isNetworkError(e)) return saveOffline(key);
+        setSaving(false);
+        toast("error", e instanceof Error ? e.message : "No se pudo registrar la venta");
+      }
+      return;
+    }
     if (sel) {
       // Stock por variante: el total del producto lo recalcula la base de datos (suma de variantes)
       const { error: ev } = await supabase.from("product_variants").update({ stock: newStock }).eq("id", sel.id);

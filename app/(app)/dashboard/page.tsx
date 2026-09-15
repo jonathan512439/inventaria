@@ -46,7 +46,7 @@ export default function DashboardPage() {
         supabase.from("categories").select("id,parent_id,min_stock_default"),
         supabase.from("profiles").select("business_name, onboarded_at").maybeSingle(),
         supabase.from("product_summaries").select("stock,precio,min_stock,expires_at,category_id").eq("status", "confirmed"),
-        supabase.from("stock_movements").select("total").eq("tipo", "venta").gte("created_at", dayStart.toISOString()),
+        supabase.from("sales").select("total,cost_total").gte("created_at", dayStart.toISOString()),
         supabase.from("products").select("id", { count: "exact", head: true }).gte("created_at", dayStart.toISOString()).is("deleted_at", null),
       ]);
       const list = prods.data ?? [];
@@ -71,7 +71,7 @@ export default function DashboardPage() {
           const d = daysToExpiry(x.expires_at);
           return d !== null && d <= EXPIRY_SOON_DAYS;
         }).length,
-        salesToday: { total: (sales.data ?? []).reduce((a, r) => a + (r.total ?? 0), 0), count: (sales.data ?? []).length },
+        salesToday: { total: (sales.data ?? []).reduce((a, r) => a + Number(r.total ?? 0), 0), count: (sales.data ?? []).length },
         addedToday: added.count ?? 0,
       };
       // Cuenta nueva sin nada configurado → asistente inicial
@@ -198,9 +198,9 @@ export default function DashboardPage() {
 
       {/* Accesos directos */}
       <div className="animate-in grid grid-cols-3 gap-2">
+        <Shortcut href="/sell" Icon={IconTag} label="Vender" hint="cobrar y ticket" primary tone="emerald" />
         <Shortcut href="/capture" Icon={IconCamera} label="Agregar" hint="foto o galería" primary />
-        <Shortcut href="/scan" Icon={IconTag} label="Escanear" hint="sin gastar IA" />
-        <Shortcut href="/products" Icon={IconBox} label="Inventario" hint={stats.addedToday ? `${stats.addedToday} hoy` : "estantes"} />
+        <Shortcut href="/cash" Icon={IconList} label="Caja" hint="cerrar el día" />
       </div>
 
       {/* Más: guía, IA, limpieza, exportar, ajustes (plegado) */}
@@ -253,9 +253,10 @@ function Tile({ href, label, value, hint, tone }: { href: string; label: string;
   );
 }
 
-function Shortcut({ href, Icon, label, hint, primary }: { href: string; Icon: (p: { size?: number }) => JSX.Element; label: string; hint: string; primary?: boolean }) {
+function Shortcut({ href, Icon, label, hint, primary, tone }: { href: string; Icon: (p: { size?: number }) => JSX.Element; label: string; hint: string; primary?: boolean; tone?: "emerald" }) {
+  const solid = tone === "emerald" ? "bg-emerald-600 text-white ring-emerald-600 hover:bg-emerald-700" : "bg-brand-600 text-white ring-brand-600 hover:bg-brand-700";
   return (
-    <Link href={href} className={`press flex flex-col items-center gap-1 rounded-2xl p-3 text-center shadow-card ring-1 transition ${primary ? "bg-brand-600 text-white ring-brand-600 hover:bg-brand-700" : "bg-white text-ink ring-slate-900/10 hover:ring-brand-300"}`}>
+    <Link href={href} className={`press flex flex-col items-center gap-1 rounded-2xl p-3 text-center shadow-card ring-1 transition ${primary ? solid : "bg-white text-ink ring-slate-900/10 hover:ring-brand-300"}`}>
       <span className={`grid h-10 w-10 place-items-center rounded-xl ${primary ? "bg-white/20" : "bg-brand-50 text-brand-700"}`}><Icon size={22} /></span>
       <span className="text-sm font-bold">{label}</span>
       <span className={`text-[11px] ${primary ? "text-white/80" : "text-slate-500"}`}>{hint}</span>

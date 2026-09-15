@@ -57,10 +57,10 @@ export default function ProductsPage() {
       start.setDate(1);
       start.setHours(0, 0, 0, 0);
       const [{ data: sales }, { data: vs }] = await Promise.all([
-        supabase.from("stock_movements").select("total").eq("tipo", "venta").gte("created_at", start.toISOString()),
+        supabase.from("sales").select("total").gte("created_at", start.toISOString()),
         supabase.from("product_variants").select("product_id,stock"),
       ]);
-      setSalesMonth({ total: (sales ?? []).reduce((s, r) => s + (r.total ?? 0), 0), count: (sales ?? []).length });
+      setSalesMonth({ total: (sales ?? []).reduce((s, r) => s + Number(r.total ?? 0), 0), count: (sales ?? []).length });
       const m = new Map<string, { stock: number }[]>();
       (vs ?? []).forEach((v) => m.set(v.product_id, [...(m.get(v.product_id) ?? []), { stock: v.stock }]));
       setVariantsOf(m);
@@ -98,7 +98,7 @@ export default function ProductsPage() {
         </div>
         <div className="flex gap-2">
           <Link href="/products/new" className="btn-primary btn-sm"><IconPlus size={16} /> Producto</Link>
-          <Link href="/movements" className="btn-secondary btn-sm border-emerald-400 text-emerald-800"><IconTag size={16} /> Ventas</Link>
+          <Link href="/sell" className="btn-success btn-sm"><IconTag size={16} /> Vender</Link>
           <Link href="/purchases" className="btn-secondary btn-sm hidden sm:inline-flex"><IconPlus size={16} /> Compra</Link>
           <Link href="/export" className="btn-secondary btn-sm"><IconDownload size={16} /> Excel</Link>
           <Link href="/products/table" className="btn-secondary btn-sm hidden md:inline-flex"><IconTable size={16} /> Tabla</Link>

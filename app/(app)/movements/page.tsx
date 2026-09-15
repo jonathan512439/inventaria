@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import type { MovementType, StockMovement } from "@/types/database";
+import type { MovementType, Sale, SaleItem, StockMovement } from "@/types/database";
+import { METHOD_LABEL, STATUS_LABEL } from "@/lib/sales";
 import { fmtMoney } from "@/lib/inventory";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { IconArrowLeft, IconChevronRight } from "@/components/ui/Icons";
@@ -31,30 +32,44 @@ function rangeStart(r: Range): Date | null {
 export default function MovementsPage() {
   const supabase = createClient();
   const [rows, setRows] = useState<StockMovement[]>([]);
+  const [tickets, setTickets] = useState<Sale[]>([]);
+  const [open, setOpen] = useState<string | null>(null);
+  const [items, setItems] = useState<Record<string, SaleItem[]>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("venta");
   const [range, setRange] = useState<Range>("mes");
 
   useEffect(() => {
-    supabase
-      .from("stock_movements")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(1000)
-      .then(({ data }) => {
-        setRows((data ?? []) as StockMovement[]);
-        setLoading(false);
-      });
+    Promise.all([
+      supabase.from("stock_movements").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("sales").select("*").order("created_at", { ascending: false }).limit(500),
+    ]).then(([m, s]) => {
+      setRows((m.data ?? []) as StockMovement[]);
+      setTickets((s.data ?? []) as Sale[]);
+      setLoading(false);
+    });
   }, [supabase]);
 
-  const inRange = useMemo(() => {
-    const start = rangeStart(range);
-    return start ? rows.filter((r) => new Date(r.created_at) >= start) : rows;
-  }, [rows, range]);
+  async function toggleTicket(id: string) {
+    if (open === id) return setOpen(null);
+    setOpen(id);
+    if (!items[id]) {
+      const { data } = await supabase.from("sale_items").select("*").eq("sale_id", id).order("created_at");
+      setItems((m) => ({ ...m, [id]: (data ?? []) as SaleItem[] }));
+    }
+  }
+
+  const start = rangeStart(range);
+  const inRange = useMemo(() => (start ? rows.filter((r) => new Date(r.created_at) >= start) : rows), [rows, start]);
+  const ticketsInRange = useMemo(() => (start ? tickets.filter((t) => new Date(t.created_at) >= start) : tickets), [tickets, start]);
   const list = tab === "todos" ? inRange : inRange.filter((r) => r.tipo === tab);
 
+  // Ventas: los tickets + las ventas rápidas hechas sin conexión (movimiento sin ticket)
   const sales = inRange.filter((r) => r.tipo === "venta");
-  const ingresos = sales.reduce((s, r) => s + (r.total ?? 0), 0);
+  const looseSales = sales.filter((r) => !r.sale_id);
+  const ingresos = ticketsInRange.reduce((s, t) => s + Number(t.total), 0) + looseSales.reduce((s, r) => s + (r.total ?? 0), 0);
+  const ganancia = ticketsInRange.reduce((s, t) => s + (Number(t.total) - Number(t.cost_total)), 0);
+  const pendienteCobro = ticketsInRange.filter((t) => t.status !== "pagado").reduce((s, t) => s + (Number(t.total) - Number(t.paid)), 0);
   const unidadesVendidas = sales.reduce((s, r) => s + r.cantidad, 0);
   const entradas = inRange.filter((r) => r.tipo === "entrada").reduce((s, r) => s + r.cantidad, 0);
   const retiros = inRange.filter((r) => r.tipo === "salida").reduce((s, r) => s + r.cantidad, 0);
@@ -77,8 +92,16 @@ export default function MovementsPage() {
     <div className="w-full space-y-5">
       <header className="animate-in">
         <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Ventas y movimientos</h1>
-        <p className="text-sm text-slate-500">Lo que entra, lo que se vende y lo que se retira. Se registra desde el botón <b>+/− Stock</b>.</p>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-ink">Ventas y movimientos</h1>
+            <p className="text-sm text-slate-500">Lo que vendiste, lo que entró y lo que salió del negocio.</p>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/sell" className="btn-success btn-sm">Vender</Link>
+            <Link href="/cash" className="btn-secondary btn-sm">Caja de hoy</Link>
+          </div>
+        </div>
       </header>
 
       <div className="animate-in flex flex-wrap gap-2">
@@ -90,13 +113,13 @@ export default function MovementsPage() {
       {/* Resumen */}
       <div className="animate-in grid grid-cols-2 gap-2 md:grid-cols-4 xl:max-w-4xl">
         <div className="rounded-3xl bg-emerald-600 p-4 text-white shadow-float">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Ingresos por ventas</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Vendido</p>
           <p className="text-2xl font-bold tabular-nums">Bs {fmtMoney(ingresos)}</p>
-          <p className="text-xs text-white/80">{sales.length} venta{sales.length === 1 ? "" : "s"} · {unidadesVendidas} unid.</p>
+          <p className="text-xs text-white/80">{ticketsInRange.length + looseSales.length} venta{ticketsInRange.length + looseSales.length === 1 ? "" : "s"} · {unidadesVendidas} unid.</p>
         </div>
-        <Stat label="Entradas" value={`+${entradas}`} hint="unidades recibidas" />
+        <Stat label="Ganancia real" value={`Bs ${fmtMoney(ganancia)}`} hint={ganancia > 0 || ingresos === 0 ? "vendido − lo que te costó" : "faltan costos de compra"} />
+        {pendienteCobro > 0 ? <Stat label="Por cobrar" value={`Bs ${fmtMoney(pendienteCobro)}`} hint="ventas fiadas o a medias" /> : <Stat label="Entradas" value={`+${entradas}`} hint="unidades recibidas" />}
         <Stat label="Retiros sin venta" value={`−${retiros}`} hint="no suman ingresos" />
-        <Stat label="Movimientos" value={String(inRange.length)} hint="en el periodo" />
       </div>
 
       {top.length > 0 && (
@@ -124,8 +147,54 @@ export default function MovementsPage() {
 
       {loading ? (
         <ListSkeleton rows={4} />
+      ) : tab === "venta" && (ticketsInRange.length > 0 || looseSales.length > 0) ? (
+        <ul className="stagger space-y-2">
+          {ticketsInRange.map((t) => (
+            <li key={t.id} className="rounded-2xl bg-white shadow-card ring-1 ring-slate-900/10">
+              <button onClick={() => toggleTicket(t.id)} className="flex w-full items-center gap-3 p-3 text-left">
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${t.status === "pagado" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{t.status === "pagado" ? "Venta" : STATUS_LABEL[t.status]}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold text-ink">N.º {t.number} · {t.items} producto{t.items === 1 ? "" : "s"}{t.customer_name ? ` · ${t.customer_name}` : ""}</span>
+                  <span className="block text-xs text-slate-500">
+                    {new Date(t.created_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {METHOD_LABEL[t.method]}
+                    {t.status !== "pagado" ? ` · debe Bs ${fmtMoney(Number(t.total) - Number(t.paid))}` : ""}
+                  </span>
+                </span>
+                <span className="text-right">
+                  <span className="block font-bold tabular-nums text-emerald-700">Bs {fmtMoney(Number(t.total))}</span>
+                  <span className="block text-[11px] text-slate-500">gana Bs {fmtMoney(Number(t.total) - Number(t.cost_total))}</span>
+                </span>
+                <IconChevronRight size={16} className={`text-slate-300 transition ${open === t.id ? "rotate-90" : ""}`} />
+              </button>
+              {open === t.id && (
+                <ul className="divide-y divide-slate-100 border-t border-slate-100 px-3 pb-2 text-sm">
+                  {(items[t.id] ?? []).map((i) => (
+                    <li key={i.id} className="flex items-center gap-2 py-1.5">
+                      <span className="w-8 shrink-0 text-right font-bold tabular-nums">{i.qty}×</span>
+                      <span className="min-w-0 flex-1 truncate">{i.product_name ?? "Producto"}{i.variant_label ? <span className="text-violet-800"> · {i.variant_label}</span> : null}</span>
+                      <span className="tabular-nums text-slate-500">Bs {fmtMoney(Number(i.unit_price))}</span>
+                      <span className="font-semibold tabular-nums">Bs {fmtMoney(Number(i.line_total))}</span>
+                    </li>
+                  ))}
+                  {!items[t.id] && <li className="py-2 text-xs text-slate-500">Cargando…</li>}
+                  {Number(t.discount) > 0 && <li className="flex justify-between py-1.5 text-xs text-slate-500"><span>Descuento</span><span>−Bs {fmtMoney(Number(t.discount))}</span></li>}
+                </ul>
+              )}
+            </li>
+          ))}
+          {looseSales.map((r) => (
+            <li key={r.id} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10">
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">Venta</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold text-ink">{r.product_name || "Producto"}{r.variant_label ? <span className="text-violet-800"> · {r.variant_label}</span> : null}</span>
+                <span className="block text-xs text-slate-500">{new Date(r.created_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · registrada sin conexión</span>
+              </span>
+              <span className="font-bold tabular-nums text-emerald-700">Bs {fmtMoney(r.total ?? 0)}</span>
+            </li>
+          ))}
+        </ul>
       ) : list.length === 0 ? (
-        <p className="py-8 text-center text-sm text-slate-500">Sin movimientos en este periodo. Usa <b>+/− Stock</b> en un producto del inventario.</p>
+        <p className="py-8 text-center text-sm text-slate-500">{tab === "venta" ? <>Sin ventas en este periodo. Toca <Link href="/sell" className="font-semibold text-brand-700 underline">Vender</Link> para registrar una.</> : <>Sin movimientos en este periodo. Usa <b>+/− Stock</b> en un producto del inventario.</>}</p>
       ) : (
         <ul className="stagger grid grid-cols-1 gap-2 xl:grid-cols-2">
           {list.map((r) => {

@@ -39,6 +39,61 @@ export type FieldTemplate = {
 export type ProductData = Record<string, string | number | null>;
 
 export type MovementType = "entrada" | "venta" | "salida" | "ajuste";
+export type SaleStatus = "pagado" | "parcial" | "fiado";
+export type PayMethod = "efectivo" | "qr" | "transferencia" | "mixto";
+
+/** Una venta = un ticket con varias líneas. */
+export type Sale = {
+  id: string;
+  user_id: string;
+  number: number | null;
+  customer_id: string | null;
+  customer_name: string | null;
+  status: SaleStatus;
+  method: PayMethod;
+  subtotal: number;
+  discount: number;
+  total: number;
+  paid: number;
+  cost_total: number; // costo de lo vendido → ganancia real = total − cost_total
+  items: number;
+  note: string | null;
+  created_at: string;
+};
+
+export type SaleItem = {
+  id: string;
+  sale_id: string;
+  user_id: string;
+  product_id: string | null;
+  variant_id: string | null;
+  product_name: string | null;
+  variant_label: string | null;
+  qty: number;
+  unit_price: number;
+  unit_cost: number | null;
+  line_total: number;
+  created_at: string;
+};
+
+export type CashMovement = { id: string; user_id: string; tipo: "ingreso" | "retiro"; amount: number; note: string | null; created_at: string };
+
+export type CashClosing = {
+  id: string;
+  user_id: string;
+  day: string;
+  sales_count: number;
+  total_sales: number;
+  by_method: Record<string, number>;
+  cash_in: number;
+  cash_out: number;
+  expected_cash: number;
+  counted_cash: number | null;
+  difference: number | null;
+  profit: number;
+  note: string | null;
+  closed_at: string;
+};
 
 export type StockMovement = {
   id: number;
@@ -49,6 +104,7 @@ export type StockMovement = {
   variant_label: string | null;
   purchase_id?: string | null;
   count_id?: string | null;
+  sale_id?: string | null;
   tipo: MovementType;
   cantidad: number;
   precio_unitario: number | null;
@@ -271,6 +327,7 @@ export interface Database {
           variant_label?: string | null;
           purchase_id?: string | null;
           count_id?: string | null;
+          sale_id?: string | null;
         };
         Update: Partial<StockMovement>;
         Relationships: [];
@@ -301,6 +358,68 @@ export interface Database {
         Row: AiUsage;
         Insert: Omit<AiUsage, "id" | "created_at" | "quota_limit" | "own_key"> & { id?: string; created_at?: string; quota_limit?: number | null; own_key?: boolean };
         Update: Partial<AiUsage>;
+        Relationships: [];
+      };
+      sales: {
+        Row: Sale;
+        Insert: Omit<Sale, "id" | "created_at" | "number" | "customer_id" | "customer_name" | "status" | "method" | "subtotal" | "discount" | "total" | "paid" | "cost_total" | "items" | "note"> & {
+          id?: string;
+          created_at?: string;
+          number?: number | null;
+          customer_id?: string | null;
+          customer_name?: string | null;
+          status?: SaleStatus;
+          method?: PayMethod;
+          subtotal?: number;
+          discount?: number;
+          total?: number;
+          paid?: number;
+          cost_total?: number;
+          items?: number;
+          note?: string | null;
+        };
+        Update: Partial<Sale>;
+        Relationships: [];
+      };
+      sale_items: {
+        Row: SaleItem;
+        Insert: Omit<SaleItem, "id" | "created_at" | "product_id" | "variant_id" | "product_name" | "variant_label" | "unit_cost" | "unit_price" | "line_total"> & {
+          id?: string;
+          created_at?: string;
+          product_id?: string | null;
+          variant_id?: string | null;
+          product_name?: string | null;
+          variant_label?: string | null;
+          unit_cost?: number | null;
+          unit_price?: number;
+          line_total?: number;
+        };
+        Update: Partial<SaleItem>;
+        Relationships: [];
+      };
+      cash_movements: {
+        Row: CashMovement;
+        Insert: Omit<CashMovement, "id" | "created_at" | "note"> & { id?: string; created_at?: string; note?: string | null };
+        Update: Partial<CashMovement>;
+        Relationships: [];
+      };
+      cash_closings: {
+        Row: CashClosing;
+        Insert: Omit<CashClosing, "id" | "closed_at" | "sales_count" | "total_sales" | "by_method" | "cash_in" | "cash_out" | "expected_cash" | "counted_cash" | "difference" | "profit" | "note"> & {
+          id?: string;
+          closed_at?: string;
+          sales_count?: number;
+          total_sales?: number;
+          by_method?: Record<string, number>;
+          cash_in?: number;
+          cash_out?: number;
+          expected_cash?: number;
+          counted_cash?: number | null;
+          difference?: number | null;
+          profit?: number;
+          note?: string | null;
+        };
+        Update: Partial<CashClosing>;
         Relationships: [];
       };
       suppliers: {
@@ -413,7 +532,7 @@ export interface Database {
       product_summaries: { Row: ProductSummary; Relationships: [] };
     };
     Functions: { [_ in never]: never };
-    Enums: { field_type: FieldType; product_status: ProductStatus; movement_type: MovementType };
+    Enums: { field_type: FieldType; product_status: ProductStatus; movement_type: MovementType; sale_status: SaleStatus; pay_method: PayMethod };
     CompositeTypes: { [_ in never]: never };
   };
 }

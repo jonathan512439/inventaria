@@ -30,8 +30,10 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
   {
     title: "Del día a día",
     items: [
+      { href: "/sell", label: "Vender", hint: "Cobra varios productos a la vez y envía el ticket", Icon: IconTag },
+      { href: "/cash", label: "Caja de hoy", hint: "Cuánto entró, cuánto salió y cerrar el día", Icon: IconList },
       { href: "/scan", label: "Escanear un código", hint: "Apunta al código de barras para sumar stock o dar de alta", Icon: IconTag },
-      { href: "/movements", label: "Ventas y movimientos", hint: "Cuánto vendiste y qué entró o salió del negocio", Icon: IconList },
+      { href: "/movements", label: "Ventas y movimientos", hint: "Cuánto vendiste, tu ganancia y qué entró o salió", Icon: IconList },
       { href: "/restock", label: "Qué falta y qué caduca", hint: "Lo que se está acabando y lo que vence pronto", Icon: IconAlert },
     ],
   },
