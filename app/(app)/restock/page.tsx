@@ -180,6 +180,7 @@ function Restock() {
               <button onClick={() => share()} className="btn-success"><IconTag size={16} /> Compartir pedido por WhatsApp</button>
               <button onClick={excel} className="btn-secondary"><IconDownload size={16} /> Excel</button>
             </div>
+            <SwipeHint />
             {grouped.map(([sup, ls]) => (
               <section key={sup} className="animate-in card space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
@@ -187,9 +188,9 @@ function Restock() {
                   {sup !== "Sin proveedor" && <button onClick={() => share(sup)} className="btn-secondary btn-sm">WhatsApp</button>}
                 </div>
                 <ul className="divide-y divide-slate-100">
-                  {ls.map((l) => (
+                  {ls.map((l, i) => (
                     <li key={l.key}>
-                      <SwipeRow onDismiss={() => dismiss(l.productId, l.name)}>
+                      <SwipeRow onDismiss={() => dismiss(l.productId, l.name)} peek={i === 0}>
                         <div className="flex items-center gap-3 bg-white py-2">
                           <Link href={`/products/${l.productId}`} className="min-w-0 flex-1">
                             <span className="block truncate font-semibold text-ink">{l.name}{l.variant ? <span className="text-violet-800"> · {l.variant}</span> : null}</span>
@@ -206,7 +207,7 @@ function Restock() {
                 </ul>
               </section>
             ))}
-            <p className="text-center text-[11px] text-slate-500">La cantidad sugerida repone hasta el doble del mínimo. Cámbiala antes de compartir. <b>Desliza una fila a la izquierda</b> para que ese producto deje de avisarte (se reactiva en <Link href="/alerts" className="underline">Ajustes → Avisos</Link>).</p>
+            <p className="text-center text-[11px] text-slate-500">La cantidad sugerida alcanza para el doble del mínimo; cámbiala antes de compartir.</p>
           </>
         )
       ) : expiring.length === 0 ? (
@@ -215,10 +216,12 @@ function Restock() {
           <p className="mt-1 text-sm text-slate-500">Ningún producto vence en los próximos 30 días. La fecha se pone en la ficha del producto («Vence el») o al registrar una compra.</p>
         </div>
       ) : (
+        <>
+        <SwipeHint />
         <ul className="stagger space-y-2">
-          {expiring.map(({ p, days }) => (
+          {expiring.map(({ p, days }, i) => (
             <li key={p.id}>
-              <SwipeRow onDismiss={() => dismiss(p.id, String(p.data.nombre || "Producto"))} rounded>
+              <SwipeRow onDismiss={() => dismiss(p.id, String(p.data.nombre || "Producto"))} rounded peek={i === 0}>
                 <Link href={`/products/${p.id}`} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 hover:ring-brand-400">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-ink">{String(p.data.nombre || "Sin nombre")}</span>
@@ -232,7 +235,24 @@ function Restock() {
             </li>
           ))}
         </ul>
+        </>
       )}
+    </div>
+  );
+}
+
+/** Aviso visible de que las filas se descartan deslizando (y cómo recuperarlas). */
+function SwipeHint() {
+  return (
+    <div className="animate-in flex items-center gap-3 rounded-2xl border-2 border-dashed border-slate-300 bg-white p-3">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-800 text-white">
+        <span className="animate-swipe text-lg">👈</span>
+      </span>
+      <span className="min-w-0 flex-1 text-xs text-slate-600">
+        <b className="block text-[13px] text-ink">¿Alguno no te interesa?</b>
+        Desliza esa fila hacia la izquierda y deja de avisarte. Puedes volver a activarlo en{" "}
+        <Link href="/alerts" className="font-semibold text-brand-700 underline">Cuándo avisarme</Link>.
+      </span>
     </div>
   );
 }

@@ -18,21 +18,49 @@ const MAIN = [
   { href: "/products", label: "Inventario", Icon: IconBox },
 ] as const;
 
-/** Lo secundario vive en «Más» */
-const MORE: { href: string; label: string; hint: string; Icon: (p: { size?: number; className?: string }) => JSX.Element }[] = [
-  { href: "/scan", label: "Escanear código de barras", hint: "repetidos y reposición sin IA", Icon: IconTag },
-  { href: "/movements", label: "Ventas y movimientos", hint: "ingresos, entradas y retiros", Icon: IconList },
-  { href: "/restock", label: "Por reponer y por vencer", hint: "lista de pedido para WhatsApp o Excel", Icon: IconAlert },
-  { href: "/purchases", label: "Compras y proveedores", hint: "llegó mercadería: stock, costo y vencimiento", Icon: IconBox },
-  { href: "/count", label: "Toma de inventario", hint: "contar, comparar y ajustar con acta", Icon: IconCheckCircle },
-  { href: "/prices", label: "Cambiar precios", hint: "por categoría: +%, monto o margen", Icon: IconTag },
-  { href: "/export", label: "Exportar a Excel", hint: "todo o por categoría", Icon: IconDownload },
-  { href: "/store", label: "Mi tienda", hint: "categorías, datos y variantes", Icon: IconFolder },
-  { href: "/dashboard#guia", label: "Guía paso a paso", hint: "cómo armar tu inventario", Icon: IconSparkles },
-  { href: "/dashboard#limpiar", label: "Ordenar y limpiar", hint: "pendientes viejos, vacías, fotos sueltas", Icon: IconTrash },
-  { href: "/alerts", label: "Avisos de reposición", hint: "desde cuántas unidades avisar", Icon: IconAlert },
-  { href: "/settings", label: "Ajustes", hint: "nombre del negocio, cuenta, ayuda", Icon: IconSettings },
+interface MoreItem {
+  href: string;
+  label: string;
+  hint: string;
+  Icon: (p: { size?: number; className?: string }) => JSX.Element;
+}
+
+/** Lo secundario vive en «Más», agrupado y explicado sin tecnicismos. */
+const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
+  {
+    title: "Del día a día",
+    items: [
+      { href: "/scan", label: "Escanear un código", hint: "Apunta al código de barras para sumar stock o dar de alta", Icon: IconTag },
+      { href: "/movements", label: "Ventas y movimientos", hint: "Cuánto vendiste y qué entró o salió del negocio", Icon: IconList },
+      { href: "/restock", label: "Qué falta y qué caduca", hint: "Lo que se está acabando y lo que vence pronto", Icon: IconAlert },
+    ],
+  },
+  {
+    title: "Ordenar el inventario",
+    items: [
+      { href: "/purchases", label: "Anotar una compra", hint: "Llegó mercadería: cuánta y a qué precio la compraste", Icon: IconBox },
+      { href: "/count", label: "Contar lo que tengo", hint: "Revisa el estante y corrige lo que no coincide", Icon: IconCheckCircle },
+      { href: "/prices", label: "Cambiar precios", hint: "Sube o baja el precio de muchos productos a la vez", Icon: IconTag },
+      { href: "/export", label: "Descargar en Excel", hint: "Tu inventario en una planilla para ver o compartir", Icon: IconDownload },
+    ],
+  },
+  {
+    title: "Configurar",
+    items: [
+      { href: "/store", label: "Mi tienda", hint: "Qué vendes y cómo se ordena tu inventario", Icon: IconFolder },
+      { href: "/alerts", label: "Cuándo avisarme", hint: "Desde cuántas unidades quieres que te avise", Icon: IconAlert },
+      { href: "/settings", label: "Ajustes", hint: "Nombre del negocio, tu cuenta y ayuda", Icon: IconSettings },
+    ],
+  },
+  {
+    title: "Ayuda",
+    items: [
+      { href: "/dashboard#guia", label: "Guía paso a paso", hint: "Cómo armar tu inventario desde cero", Icon: IconSparkles },
+      { href: "/dashboard#limpiar", label: "Ordenar y limpiar", hint: "Quita lo que sobra y libera espacio", Icon: IconTrash },
+    ],
+  },
 ];
+const MORE: MoreItem[] = MORE_GROUPS.flatMap((g) => g.items);
 
 export default function Nav() {
   const pathname = usePathname();
@@ -101,7 +129,7 @@ export default function Nav() {
                 <IconList size={18} /> Más ▾
               </button>
               {more && (
-                <div className="animate-in absolute right-0 top-12 w-80 rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-slate-900/10">
+                <div className="animate-in absolute right-0 top-12 max-h-[75vh] w-[22rem] overflow-y-auto overscroll-contain rounded-2xl bg-white p-2 shadow-2xl ring-1 ring-slate-900/10">
                   <MoreList onTour={() => { setMore(false); setTour(true); }} />
                 </div>
               )}
@@ -126,16 +154,21 @@ export default function Nav() {
         </div>
       )}
 
-      {/* Móvil: panel «Más» */}
+      {/* Móvil: panel «Más» (hoja inferior con su propio desplazamiento) */}
       {more && (
-        <div className="fixed inset-0 z-40 md:hidden" onClick={() => setMore(false)}>
+        <div className="fixed inset-0 z-40 flex flex-col justify-end md:hidden" onClick={() => setMore(false)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
-          <div className="animate-in absolute inset-x-0 bottom-0 rounded-t-3xl bg-white p-3 pb-24 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 flex items-center justify-between px-2">
-              <p className="text-sm font-bold text-ink">Más</p>
-              <button onClick={() => setMore(false)} className="btn-ghost btn-sm"><IconX size={18} /></button>
+          <div className="animate-in relative flex max-h-[82vh] flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="h-1 w-8 rounded-full bg-slate-300" aria-hidden />
+                <p className="text-base font-bold text-ink">Más opciones</p>
+              </div>
+              <button onClick={() => setMore(false)} className="btn-ghost btn-sm" aria-label="Cerrar"><IconX size={18} /></button>
             </div>
-            <MoreList onTour={() => { setMore(false); setTour(true); }} />
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2" style={{ paddingBottom: "calc(5.5rem + env(safe-area-inset-bottom))" }}>
+              <MoreList onTour={() => { setMore(false); setTour(true); }} />
+            </div>
           </div>
         </div>
       )}
@@ -187,28 +220,36 @@ export default function Nav() {
 
 function MoreList({ onTour }: { onTour: () => void }) {
   return (
-    <ul className="grid gap-0.5">
-      {MORE.map(({ href, label, hint, Icon }) => (
-        <li key={href}>
-          <Link href={href} className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-brand-50">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><Icon size={18} /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-ink">{label}</span>
-              <span className="block truncate text-[11px] text-slate-500">{hint}</span>
-            </span>
-          </Link>
-        </li>
+    <div className="space-y-3">
+      {MORE_GROUPS.map((g) => (
+        <section key={g.title}>
+          <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{g.title}</p>
+          <ul className="grid gap-0.5">
+            {g.items.map(({ href, label, hint, Icon }) => (
+              <li key={href}>
+                <Link href={href} className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition hover:bg-brand-50 active:bg-brand-100">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600"><Icon size={20} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold leading-tight text-ink">{label}</span>
+                    <span className="block text-xs leading-snug text-slate-500">{hint}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       ))}
-      <li>
-        <button onClick={onTour} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-brand-50">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><IconSparkles size={18} /></span>
+      <section>
+        <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">Primera vez</p>
+        <button onClick={onTour} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-brand-50 active:bg-brand-100">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><IconSparkles size={20} /></span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-ink">Cómo usar la herramienta</span>
-            <span className="block text-[11px] text-slate-500">recorrido de 3 pantallas</span>
+            <span className="block text-[15px] font-semibold leading-tight text-ink">Cómo usar la herramienta</span>
+            <span className="block text-xs leading-snug text-slate-500">Un recorrido corto por lo principal</span>
           </span>
         </button>
-      </li>
-    </ul>
+      </section>
+    </div>
   );
 }
 

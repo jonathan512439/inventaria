@@ -9,12 +9,14 @@ interface Props {
   onDismiss: () => void;
   label?: string;
   rounded?: boolean;
+  /** Muestra el gesto una vez al entrar (solo en la primera fila de la lista) */
+  peek?: boolean;
 }
 
 const THRESHOLD = 90;
 
 /** Fila que se descarta deslizándola a la izquierda (con botón de respaldo para ratón y accesibilidad). */
-export default function SwipeRow({ children, onDismiss, label = "No avisar", rounded }: Props) {
+export default function SwipeRow({ children, onDismiss, label = "No avisar", rounded, peek }: Props) {
   const [dx, setDx] = useState(0);
   const [gone, setGone] = useState(false);
   const drag = useRef<{ x: number; y: number; active: boolean; horizontal: boolean | null }>({ x: 0, y: 0, active: false, horizontal: null });
@@ -44,10 +46,10 @@ export default function SwipeRow({ children, onDismiss, label = "No avisar", rou
   }
 
   return (
-    <div className={`relative overflow-hidden ${rounded ? "rounded-2xl" : ""} ${gone ? "h-0 opacity-0 transition-all duration-200" : ""}`}>
+    <div className={`relative overflow-hidden ${rounded ? "rounded-2xl" : ""} ${peek ? "swipe-peek" : ""} ${gone ? "h-0 opacity-0 transition-all duration-200" : ""}`}>
       {/* Fondo que aparece al deslizar */}
-      <div className="absolute inset-y-0 right-0 flex items-center gap-1 bg-slate-800 px-4 text-xs font-bold text-white">
-        <IconX size={14} /> {label}
+      <div className="absolute inset-y-0 right-0 flex w-40 items-center justify-center gap-1.5 bg-slate-800 px-4 text-xs font-bold text-white">
+        <IconX size={16} /> {label}
       </div>
       <div
         className="relative touch-pan-y"

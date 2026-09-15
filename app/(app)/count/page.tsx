@@ -105,8 +105,8 @@ export default function CountPage() {
   async function close() {
     if (!rows || !top) return;
     const toApply = rows.filter((r) => parsed(r) !== null);
-    if (!toApply.length) return toast("info", "Escribe el contado de al menos un producto");
-    if (!confirm(`Se ajustará el stock de ${stats.diffs} producto${stats.diffs === 1 ? "" : "s"} con diferencia (${stats.units} unidades) y quedará el acta del conteo. ¿Cerrar el conteo?`)) return;
+    if (!toApply.length) return toast("info", "Escribe cuántas unidades hay de al menos un producto");
+    if (!confirm(`Se corregirá el stock de ${stats.diffs} producto${stats.diffs === 1 ? "" : "s"} que no coincidían (${stats.units} unidades de diferencia) y quedará anotado. ¿Terminar el conteo?`)) return;
     setSaving(true);
     const {
       data: { user },
@@ -151,7 +151,7 @@ export default function CountPage() {
     }
     setSaving(false);
     navigator.vibrate?.(30);
-    toast("success", `Conteo cerrado: ${toApply.length} contados, ${stats.diffs} ajustados`);
+    toast("success", `Listo: contaste ${toApply.length} producto${toApply.length === 1 ? "" : "s"} y se corrigieron ${stats.diffs}`);
     setHistory((h) => [count as StockCount, ...h]);
     setTop(null);
     setRows(null);
@@ -168,8 +168,8 @@ export default function CountPage() {
           <div className="flex items-center gap-3">
             <span className={`grid h-12 w-12 place-items-center rounded-2xl text-2xl ring-1 ${col.bg} ${col.ring}`}>{top.icon || "🏷️"}</span>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-ink">Contar {top.name}</h1>
-              <p className="text-sm text-slate-500">{rows ? `${stats.done} de ${rows.length} contados · ${stats.diffs} con diferencia` : "Cargando…"}</p>
+              <h1 className="text-2xl font-bold tracking-tight text-ink">Contando {top.name}</h1>
+                    <p className="text-sm text-slate-500">{rows ? `Ya contaste ${stats.done} de ${rows.length}${stats.diffs ? ` · ${stats.diffs} no coincide${stats.diffs === 1 ? "" : "n"}` : ""}` : "Cargando…"}</p>
             </div>
           </div>
         </header>
@@ -182,13 +182,13 @@ export default function CountPage() {
               <BarcodeCamera onCode={onCode} label="Escanear para contar (+1 por lectura)" />
               <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-2 shadow-card ring-1 ring-slate-900/10">
                 <button onClick={() => setOnlyPending((v) => !v)} className={`chip ${onlyPending ? "chip-active" : ""}`}>
-                  {onlyPending ? "Viendo solo los que faltan" : "Ocultar los ya contados"}
+                  {onlyPending ? "Viendo solo los que faltan" : "Ocultar los que ya conté"}
                   <span className="opacity-70">{rows.length - stats.done}</span>
                 </button>
                 <span className="min-w-0 flex-1 text-[11px] text-slate-500">
                   {onlyPending
-                    ? `Se muestran los ${rows.length - stats.done} productos a los que todavía no les escribiste el contado.`
-                    : `Se muestran los ${rows.length} productos de la categoría. Toca para ver solo los que faltan por contar.`}
+                    ? `Estás viendo los ${rows.length - stats.done} productos que aún no has contado.`
+                    : `Estás viendo los ${rows.length} productos de esta categoría. Toca el botón para ver solo los que te faltan.`}
                 </span>
               </div>
             </div>
@@ -201,13 +201,13 @@ export default function CountPage() {
                     <div className="flex items-center gap-3">
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold text-ink">{r.name}{r.variant ? <span className="text-violet-800"> · {r.variant}</span> : null}</span>
-                        <span className="block text-xs text-slate-500">En el sistema: <b className="text-ink">{r.expected}</b>{diff !== null && diff !== 0 ? <span className={diff > 0 ? "text-emerald-700" : "text-rose-700"}> · diferencia {diff > 0 ? "+" : ""}{diff}</span> : diff === 0 ? <span className="text-emerald-700"> · coincide ✓</span> : null}</span>
+                        <span className="block text-xs text-slate-500">La app dice <b className="text-ink">{r.expected}</b>{diff !== null && diff !== 0 ? <span className={diff > 0 ? "text-emerald-700" : "text-rose-700"}> · {diff > 0 ? `hay ${diff} de más` : `faltan ${-diff}`}</span> : diff === 0 ? <span className="text-emerald-700"> · coincide ✓</span> : null}</span>
                       </span>
                       <input
                         type="number"
                         min={0}
                         inputMode="numeric"
-                        placeholder="contado"
+                        placeholder="¿cuántos?"
                         className="input w-24 py-2 text-center text-lg font-bold tabular-nums"
                         value={counted[r.key] ?? ""}
                         onChange={(e) => setCounted({ ...counted, [r.key]: e.target.value })}
@@ -225,7 +225,7 @@ export default function CountPage() {
             </ul>
             <div className="sticky-action">
               <button onClick={close} disabled={saving || !stats.done} className="btn-success btn-lg w-full">
-                {saving ? <Spinner /> : <IconCheck size={20} />} Cerrar conteo · ajustar {stats.diffs} con diferencia
+                {saving ? <Spinner /> : <IconCheck size={20} />} Terminar y corregir {stats.diffs} producto{stats.diffs === 1 ? "" : "s"}
               </button>
             </div>
           </>
@@ -238,11 +238,11 @@ export default function CountPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <header className="animate-in">
         <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Toma de inventario</h1>
-        <p className="text-sm text-slate-500">Cuenta lo que hay en el estante, compara con el sistema y ajusta con motivo. Queda un acta por conteo.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Contar lo que tengo</h1>
+        <p className="text-sm text-slate-500">Revisa cuántas unidades hay de verdad en el estante. Si no coincide con lo que dice la app, se corrige al instante y queda anotado.</p>
       </header>
-      <CoachTip screen="count" title="Cómo contar rápido">
-        Elige una categoría, escribe el contado de cada producto (o escanea cada unidad: +1 por lectura). Lo que no cuentes no se toca. Al cerrar, solo se ajusta lo que difiere.
+      <CoachTip screen="count" title="Así funciona">
+        Elige una categoría y ve producto por producto: escribe cuántos hay en el estante (o escanea cada unidad, que suma de a uno). Lo que no escribas se queda como está. Al terminar, la app corrige sola los que no coincidían.
       </CoachTip>
 
       {loading ? (
@@ -266,15 +266,15 @@ export default function CountPage() {
 
           {history.length > 0 && (
             <section className="animate-in card p-3">
-              <h2 className="mb-2 text-sm font-bold text-ink">Conteos anteriores</h2>
+              <h2 className="mb-2 text-sm font-bold text-ink">Veces que contaste</h2>
               <ul className="divide-y divide-slate-100 text-sm">
                 {history.map((h) => (
                   <li key={h.id} className="flex items-center gap-3 py-2">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold text-ink">{h.category_name ?? "Categoría"}</span>
-                      <span className="block text-xs text-slate-500">{new Date(h.started_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {h.items} contados</span>
+                      <span className="block text-xs text-slate-500">{new Date(h.started_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {h.items} producto{h.items === 1 ? "" : "s"} contados</span>
                     </span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${h.differences ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{h.differences ? `${h.differences} ajustados · ${h.diff_units} unid.` : "sin diferencias"}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${h.differences ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{h.differences ? `${h.differences} corregidos · ${h.diff_units} unid.` : "todo coincidía"}</span>
                   </li>
                 ))}
               </ul>

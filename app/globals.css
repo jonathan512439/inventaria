@@ -111,14 +111,25 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
   /* Acción principal fija abajo (sobre la barra inferior en móvil) */
+  /* Acción principal fija sobre la barra inferior. Fondo sólido para que no se lea el contenido
+     por debajo, y separada del contenido anterior para no taparlo. */
   .sticky-action {
     position: sticky;
-    bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    bottom: calc(4.75rem + env(safe-area-inset-bottom));
     z-index: 20;
     margin-left: -1rem;
     margin-right: -1rem;
-    padding: 0.75rem 1rem 0.25rem;
-    background: linear-gradient(to top, theme(colors.surface) 70%, transparent);
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: theme(colors.surface);
+    border-top: 1px solid rgb(226 232 240);
+    box-shadow: 0 -10px 20px -12px rgb(15 23 42 / 0.25);
+  }
+  /* Espacio al final para que la última fila de la lista no quede debajo del botón */
+  .sticky-action::after {
+    content: "";
+    display: block;
+    height: 0;
   }
   @media (min-width: 768px) {
     .sticky-action {
@@ -127,6 +138,8 @@
       margin-right: 0;
       padding: 0.5rem 0 0;
       background: none;
+      border-top: 0;
+      box-shadow: none;
     }
   }
   .animate-in {
@@ -193,6 +206,23 @@
   .stagger > *:nth-child(5) { animation-delay: 0.23s; }
   .stagger > *:nth-child(6) { animation-delay: 0.28s; }
   .stagger > *:nth-child(n + 7) { animation-delay: 0.33s; }
+  .animate-swipe {
+    animation: swipe-hint 1.8s ease-in-out infinite;
+    display: inline-block;
+  }
+  @keyframes swipe-hint {
+    0%, 60%, 100% { transform: translateX(3px); }
+    30% { transform: translateX(-5px); }
+  }
+  /* La primera fila asoma el fondo «No avisar» un momento al entrar, para que se vea el gesto */
+  .swipe-peek > div:nth-child(2) {
+    animation: swipe-peek 2.4s ease-in-out 0.6s 2;
+  }
+  @keyframes swipe-peek {
+    0%, 100% { transform: translateX(0); }
+    12% { transform: translateX(-56px); }
+    28% { transform: translateX(0); }
+  }
   .pulse-success {
     animation: pulse-success 0.6s ease-out;
   }
