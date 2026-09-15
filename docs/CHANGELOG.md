@@ -32,6 +32,20 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
 ---
 
+### 12.21 Ficha del producto en el celular: mínimo y vencimiento
+- **Qué**: el campo del mínimo ocupaba toda la columna y empujaba el botón **Sin fecha** fuera de la pantalla. Ahora se lee como una frase —**«Avisarme cuando queden [ 3 ] unidades o menos»** con casilla estrecha— y la fecha con su botón **Sin fecha** se acomodan solos (se apilan si no caben). Nada se sale del borde.
+- **Validar**: en el celular, abrir un producto → poner una fecha de vencimiento → el botón *Sin fecha* sigue visible y se puede tocar.
+
+### 12.22 Código de barras del producto, con la cámara
+- **Qué**: la IA no siempre puede leer el código en la foto, así que la ficha tiene ahora el campo **Código de barras** con botón **Escanear**: abre la cámara, lee el código y lo deja escrito (se confirma al Guardar). Si la categoría ya tenía ese dato, deja de aparecer duplicado en la lista de datos. Con el código guardado, el escáner y el conteo reconocen el producto al instante.
+- **Validar**: abrir un producto sin código → *Escanear* → apuntar al envase → el código aparece en el campo → *Guardar cambios*; escanear ese producto en *Escanear un código* lo encuentra.
+
+### 12.23 Contar lo que tengo: códigos nuevos y productos sin categoría
+- **Qué**: al contar, si el código leído **no es de ningún producto de esa categoría**, la app ya no se limita a decir «no está»: si el código pertenece a otro producto del inventario lo dice con su nombre, y si es nuevo pregunta **«¿de qué producto es?»** con un buscador; al elegirlo, **guarda el código para siempre** y suma 1. Arriba se avisa cuántos productos de la categoría aún no tienen código. Además hay una opción **«Sin categoría»** para contar los productos que la IA no llegó a ubicar.
+- **Validar**: Más → *Contar lo que tengo* → una categoría → escanear un producto sin código → elegirlo en la lista → queda contado y el código guardado; volver a escanearlo suma directo.
+
+---
+
 ### 12.17 Menú «Más»: se abría mal y hablaba en técnico
 - **Qué**: en el celular el panel crecía más que la pantalla, así que la primera opción quedaba **debajo de la barra del navegador** y la barra de desplazamiento mostraba un recorrido que no existía. Ahora es una hoja inferior con **cabecera fija y su propio desplazamiento** (máx. 82 % de la pantalla, con espacio para la barra de abajo); en computadora el desplegable también tiene su scroll. Además las opciones están **agrupadas** y explicadas en lenguaje cotidiano: *Del día a día* (Escanear un código · Ventas y movimientos · Qué falta y qué caduca), *Ordenar el inventario* (Anotar una compra · Contar lo que tengo · Cambiar precios · Descargar en Excel), *Configurar* (Mi tienda · Cuándo avisarme · Ajustes) y *Ayuda* (Guía paso a paso · Ordenar y limpiar · Cómo usar la herramienta).
 - **Validar**: en el celular, tocar **Más** → se ve el título «Más opciones» y la primera opción completa; la lista se desplaza dentro del panel y la última opción es accesible.
