@@ -10,6 +10,7 @@ import { categoryPath } from "@/lib/categories";
 import { categoryColor } from "@/lib/colors";
 import { useFlow } from "@/components/FlowProvider";
 import CoachTip from "@/components/CoachTip";
+import OwnerOnly from "@/components/OwnerOnly";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { IconArrowLeft, IconChevronRight } from "@/components/ui/Icons";
 
@@ -69,6 +70,7 @@ export default function ReportsPage() {
   const prevLabel = { "7d": "7 días anteriores", mes: "mes anterior", "90d": "90 días anteriores" }[period];
 
   return (
+    <OwnerOnly>
     <div className="mx-auto max-w-3xl space-y-4">
       <header className="animate-in">
         <Link href="/dashboard" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Inicio</Link>
@@ -240,6 +242,7 @@ export default function ReportsPage() {
         </div>
       )}
     </div>
+    </OwnerOnly>
   );
 }
 

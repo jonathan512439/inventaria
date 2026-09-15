@@ -21,6 +21,7 @@ import { parseProposals } from "@/lib/variants";
 import { parseExpiry } from "@/lib/inventory";
 import { userExamples } from "@/lib/aiExamples";
 import { findDuplicate } from "@/lib/duplicates";
+import { businessIdOf } from "@/lib/business";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
 
 export const runtime = "edge";
@@ -217,7 +218,7 @@ export async function POST(request: Request) {
   // 5. Crear pendiente
   const { data: product, error: insErr } = await admin
     .from("products")
-    .insert({ id: productId, user_id: user.id, category_id: categoryId, status: "draft", data, ai_meta: aiMeta, image_url: publicUrl, expires_at: expiresAt })
+    .insert({ id: productId, user_id: user.id, business_id: await businessIdOf(admin, user.id), category_id: categoryId, status: "draft", data, ai_meta: aiMeta, image_url: publicUrl, expires_at: expiresAt })
     .select()
     .single();
   if (insErr) {

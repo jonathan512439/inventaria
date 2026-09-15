@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { MovementType, Sale, SaleItem, StockMovement } from "@/types/database";
 import { METHOD_LABEL, STATUS_LABEL } from "@/lib/sales";
+import { useFlow } from "@/components/FlowProvider";
 import { fmtMoney } from "@/lib/inventory";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { IconArrowLeft, IconChevronRight } from "@/components/ui/Icons";
@@ -31,6 +32,7 @@ function rangeStart(r: Range): Date | null {
 /** Resumen de ventas y movimientos de stock. */
 export default function MovementsPage() {
   const supabase = createClient();
+  const { isOwner } = useFlow();
   const [rows, setRows] = useState<StockMovement[]>([]);
   const [tickets, setTickets] = useState<Sale[]>([]);
   const [open, setOpen] = useState<string | null>(null);
@@ -117,7 +119,7 @@ export default function MovementsPage() {
           <p className="text-2xl font-bold tabular-nums">Bs {fmtMoney(ingresos)}</p>
           <p className="text-xs text-white/80">{ticketsInRange.length + looseSales.length} venta{ticketsInRange.length + looseSales.length === 1 ? "" : "s"} · {unidadesVendidas} unid.</p>
         </div>
-        <Stat label="Ganancia real" value={`Bs ${fmtMoney(ganancia)}`} hint={ganancia > 0 || ingresos === 0 ? "vendido − lo que te costó" : "faltan costos de compra"} />
+        {isOwner ? <Stat label="Ganancia real" value={`Bs ${fmtMoney(ganancia)}`} hint={ganancia > 0 || ingresos === 0 ? "vendido − lo que te costó" : "faltan costos de compra"} /> : <Stat label="Unidades vendidas" value={String(unidadesVendidas)} hint="en el periodo" />}
         {pendienteCobro > 0 ? <Stat label="Por cobrar" value={`Bs ${fmtMoney(pendienteCobro)}`} hint="ventas fiadas o a medias" /> : <Stat label="Entradas" value={`+${entradas}`} hint="unidades recibidas" />}
         <Stat label="Retiros sin venta" value={`−${retiros}`} hint="no suman ingresos" />
       </div>
@@ -162,7 +164,7 @@ export default function MovementsPage() {
                 </span>
                 <span className="text-right">
                   <span className="block font-bold tabular-nums text-emerald-700">Bs {fmtMoney(Number(t.total))}</span>
-                  <span className="block text-[11px] text-slate-500">gana Bs {fmtMoney(Number(t.total) - Number(t.cost_total))}</span>
+                  {isOwner && <span className="block text-[11px] text-slate-500">gana Bs {fmtMoney(Number(t.total) - Number(t.cost_total))}</span>}
                 </span>
                 <IconChevronRight size={16} className={`text-slate-300 transition ${open === t.id ? "rotate-90" : ""}`} />
               </button>

@@ -7,6 +7,7 @@ import type { Category, Product } from "@/types/database";
 import { getDescendantIds } from "@/lib/categories";
 import { SUMMARY_COLS, fmtMoney, fromSummary, priceOf } from "@/lib/inventory";
 import CoachTip from "@/components/CoachTip";
+import OwnerOnly from "@/components/OwnerOnly";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
@@ -106,6 +107,7 @@ export default function PricesPage() {
   }
 
   return (
+    <OwnerOnly>
     <div className="has-action mx-auto max-w-3xl space-y-4">
       <header className="animate-in">
         <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
@@ -182,5 +184,6 @@ export default function PricesPage() {
         </button>
       </div>
     </div>
+    </OwnerOnly>
   );
 }

@@ -13,7 +13,7 @@ import { IconArrowLeft, IconTag } from "@/components/ui/Icons";
 /** Resumen del día: lo que un dueño quiere saber al cerrar, en un mensaje que se puede mandar por WhatsApp. */
 export default function DigestPage() {
   const supabase = createClient();
-  const { alerts } = useFlow();
+  const { alerts, isOwner } = useFlow();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [salesToday, setSalesToday] = useState<Sale[]>([]);
@@ -65,7 +65,7 @@ export default function DigestPage() {
     `*${business || "Mi negocio"} · resumen de hoy* (${new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" })})`,
     "",
     `💰 Vendido: Bs ${fmtMoney(t.total)} en ${salesToday.length} venta${salesToday.length === 1 ? "" : "s"} (ayer Bs ${fmtMoney(y.total)})`,
-    `📈 Ganancia: Bs ${fmtMoney(t.profit)}`,
+    isOwner ? `📈 Ganancia: Bs ${fmtMoney(t.profit)}` : "",
     out.length ? `🔴 Agotados: ${out.slice(0, 5).map((p) => String(p.data.nombre)).join(", ")}${out.length > 5 ? ` y ${out.length - 5} más` : ""}` : "✅ Sin agotados",
     restock.length ? `🟠 Por reponer: ${restock.length} producto${restock.length === 1 ? "" : "s"}` : "",
     expiring.length ? `⏳ Por vencer: ${expiring.slice(0, 3).map((p) => `${String(p.data.nombre)} (${daysToExpiry(p.expires_at)} d)`).join(", ")}${expiring.length > 3 ? ` y ${expiring.length - 3} más` : ""}` : "",
@@ -91,7 +91,7 @@ export default function DigestPage() {
         <>
           <div className="animate-in grid grid-cols-2 gap-2">
             <Tile label="Vendido hoy" value={`Bs ${fmtMoney(t.total)}`} hint={`ayer Bs ${fmtMoney(y.total)}`} tone="emerald" />
-            <Tile label="Ganancia de hoy" value={`Bs ${fmtMoney(t.profit)}`} hint={`ayer Bs ${fmtMoney(y.profit)}`} />
+            {isOwner ? <Tile label="Ganancia de hoy" value={`Bs ${fmtMoney(t.profit)}`} hint={`ayer Bs ${fmtMoney(y.profit)}`} /> : <Tile label="Ventas de hoy" value={String(salesToday.length)} hint={`ayer ${salesYesterday.length}`} />}
             <Tile label="Agotados" value={String(out.length)} hint={restock.length ? `+${restock.length} por reponer` : "nada por reponer"} tone={out.length ? "rose" : undefined} href="/restock" />
             <Tile label="Te deben" value={`Bs ${fmtMoney(debts.reduce((a, d) => a + d.amount, 0))}`} hint={oldDebts.length ? `${oldDebts.length} con más de 30 días` : `${debts.length} cliente${debts.length === 1 ? "" : "s"}`} tone={oldDebts.length ? "amber" : undefined} href="/customers?tab=deben" />
           </div>

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveFields, getValue, normalizeFieldName } from "@/lib/fields";
 import type { ProductData } from "@/types/database";
+import { businessIdsOf } from "@/lib/business";
 
 export const runtime = "edge";
 
@@ -21,8 +22,10 @@ function descendants(cats: { id: string; parent_id: string | null }[], id: strin
 /** Borra definitivamente (con su foto) lo que lleva más de 30 días en la papelera. */
 async function purgeTrash(userId: string) {
   const admin = createAdminClient();
+  const bids = await businessIdsOf(admin, userId);
+  if (!bids.length) return 0;
   const limit = new Date(Date.now() - TRASH_DAYS * 86400000).toISOString();
-  const { data: rows } = await admin.from("products").select("id,image_url").eq("user_id", userId).not("deleted_at", "is", null).lt("deleted_at", limit);
+  const { data: rows } = await admin.from("products").select("id,image_url").in("business_id", bids).not("deleted_at", "is", null).lt("deleted_at", limit);
   if (!rows?.length) return 0;
   const paths = rows.map((r) => r.image_url?.split("/product-images/")[1]).filter(Boolean) as string[];
   if (paths.length) await admin.storage.from("product-images").remove(paths);
@@ -34,10 +37,11 @@ async function purgeTrash(userId: string) {
 async function summary(userId: string) {
   const admin = createAdminClient();
   await purgeTrash(userId);
+  const bids = await businessIdsOf(admin, userId);
   const [{ data: allProducts }, { data: categories }, { data: templates }] = await Promise.all([
-    admin.from("products").select("id,status,category_id,data,image_url,created_at,deleted_at").eq("user_id", userId),
-    admin.from("categories").select("*").eq("user_id", userId),
-    admin.from("field_templates").select("*").eq("user_id", userId).order("sort_order"),
+    admin.from("products").select("id,status,category_id,data,image_url,created_at,deleted_at").in("business_id", bids),
+    admin.from("categories").select("*").in("business_id", bids),
+    admin.from("field_templates").select("*").in("business_id", bids).order("sort_order"),
   ]);
   const trash = (allProducts ?? []).filter((p) => p.deleted_at);
   const prods = (allProducts ?? []).filter((p) => !p.deleted_at);
@@ -206,9 +210,10 @@ export async function POST(request: Request) {
     // Limpia dentro de cada producto: valores vacíos y/o datos sueltos que ya no pertenecen a su categoría
     const ids = Array.from(new Set([...(set.has("emptyValues") ? s.ids.emptyValueIds : []), ...(set.has("orphanValues") ? s.ids.orphanIds : [])]));
     const { data: rows } = await admin.from("products").select("id,category_id,data").in("id", ids);
+    const bids2 = await businessIdsOf(admin, user.id);
     const [{ data: cats2 }, { data: tpls2 }] = await Promise.all([
-      admin.from("categories").select("*").eq("user_id", user.id),
-      admin.from("field_templates").select("*").eq("user_id", user.id),
+      admin.from("categories").select("*").in("business_id", bids2),
+      admin.from("field_templates").select("*").in("business_id", bids2),
     ]);
     let cleanedEmpty = 0;
     let cleanedOrphan = 0;
@@ -239,7 +244,7 @@ export async function POST(request: Request) {
   }
   if (set.has("emptyTrash")) {
     // Vaciar la papelera: borrado definitivo con fotos
-    const { data: rows } = await admin.from("products").select("id,image_url").eq("user_id", user.id).not("deleted_at", "is", null);
+    const { data: rows } = await admin.from("products").select("id,image_url").in("business_id", await businessIdsOf(admin, user.id)).not("deleted_at", "is", null);
     const paths = (rows ?? []).map((r) => r.image_url?.split("/product-images/")[1]).filter(Boolean) as string[];
     if (paths.length) await admin.storage.from("product-images").remove(paths);
     if (rows?.length) await admin.from("products").delete().in("id", rows.map((r) => r.id));

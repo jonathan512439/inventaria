@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { resetCoach, resetTour } from "@/lib/coach";
 import WhatsNew from "@/components/WhatsNew";
 import AiKeyCard from "@/components/AiKeyCard";
+import { useFlow } from "@/components/FlowProvider";
 import { IconAlert, IconCheckCircle, IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
 
 export default function SettingsPage() {
@@ -20,6 +21,7 @@ export default function SettingsPage() {
   const [counts, setCounts] = useState<{ types: number; sections: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [tour, setTour] = useState(false);
+  const flow = useFlow();
 
   useEffect(() => {
     (async () => {
@@ -42,6 +44,7 @@ export default function SettingsPage() {
       data: { user },
     } = await supabase.auth.getUser();
     const { error } = await supabase.from("profiles").upsert({ id: user!.id, business_name: business.trim() || null });
+    if (!error && flow.business && flow.isOwner) await supabase.from("businesses").update({ name: business.trim() || "Mi negocio" }).eq("id", flow.business.id);
     setSaving(false);
     if (error) return toast("error", error.message);
     setSavedBusiness(business.trim());
@@ -72,12 +75,13 @@ export default function SettingsPage() {
       </section>
 
       <section className="animate-in card divide-y divide-slate-100 p-0">
-        <Row href="/store" icon={<IconFolder />} title="Mi tienda" subtitle={counts ? `${counts.types} categoría${counts.types === 1 ? "" : "s"} · ${counts.sections} subcategorías · qué vendes, datos y variantes` : ""} />
+        <Row href="/team" icon={<IconCheckCircle />} title="Equipo" subtitle={flow.members.length > 1 ? `${flow.members.filter((m) => m.active).length} personas · roles, invitaciones y PIN` : "Invita a alguien o pon tu PIN para atender por turnos"} />
+        {flow.isOwner && <Row href="/store" icon={<IconFolder />} title="Mi tienda" subtitle={counts ? `${counts.types} categoría${counts.types === 1 ? "" : "s"} · ${counts.sections} subcategorías · qué vendes, datos y variantes` : ""} />}
         <Row href="/review" icon={<IconCheckCircle />} title="Revisar pendientes" subtitle="Confirma lo que la IA reconoció" />
         <Row href="/scan" icon={<IconTag />} title="Escanear código de barras" subtitle="Repetidos y reposición sin gastar IA" />
-        <Row href="/alerts" icon={<IconAlert />} title="Avisos de reposición" subtitle="Desde cuántas unidades avisar y de qué categorías o productos" />
+        {flow.isOwner && <Row href="/alerts" icon={<IconAlert />} title="Avisos de reposición" subtitle="Desde cuántas unidades avisar y de qué categorías o productos" />}
         <Row href="/movements" icon={<IconList />} title="Ventas y movimientos" subtitle="Ingresos, entradas y retiros de stock" />
-        <Row href="/export" icon={<IconDownload />} title="Exportar a Excel" subtitle="Descarga tu inventario" />
+        {flow.isOwner && <Row href="/export" icon={<IconDownload />} title="Exportar a Excel" subtitle="Descarga tu inventario" />}
         <Row href="/dashboard#guia" icon={<IconList />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" />
         <Row href="/dashboard#limpiar" icon={<IconTrash />} title="Ordenar y limpiar" subtitle="Pendientes viejos, categorías vacías y fotos sueltas" />
       </section>

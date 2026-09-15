@@ -23,6 +23,8 @@ interface MoreItem {
   label: string;
   hint: string;
   Icon: (p: { size?: number; className?: string }) => JSX.Element;
+  /** Solo lo ve el dueño (el vendedor vende, cobra, cuenta y repone) */
+  ownerOnly?: boolean;
 }
 
 /** Lo secundario vive en «Más», agrupado y explicado sin tecnicismos. */
@@ -42,7 +44,7 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
   {
     title: "Cómo va el negocio",
     items: [
-      { href: "/reports", label: "Cómo va el negocio", hint: "Qué se vende, qué no, cuánto ganas y cuánto vale lo que tienes", Icon: IconList },
+      { href: "/reports", label: "Cómo va el negocio", hint: "Qué se vende, qué no, cuánto ganas y cuánto vale lo que tienes", Icon: IconList, ownerOnly: true },
       { href: "/digest", label: "Resumen de hoy", hint: "Lo importante del día, listo para mandar por WhatsApp", Icon: IconCheckCircle },
       { href: "/ask", label: "Pregúntale a tu inventario", hint: "«¿Cuánto vendí esta semana?» y te responde con tus datos", Icon: IconSparkles },
     ],
@@ -50,17 +52,18 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
   {
     title: "Ordenar el inventario",
     items: [
-      { href: "/purchases", label: "Anotar una compra", hint: "Llegó mercadería: cuánta y a qué precio la compraste", Icon: IconBox },
+      { href: "/purchases", label: "Anotar una compra", hint: "Llegó mercadería: cuánta y a qué precio la compraste", Icon: IconBox, ownerOnly: true },
       { href: "/count", label: "Contar lo que tengo", hint: "Revisa el estante y corrige lo que no coincide", Icon: IconCheckCircle },
-      { href: "/prices", label: "Cambiar precios", hint: "Sube o baja el precio de muchos productos a la vez", Icon: IconTag },
-      { href: "/export", label: "Descargar en Excel", hint: "Tu inventario en una planilla para ver o compartir", Icon: IconDownload },
+      { href: "/prices", label: "Cambiar precios", hint: "Sube o baja el precio de muchos productos a la vez", Icon: IconTag, ownerOnly: true },
+      { href: "/export", label: "Descargar en Excel", hint: "Tu inventario en una planilla para ver o compartir", Icon: IconDownload, ownerOnly: true },
     ],
   },
   {
     title: "Configurar",
     items: [
-      { href: "/store", label: "Mi tienda", hint: "Qué vendes y cómo se ordena tu inventario", Icon: IconFolder },
-      { href: "/alerts", label: "Cuándo avisarme", hint: "Desde cuántas unidades quieres que te avise", Icon: IconAlert },
+      { href: "/store", label: "Mi tienda", hint: "Qué vendes y cómo se ordena tu inventario", Icon: IconFolder, ownerOnly: true },
+      { href: "/alerts", label: "Cuándo avisarme", hint: "Desde cuántas unidades quieres que te avise", Icon: IconAlert, ownerOnly: true },
+      { href: "/team", label: "Equipo", hint: "Quiénes usan el negocio, invitaciones y tu PIN", Icon: IconHome },
       { href: "/settings", label: "Ajustes", hint: "Nombre del negocio, tu cuenta y ayuda", Icon: IconSettings },
     ],
   },
@@ -68,7 +71,7 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
     title: "Ayuda",
     items: [
       { href: "/dashboard#guia", label: "Guía paso a paso", hint: "Cómo armar tu inventario desde cero", Icon: IconSparkles },
-      { href: "/dashboard#limpiar", label: "Ordenar y limpiar", hint: "Quita lo que sobra y libera espacio", Icon: IconTrash },
+      { href: "/dashboard#limpiar", label: "Ordenar y limpiar", hint: "Quita lo que sobra y libera espacio", Icon: IconTrash, ownerOnly: true },
     ],
   },
 ];
@@ -231,9 +234,10 @@ export default function Nav() {
 }
 
 function MoreList({ onTour }: { onTour: () => void }) {
+  const { isOwner } = useFlow();
   return (
     <div className="space-y-3">
-      {MORE_GROUPS.map((g) => (
+      {MORE_GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => isOwner || !i.ownerOnly) })).filter((g) => g.items.length).map((g) => (
         <section key={g.title}>
           <p className="px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{g.title}</p>
           <ul className="grid gap-0.5">

@@ -1,11 +1,38 @@
 export type FieldType = "text" | "number" | "select";
 export type ProductStatus = "draft" | "confirmed";
 
+export type MemberRole = "dueno" | "vendedor";
+
+export type Business = { id: string; name: string; owner_id: string; plan: string; created_at: string };
+
+export type BusinessMember = {
+  business_id: string;
+  user_id: string;
+  role: MemberRole;
+  display_name: string | null;
+  has_pin: boolean;
+  active: boolean;
+  created_at: string;
+};
+
+export type Invite = {
+  id: string;
+  business_id: string;
+  code: string;
+  role: MemberRole;
+  created_by: string;
+  expires_at: string;
+  used_by: string | null;
+  used_at: string | null;
+  created_at: string;
+};
+
 export type Profile = {
   id: string;
   email: string | null;
   business_name: string | null;
   onboarded_at: string | null;
+  current_business_id: string | null;
   /** Avisos: mínimo por defecto y días de anticipación del vencimiento (null = valores de fábrica) */
   min_stock_default: number | null;
   expiry_days: number | null;
@@ -264,6 +291,7 @@ export type PriceHistory = {
 export type ProductSummary = {
   id: string;
   user_id: string;
+  business_id?: string | null;
   category_id: string | null;
   status: ProductStatus;
   image_url: string | null;
@@ -329,6 +357,7 @@ export type Product = {
   expires_at?: string | null;
   alerts_off?: boolean; // descartado de los avisos de reposición / vencimiento
   deleted_at?: string | null; // papelera (borrado suave)
+  business_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -409,6 +438,24 @@ export interface Database {
         Row: AiUsage;
         Insert: Omit<AiUsage, "id" | "created_at" | "quota_limit" | "own_key"> & { id?: string; created_at?: string; quota_limit?: number | null; own_key?: boolean };
         Update: Partial<AiUsage>;
+        Relationships: [];
+      };
+      businesses: {
+        Row: Business;
+        Insert: Omit<Business, "id" | "created_at" | "plan"> & { id?: string; created_at?: string; plan?: string };
+        Update: Partial<Business>;
+        Relationships: [];
+      };
+      business_members: {
+        Row: BusinessMember;
+        Insert: Omit<BusinessMember, "created_at" | "has_pin" | "active" | "display_name" | "role"> & { created_at?: string; has_pin?: boolean; active?: boolean; display_name?: string | null; role?: MemberRole };
+        Update: Partial<BusinessMember>;
+        Relationships: [];
+      };
+      invites: {
+        Row: Invite;
+        Insert: Omit<Invite, "id" | "created_at" | "expires_at" | "used_by" | "used_at" | "role"> & { id?: string; created_at?: string; expires_at?: string; used_by?: string | null; used_at?: string | null; role?: MemberRole };
+        Update: Partial<Invite>;
         Relationships: [];
       };
       customers: {
@@ -492,6 +539,7 @@ export interface Database {
         Row: CashClosing;
         Insert: Omit<CashClosing, "id" | "closed_at" | "sales_count" | "total_sales" | "by_method" | "cash_in" | "cash_out" | "expected_cash" | "counted_cash" | "difference" | "profit" | "note"> & {
           id?: string;
+          business_id?: string | null;
           closed_at?: string;
           sales_count?: number;
           total_sales?: number;
@@ -608,6 +656,7 @@ export interface Database {
           expires_at?: string | null;
           alerts_off?: boolean;
           deleted_at?: string | null;
+          business_id?: string | null;
         };
         Update: Partial<Product>;
         Relationships: [];
@@ -616,7 +665,13 @@ export interface Database {
     Views: {
       product_summaries: { Row: ProductSummary; Relationships: [] };
     };
-    Functions: { [_ in never]: never };
+    Functions: {
+      accept_invite: { Args: { p_code: string; p_display_name?: string | null }; Returns: string };
+      verify_pin: { Args: { p_business: string; p_user: string; p_pin: string }; Returns: boolean };
+      set_pin: { Args: { p_business: string; p_pin: string }; Returns: undefined };
+      set_my_name: { Args: { p_business: string; p_name: string }; Returns: undefined };
+      current_business_id: { Args: Record<string, never>; Returns: string | null };
+    };
     Enums: { field_type: FieldType; product_status: ProductStatus; movement_type: MovementType; sale_status: SaleStatus; pay_method: PayMethod };
     CompositeTypes: { [_ in never]: never };
   };

@@ -7,6 +7,7 @@ import type { CashClosing, CashMovement, PayMethod, Sale } from "@/types/databas
 import { fmtMoney } from "@/lib/inventory";
 import { METHOD_LABEL } from "@/lib/sales";
 import CoachTip from "@/components/CoachTip";
+import { useFlow } from "@/components/FlowProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
@@ -19,6 +20,7 @@ export default function CashPage() {
   const supabase = createClient();
   const toast = useToast();
   const confirm = useConfirm();
+  const { isOwner, business } = useFlow();
   const [sales, setSales] = useState<Sale[]>([]);
   const [moves, setMoves] = useState<CashMovement[]>([]);
   const [closings, setClosings] = useState<CashClosing[]>([]);
@@ -85,7 +87,7 @@ export default function CashPage() {
         { label: "Ventas de hoy", value: `${sales.length} · Bs ${fmtMoney(totalSales)}` },
         { label: "Efectivo que debería haber", value: `Bs ${fmtMoney(expectedCash)}` },
         ...(countedNum !== null ? [{ label: "Efectivo contado", value: `Bs ${fmtMoney(countedNum)}`, tone: (diff === 0 ? "ok" : "warn") as "ok" | "warn" }] : []),
-        { label: "Ganancia del día", value: `Bs ${fmtMoney(profit)}`, tone: "ok" as const },
+        ...(isOwner ? [{ label: "Ganancia del día", value: `Bs ${fmtMoney(profit)}`, tone: "ok" as const }] : []),
       ],
       confirmLabel: "Cerrar caja",
       tone: "success",
@@ -97,6 +99,7 @@ export default function CashPage() {
     } = await supabase.auth.getUser();
     const row = {
       user_id: user!.id,
+      business_id: business?.id ?? null,
       day: dayKey(),
       sales_count: sales.length,
       total_sales: Math.round(totalSales * 100) / 100,
@@ -109,7 +112,7 @@ export default function CashPage() {
       profit: Math.round(profit * 100) / 100,
       note: note.trim() || null,
     };
-    const { error } = await supabase.from("cash_closings").upsert(row, { onConflict: "user_id,day" });
+    const { error } = await supabase.from("cash_closings").upsert(row, { onConflict: "business_id,day" });
     setSaving(false);
     if (error) return toast("error", error.message);
     navigator.vibrate?.(30);
@@ -142,7 +145,7 @@ export default function CashPage() {
             <div className="rounded-3xl bg-emerald-600 p-4 text-white shadow-float">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Vendido hoy</p>
               <p className="text-2xl font-bold tabular-nums">Bs {fmtMoney(totalSales)}</p>
-              <p className="text-xs text-white/80">{sales.length} venta{sales.length === 1 ? "" : "s"} · ganancia Bs {fmtMoney(profit)}</p>
+              <p className="text-xs text-white/80">{sales.length} venta{sales.length === 1 ? "" : "s"}{isOwner ? ` · ganancia Bs ${fmtMoney(profit)}` : ""}</p>
             </div>
             <div className="rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-900/10">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cobrado</p>
@@ -224,7 +227,7 @@ export default function CashPage() {
                   <li key={c.id} className="flex items-center gap-3 py-2">
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold text-ink">{new Date(c.day + "T00:00:00").toLocaleDateString("es", { weekday: "short", day: "2-digit", month: "short" })}</span>
-                      <span className="block text-xs text-slate-500">{c.sales_count} venta{c.sales_count === 1 ? "" : "s"} · ganancia Bs {fmtMoney(Number(c.profit))}</span>
+                      <span className="block text-xs text-slate-500">{c.sales_count} venta{c.sales_count === 1 ? "" : "s"}{isOwner ? ` · ganancia Bs ${fmtMoney(Number(c.profit))}` : ""}</span>
                     </span>
                     <span className="font-bold tabular-nums">Bs {fmtMoney(Number(c.total_sales))}</span>
                     {c.difference !== null && (

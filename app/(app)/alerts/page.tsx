@@ -8,6 +8,7 @@ import { categoryPath } from "@/lib/categories";
 import { SUMMARY_COLS, DEFAULT_ALERTS, fromSummary as toProduct, minStockOf, stockOf } from "@/lib/inventory";
 import { categoryColor } from "@/lib/colors";
 import CoachTip from "@/components/CoachTip";
+import OwnerOnly from "@/components/OwnerOnly";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { IconAlert, IconArrowLeft, IconCheck, IconSearch, Spinner } from "@/components/ui/Icons";
@@ -96,6 +97,7 @@ export default function AlertsPage() {
   const settings = { minStock: minStock.trim() === "" ? DEFAULT_ALERTS.minStock : parseInt(minStock, 10) || 0, expiryDays: expiryDays.trim() === "" ? DEFAULT_ALERTS.expiryDays : parseInt(expiryDays, 10) || 30 };
 
   return (
+    <OwnerOnly>
     <div className="mx-auto max-w-2xl space-y-4">
       <header className="animate-in">
         <Link href="/settings" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ajustes</Link>
@@ -222,5 +224,6 @@ export default function AlertsPage() {
         </section>
       )}
     </div>
+    </OwnerOnly>
   );
 }

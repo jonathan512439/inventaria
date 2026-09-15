@@ -27,7 +27,7 @@ export default function ProductsPage() {
   const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [salesMonth, setSalesMonth] = useState<{ total: number; count: number } | null>(null);
   const [variantsOf, setVariantsOf] = useState<Map<string, { stock: number }[]>>(new Map());
-  const { alerts } = useFlow();
+  const { alerts, isOwner } = useFlow();
 
   useEffect(() => {
     (async () => {
@@ -124,7 +124,9 @@ export default function ProductsPage() {
             <p className="truncate text-[11px] text-slate-400">{total.alerts.porReponer ? "ver lista de reposición" : `${fmtMoney(total.units)} unidades en total`}</p>
           </Link>
           <Stat label="Valor de venta" value={`Bs ${fmtMoney(total.saleValue)}`} tone="ok" hint="precio × stock" />
-          {total.costValue > 0 ? (
+          {!isOwner ? (
+            <Stat label="Categorías" value={String(shelves.length)} hint="estantes" />
+          ) : total.costValue > 0 ? (
             <Stat label="Ganancia estimada" value={`Bs ${fmtMoney(total.saleValue - total.costValue)}`} tone="ok" hint={`costo Bs ${fmtMoney(total.costValue)}`} />
           ) : (
             <Stat label="Ganancia estimada" value="—" hint="agrega precio de compra" />
@@ -203,7 +205,7 @@ export default function ProductsPage() {
                     <dl className="mt-3 grid grid-cols-3 gap-2">
                       <Mini label="Unidades" value={fmtMoney(s.units)} />
                       <Mini label="Valor venta" value={s.saleValue > 0 ? `Bs ${fmtMoney(s.saleValue)}` : "—"} tone="ok" />
-                      {s.costValue > 0 ? (
+                      {isOwner && s.costValue > 0 ? (
                         <Mini label="Ganancia" value={`Bs ${fmtMoney(s.saleValue - s.costValue)}`} tone="ok" />
                       ) : (
                         <Mini label="Poco stock" value={String(s.lowStock)} tone={s.lowStock ? "warn" : undefined} />

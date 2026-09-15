@@ -7,6 +7,8 @@ import type { Product, ProductVariant, Purchase, Supplier } from "@/types/databa
 import { SUMMARY_COLS, fmtMoney, fromSummary, stockOf } from "@/lib/inventory";
 import BarcodeCamera from "@/components/BarcodeCamera";
 import CoachTip from "@/components/CoachTip";
+import OwnerOnly from "@/components/OwnerOnly";
+import { useFlow } from "@/components/FlowProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
@@ -26,6 +28,7 @@ export default function PurchasesPage() {
   const supabase = createClient();
   const toast = useToast();
   const confirm = useConfirm();
+  const { isOwner, business } = useFlow();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,6 +208,8 @@ export default function PurchasesPage() {
     await supabase.from("suppliers").delete().eq("id", s.id);
     load();
   }
+
+  if (business && !isOwner) return <OwnerOnly>{null}</OwnerOnly>;
 
   if (mode === "new") {
     return (

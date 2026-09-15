@@ -10,6 +10,7 @@ import { StepByStep, computeStates, type GuideProgress } from "@/components/guid
 import AiUsageCard from "@/components/AiUsageCard";
 import CleanupCard from "@/components/CleanupCard";
 import { useFlow } from "@/components/FlowProvider";
+import WhoIsServing from "@/components/WhoIsServing";
 import { IconAlert, IconBox, IconCamera, IconCheck, IconCheckCircle, IconChevronRight, IconDownload, IconList, IconSettings, IconSparkles, IconTag, Spinner } from "@/components/ui/Icons";
 
 interface Stats {
@@ -151,9 +152,12 @@ export default function DashboardPage() {
           <p className="text-sm font-medium text-slate-500">{greeting}</p>
           <h1 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">{stats.business || "Tu inventario"}</h1>
         </div>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-card ring-1 ring-slate-900/10">
-          {new Date().toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" })}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-card ring-1 ring-slate-900/10">
+            {new Date().toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" })}
+          </span>
+          <WhoIsServing />
+        </div>
       </header>
 
       {/* HOY: una pregunta, una acción */}
@@ -203,7 +207,7 @@ export default function DashboardPage() {
       <div className="animate-in grid grid-cols-3 gap-2">
         <Shortcut href="/sell" Icon={IconTag} label="Vender" hint="cobrar y ticket" primary tone="emerald" />
         <Shortcut href="/capture" Icon={IconCamera} label="Agregar" hint="foto o galería" primary />
-        <Shortcut href="/reports" Icon={IconList} label="Cómo va" hint="ventas y ganancia" />
+        {flow.isOwner ? <Shortcut href="/reports" Icon={IconList} label="Cómo va" hint="ventas y ganancia" /> : <Shortcut href="/cash" Icon={IconList} label="Caja" hint="cerrar el día" />}
       </div>
 
       {/* Más: guía, IA, limpieza, exportar, ajustes (plegado) */}

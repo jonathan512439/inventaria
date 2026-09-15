@@ -2,7 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getActor, setActor } from "@/lib/supabase/client";
+import type { Business, BusinessMember, MemberRole } from "@/types/database";
 import { hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
 import { syncMoves } from "@/lib/offline";
 import { DEFAULT_ALERTS, type AlertSettings } from "@/lib/inventory";
@@ -16,12 +17,22 @@ export interface FlowState {
   loaded: boolean;
   /** Ajustes de avisos del negocio (mínimo por defecto y días de vencimiento) */
   alerts: AlertSettings;
+  /** Negocio activo, mi rol y el equipo */
+  business: Business | null;
+  role: MemberRole;
+  members: BusinessMember[];
+  /** Quién está atendiendo en este celular (tras el PIN); por defecto, el usuario con sesión */
+  actorId: string | null;
+  meId: string | null;
+  isOwner: boolean;
+  /** Cambiar de persona (ya verificada con PIN) */
+  switchActor: (userId: string | null) => void;
   refresh: () => void;
   /** Paso actual según la ruta: 1 agregar, 2 revisar, 3 inventario, 0 otra */
   step: 0 | 1 | 2 | 3;
 }
 
-const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, alerts: DEFAULT_ALERTS, refresh: () => {}, step: 0 });
+const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, alerts: DEFAULT_ALERTS, business: null, role: "dueno", members: [], actorId: null, meId: null, isOwner: true, switchActor: () => {}, refresh: () => {}, step: 0 });
 
 export function stepOf(pathname: string): 0 | 1 | 2 | 3 {
   if (pathname.startsWith("/capture") || pathname.startsWith("/scan") || pathname.startsWith("/products/new")) return 1;
@@ -37,6 +48,8 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
   const q = queueSummary(queue.items);
   const [counts, setCounts] = useState({ pending: 0, confirmed: 0, loaded: false });
   const [alerts, setAlerts] = useState<AlertSettings>(DEFAULT_ALERTS);
+  const [team, setTeam] = useState<{ business: Business | null; role: MemberRole; members: BusinessMember[]; meId: string | null }>({ business: null, role: "dueno", members: [], meId: null });
+  const [actorId, setActorId] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     const supabase = createClient();
@@ -44,6 +57,29 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
       supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft").is("deleted_at", null),
       supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed").is("deleted_at", null),
     ]).then(([d, c]) => setCounts({ pending: d.count ?? 0, confirmed: c.count ?? 0, loaded: true }));
+    // Negocio, rol y equipo
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: bid } = await supabase.rpc("current_business_id");
+      if (!bid) return;
+      const [{ data: biz }, { data: mem }] = await Promise.all([
+        supabase.from("businesses").select("*").eq("id", bid).maybeSingle(),
+        supabase.from("business_members").select("*").eq("business_id", bid).order("created_at"),
+      ]);
+      const members = (mem ?? []) as BusinessMember[];
+      const me = members.find((m) => m.user_id === user.id);
+      setTeam({ business: (biz as Business | null) ?? null, role: me?.role ?? "dueno", members, meId: user.id });
+      // Actor guardado en este celular: solo vale si sigue siendo miembro activo
+      const saved = getActor();
+      if (saved && members.some((m) => m.user_id === saved && m.active)) setActorId(saved);
+      else {
+        setActor(null);
+        setActorId(null);
+      }
+    })();
     supabase
       .from("profiles")
       .select("min_stock_default,expiry_days")
@@ -80,9 +116,28 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
     refresh();
   }, [pathname, q.done, refresh]);
 
+  const switchActor = useCallback((userId: string | null) => {
+    setActor(userId);
+    setActorId(userId);
+  }, []);
+  // El rol efectivo es el de quien atiende (si un vendedor tomó el celular del dueño, ve como vendedor)
+  const actorRole: MemberRole = actorId ? team.members.find((m) => m.user_id === actorId)?.role ?? team.role : team.role;
   const value = useMemo<FlowState>(
-    () => ({ ...counts, alerts, working: q.queued + q.processing, refresh, step: stepOf(pathname) }),
-    [counts, alerts, q.queued, q.processing, refresh, pathname]
+    () => ({
+      ...counts,
+      alerts,
+      business: team.business,
+      role: actorRole,
+      members: team.members,
+      actorId,
+      meId: team.meId,
+      isOwner: actorRole === "dueno",
+      switchActor,
+      working: q.queued + q.processing,
+      refresh,
+      step: stepOf(pathname),
+    }),
+    [counts, alerts, team, actorRole, actorId, switchActor, q.queued, q.processing, refresh, pathname]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

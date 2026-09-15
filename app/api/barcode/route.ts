@@ -5,6 +5,7 @@ import { CODE_FIELDS, applyDefaults, coerceValue, getEffectiveFields, getValue, 
 import { categoryPath } from "@/lib/categories";
 import { lookupPublicCatalogs, suggestCategory } from "@/lib/publicCatalog";
 import type { ProductData } from "@/types/database";
+import { businessIdOf } from "@/lib/business";
 
 export const runtime = "edge";
 
@@ -129,6 +130,7 @@ export async function POST(request: Request) {
     .insert({
       id,
       user_id: user.id,
+      business_id: await businessIdOf(admin, user.id),
       category_id: categoryId,
       status: body.status === "draft" ? "draft" : "confirmed",
       data,

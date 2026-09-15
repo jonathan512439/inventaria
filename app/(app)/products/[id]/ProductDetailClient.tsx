@@ -5,6 +5,7 @@ import Link from "next/link";
 import CoachTip from "@/components/CoachTip";
 import BarcodeCamera from "@/components/BarcodeCamera";
 import { CODE_FIELDS } from "@/lib/fields";
+import { useFlow } from "@/components/FlowProvider";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData, ProductVariant, VariantAxis } from "@/types/database";
@@ -39,6 +40,7 @@ export default function ProductDetailClient() {
   const [reanalyzing, setReanalyzing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const { isOwner } = useFlow();
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [priceHist, setPriceHist] = useState<PriceHistory[]>([]);
   const [axes, setAxes] = useState<VariantAxis[]>([]);
@@ -242,7 +244,7 @@ export default function ProductDetailClient() {
             </div>
           )}
 
-          {priceHist.length > 0 && (
+          {isOwner && priceHist.length > 0 && (
             <div className="rounded-2xl border-2 border-slate-200 p-3">
               <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Historial de precios</p>
               <ul className="space-y-1 text-xs">
@@ -350,7 +352,7 @@ export default function ProductDetailClient() {
           </div>
 
           {fields.map((f) =>
-            CODE_FIELDS.includes(f.name.toLowerCase()) ? null :
+            CODE_FIELDS.includes(f.name.toLowerCase()) || (!isOwner && /^(precio_compra|costo|cost)$/i.test(f.name)) ? null :
             variants.length > 0 && /^(stock|cantidad|existencias)$/i.test(f.name) ? (
               <div key={f.id}>
                 <label className="label">{fieldLabel(f.name)}</label>

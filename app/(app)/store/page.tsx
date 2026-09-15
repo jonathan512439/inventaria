@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import OwnerOnly from "@/components/OwnerOnly";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, VariantAxis } from "@/types/database";
 import { getEffectiveFields, fieldLabel } from "@/lib/fields";
@@ -126,6 +127,7 @@ export default function StorePage() {
   }
 
   return (
+    <OwnerOnly>
     <div className="mx-auto max-w-2xl space-y-5">
       <header className="animate-in">
         <Link href="/settings" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ajustes</Link>
@@ -330,5 +332,6 @@ export default function StorePage() {
         </>
       )}
     </div>
+    </OwnerOnly>
   );
 }

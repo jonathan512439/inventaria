@@ -36,6 +36,10 @@ export async function POST(request: Request) {
     supabase.from("profiles").select("business_name").maybeSingle(),
   ]);
   const categories = cats ?? [];
+  // El vendedor no ve costos ni ganancia
+  const { data: bid } = await supabase.rpc("current_business_id");
+  const { data: me } = bid ? await supabase.from("business_members").select("role").eq("business_id", bid).eq("user_id", user.id).maybeSingle() : { data: null };
+  const owner = (me?.role ?? "dueno") === "dueno";
 
   // Ventas agregadas por producto (compacto) y por día
   const byProduct = new Map<string, { nombre: string; unidades: number; vendido: number; ganancia: number; ultima: string }>();
@@ -70,13 +74,13 @@ export async function POST(request: Request) {
       marca: p.marca,
       categoria: categoryPath(categories, p.category_id) || "Sin categoría",
       precio: p.precio,
-      costo: p.precio_compra,
+      costo: owner ? p.precio_compra : undefined,
       stock: p.stock,
       minimo: p.min_stock,
       vence: p.expires_at,
-      ventas_90d: byProduct.get(p.id) ? { unidades: byProduct.get(p.id)!.unidades, vendido: r2(byProduct.get(p.id)!.vendido), ganancia: r2(byProduct.get(p.id)!.ganancia), ultima: byProduct.get(p.id)!.ultima.slice(0, 10) } : null,
+      ventas_90d: byProduct.get(p.id) ? { unidades: byProduct.get(p.id)!.unidades, vendido: r2(byProduct.get(p.id)!.vendido), ganancia: owner ? r2(byProduct.get(p.id)!.ganancia) : undefined, ultima: byProduct.get(p.id)!.ultima.slice(0, 10) } : null,
     })),
-    ventas_por_dia_90d: Array.from(byDay.entries()).map(([dia, v]) => ({ dia, ...v, vendido: r2(v.vendido), ganancia: r2(v.ganancia) })),
+    ventas_por_dia_90d: Array.from(byDay.entries()).map(([dia, v]) => ({ dia, ventas: v.ventas, vendido: r2(v.vendido), ganancia: owner ? r2(v.ganancia) : undefined })),
     ultimas_ventas: (sales ?? []).slice(0, 40).map((s) => ({ n: s.number, fecha: s.created_at.slice(0, 16), cliente: s.customer_name, estado: s.status, pago: s.method, total: Number(s.total), debe: r2(Number(s.total) - Number(s.paid)), productos: s.items })),
     deudas_clientes: Array.from(debts.entries()).map(([cliente, debe]) => ({ cliente, debe: r2(debe) })),
     clientes: (customers ?? []).length,
