@@ -34,7 +34,7 @@ const STEPS: Step[] = [
     cta: "Elegir mis categorías",
     Illustration: IllustrationChoose,
     instructions: [
-      "Toca **Ajustes → Mi tienda** (o el botón de abajo).",
+      "Toca **Más → Mi tienda** (o el botón de abajo).",
       "Marca una o varias categorías: **Librería**, **Ropa**, **Bebidas**… Si no está la tuya, toca **Otro** y escríbelo en una frase.",
       "Toca **Preparar mi inventario**. Listo: ya tienes subcategorías y datos.",
     ],
@@ -63,10 +63,10 @@ const STEPS: Step[] = [
     cta: "Revisar pendientes",
     Illustration: IllustrationReview,
     instructions: [
-      "Toca **Revisar** (abajo). Verás una tarjeta por producto con la foto grande.",
+      "Toca **② Revisar** en la barra de pasos (o **Revisar ahora** en Inicio). Verás una tarjeta por producto con la foto grande.",
       "Arriba está lo que reconoció la IA (nombre, marca, color…). Corrige solo si se equivocó.",
       "Abajo escribe **precio** y **stock** (el stock viene en 1 por defecto).",
-      "Toca **✓ Confirmar y siguiente**. Si te equivocas, toca **Deshacer** en el aviso verde.",
+      "Toca el botón verde fijo abajo **✓ Confirmar y pasar al siguiente**. Si te equivocas, toca **Deshacer** en el aviso verde.",
     ],
   },
   {
@@ -77,7 +77,7 @@ const STEPS: Step[] = [
     cta: "Ver mi inventario",
     Illustration: IllustrationInventory,
     instructions: [
-      "Toca **Inventario** (abajo). Busca por nombre o marca, o filtra por categoría con los botones de arriba.",
+      "Toca **Inventario** (abajo). Entra a una categoría (estante) y luego a una subcategoría, o busca por nombre o marca.",
       "Toca un producto para editarlo (precio, stock, subcategoría, foto).",
       "Para el Excel: **Inventario → Excel** o **Ajustes → Exportar**. Elige todo o una categoría y toca **Descargar**.",
     ],
@@ -86,12 +86,14 @@ const STEPS: Step[] = [
 
 /** Tareas frecuentes: "¿Qué quieres hacer?" → 3 líneas. */
 const TASKS: Array<{ q: string; href: string; steps: string[] }> = [
-  { q: "Agregar un producto nuevo", href: "/capture", steps: ["Toca **Agregar** (botón morado).", "Toca **Cámara** y fotografía el producto.", "Ve a **Revisar**, pon precio y stock, **Confirmar**."] },
-  { q: "Cambiar precio o stock", href: "/products", steps: ["Toca **Inventario** y busca el producto.", "Tócalo y cambia **precio** o **stock**.", "Toca **Guardar**."] },
+  { q: "Agregar un producto nuevo", href: "/capture", steps: ["Toca **Agregar** (botón morado del centro).", "Toca **Cámara** y fotografía el producto.", "Toca **② Revisar** en la barra de pasos, pon precio y stock, **Confirmar**."] },
+  { q: "Cambiar precio o stock", href: "/products", steps: ["Toca **Inventario**, entra a la categoría y busca el producto.", "Para stock: toca **+/− Stock** en la fila (pregunta si es venta). Para precio: abre el producto y cámbialo.", "Toca **Guardar cambios**."] },
   { q: "Corregir un nombre o subcategoría", href: "/products", steps: ["Toca **Inventario**, busca y abre el producto.", "Edita el nombre o elige otra **Subcategoría**.", "Toca **Guardar**."] },
-  { q: "Agregar una subcategoría o categoría", href: "/store", steps: ["Toca **Ajustes → Mi tienda**.", "Para una categoría nueva: **+ Agregar categoría**. Para una subcategoría: **+ Subcategoría** dentro de la categoría.", "Escribe el nombre y confirma."] },
-  { q: "Sacar el inventario en Excel", href: "/export", steps: ["Toca **Ajustes → Exportar** (o **Inventario → Excel**).", "Elige **todo** o una **categoría**.", "Toca **Descargar .xlsx**."] },
-  { q: "Eliminar un producto", href: "/products", steps: ["Toca **Inventario**, busca y abre el producto.", "Toca **Eliminar** (abajo a la derecha).", "Confirma. La foto también se borra."] },
+  { q: "Agregar una subcategoría o categoría", href: "/store", steps: ["Toca **Más → Mi tienda**.", "Para una categoría nueva: **+ Agregar categoría**. Para una subcategoría: **+ Subcategoría** dentro de la categoría.", "Escribe el nombre y confirma."] },
+  { q: "Sacar el inventario en Excel", href: "/export", steps: ["Toca **Más → Exportar a Excel** (o **Excel** dentro de una categoría del inventario).", "Elige **todo** o una **categoría**.", "Toca **Descargar .xlsx**. Los productos con variantes salen una fila por variante."] },
+  { q: "Registrar una venta o reponer stock", href: "/products", steps: ["Toca **Inventario** y entra a la categoría del producto.", "Toca **+/− Stock** en su fila: **Sumar** si llegó mercadería, **Restar** si salió.", "Al restar, elige **Sí, es una venta** (suma a Ingresos) o **No, solo restar**."] },
+  { q: "Manejar tallas o colores (variantes)", href: "/store", steps: ["Toca **Más → Mi tienda** y, en la categoría, agrega **Talla**, **Color**… en el bloque Variantes.", "Al revisar un producto de esa categoría, toca **Sí, tiene variantes** y escribe el stock en cada casilla.", "En la ficha, toca una casilla para vender o reponer esa variante."] },
+  { q: "Eliminar un producto", href: "/products", steps: ["Toca **Inventario**, busca y abre el producto.", "Toca **Más opciones → Eliminar este producto**.", "Confirma. La foto también se borra."] },
 ];
 
 export function computeStates(p: GuideProgress): StepState[] {

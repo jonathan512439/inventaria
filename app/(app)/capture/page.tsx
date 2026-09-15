@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import CoachTip from "@/components/CoachTip";
 import { createClient } from "@/lib/supabase/client";
 import type { Category } from "@/types/database";
 import { resizeImage } from "@/lib/image";
@@ -86,8 +87,11 @@ export default function CapturePage() {
     <div className="mx-auto max-w-2xl space-y-5">
       <header className="animate-in">
         <h1 className="text-2xl font-bold tracking-tight text-ink">Agregar productos</h1>
-        <p className="text-sm text-slate-500">Toma varias fotos seguidas. La IA las procesa mientras sigues.</p>
+        <p className="text-sm text-slate-500">Paso ① · Toma varias fotos seguidas. La IA las procesa mientras sigues.</p>
       </header>
+      <CoachTip screen="capture" title="¿Cómo entran los productos?">
+        Toca <b>Cámara</b> y fotografía la etiqueta o el empaque; la cámara se vuelve a abrir sola para el siguiente. Cuando termines, sigue al paso <b>② Revisar</b> en la barra de arriba.
+      </CoachTip>
 
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPick(e, true)} />
       <input ref={galleryRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPick(e, false)} />

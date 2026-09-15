@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import CoachTip from "@/components/CoachTip";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData, ProductVariant, VariantAxis } from "@/types/database";
@@ -445,6 +446,9 @@ function Review() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <Header count={products.length} index={index} onToggle={() => router.replace("/review?view=table")} />
+      <CoachTip screen="review" title="¿Está bien este producto?">
+        Arriba, lo que reconoció la IA (corrige solo si se equivocó). Abajo, <b>precio</b> y <b>stock</b>. Luego el botón verde fijo: <b>Confirmar y pasar al siguiente</b>. Desliza la tarjeta a la derecha para confirmar más rápido.
+      </CoachTip>
 
       <div className="relative">
         {/* Indicadores del gesto */}
@@ -702,11 +706,13 @@ function Review() {
             </p>
           )}
 
-          {/* Acciones */}
+          {/* Acciones: la principal queda fija abajo */}
           <div className="grid gap-2 pt-1">
-            <button onClick={() => save("confirmed")} className={`btn-success btn-lg w-full ${leaving ? "pulse-success" : ""}`} disabled={saving}>
-              {saving ? <Spinner /> : <IconCheck size={22} />} Confirmar y pasar al siguiente
-            </button>
+            <div className="sticky-action">
+              <button onClick={() => save("confirmed")} className={`btn-success btn-lg w-full ${leaving ? "pulse-success" : ""}`} disabled={saving}>
+                {saving ? <Spinner /> : <IconCheck size={22} />} Confirmar y pasar al siguiente
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => save("draft")} className="btn-secondary" disabled={saving}>
                 <IconEdit size={16} /> Guardar y seguir

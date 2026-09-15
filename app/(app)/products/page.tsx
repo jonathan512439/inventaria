@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import CoachTip from "@/components/CoachTip";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, Product } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
@@ -69,6 +70,10 @@ export default function ProductsPage() {
           <Link href="/products/table" className="btn-secondary btn-sm hidden md:inline-flex"><IconTable size={16} /> Tabla</Link>
         </div>
       </header>
+
+      <CoachTip screen="products" title="Tu inventario, estante por estante">
+        Cada tarjeta es una categoría: toca para ver sus productos y subcategorías. Dentro, <b>+/− Stock</b> registra ventas y reposiciones sin editar nada.
+      </CoachTip>
 
       {/* Resumen */}
       {!loading && total.products > 0 && (

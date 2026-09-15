@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import CoachTip from "@/components/CoachTip";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductVariant, ProductData } from "@/types/database";
@@ -336,6 +337,9 @@ export default function ScanPage() {
         <h1 className="text-2xl font-bold tracking-tight text-ink">Escanear código de barras</h1>
         <p className="text-sm text-slate-500">Repetidos, reposición y alta de productos conocidos <b>sin gastar análisis de IA</b>.</p>
       </header>
+      <CoachTip screen="scan" title="Apunta al código y espera el beep">
+        Si el producto ya está en tu inventario, sumas stock con <b>+1 / +5 / +10</b>. Si no, lo buscamos en catálogos públicos y lo das de alta sin IA.
+      </CoachTip>
 
       {/* Modo */}
       <div className="animate-in grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">

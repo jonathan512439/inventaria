@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import CoachTip from "@/components/CoachTip";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData, ProductVariant, VariantAxis } from "@/types/database";
@@ -148,6 +149,10 @@ export default function ProductDetailPage() {
         </span>
       </div>
 
+      <CoachTip screen="product" title="¿Qué cambio?">
+        Para stock usa <b>+/− Stock</b> (registra ventas y reposiciones). Para el resto, edita y toca <b>Guardar cambios</b>, fijo abajo. Lo demás está en <b>Más opciones</b>.
+      </CoachTip>
+
       <div className="mx-auto grid w-full max-w-xl grid-cols-1 gap-5 md:max-w-none md:grid-cols-[340px_1fr]">
         <div className="animate-in space-y-3">
           <div className="card overflow-hidden p-0">
@@ -245,15 +250,17 @@ export default function ProductDetailPage() {
 
           {/* Acciones: una principal clara + el resto en "Más opciones" */}
           <div className="grid w-full gap-2 pt-2">
-            {isDraft ? (
-              <button className="btn-success btn-lg w-full" onClick={() => save("confirmed")} disabled={saving}>
-                {saving ? <Spinner /> : <IconCheck size={20} />} Guardar en el inventario
-              </button>
-            ) : (
-              <button className="btn-primary btn-lg w-full" onClick={() => save()} disabled={saving}>
-                {saving ? <Spinner /> : <IconEdit size={18} />} Guardar cambios
-              </button>
-            )}
+            <div className="sticky-action">
+              {isDraft ? (
+                <button className="btn-success btn-lg w-full" onClick={() => save("confirmed")} disabled={saving}>
+                  {saving ? <Spinner /> : <IconCheck size={20} />} Guardar en el inventario
+                </button>
+              ) : (
+                <button className="btn-primary btn-lg w-full" onClick={() => save()} disabled={saving}>
+                  {saving ? <Spinner /> : <IconEdit size={18} />} Guardar cambios
+                </button>
+              )}
+            </div>
 
             <button type="button" onClick={() => setMoreActions((v) => !v)} className="text-sm font-semibold text-slate-500 underline hover:text-ink">
               {moreActions ? "Ocultar más opciones" : "Más opciones"}
