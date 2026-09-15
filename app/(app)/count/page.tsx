@@ -11,7 +11,7 @@ import BarcodeCamera from "@/components/BarcodeCamera";
 import CoachTip from "@/components/CoachTip";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
-import { IconArrowLeft, IconCheck, IconChevronRight, Spinner } from "@/components/ui/Icons";
+import { IconArrowLeft, IconCheck, IconChevronRight, IconTag, IconX, Spinner } from "@/components/ui/Icons";
 
 interface Row {
   key: string;
@@ -39,6 +39,9 @@ export default function CountPage() {
   const [onlyPending, setOnlyPending] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastHit, setLastHit] = useState<string | null>(null);
+  // Código leído que no pertenece a ningún producto de esta categoría: se puede asignar aquí mismo
+  const [unknown, setUnknown] = useState<{ code: string; note: string } | null>(null);
+  const [assignQ, setAssignQ] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -59,8 +62,16 @@ export default function CountPage() {
     setRows(null);
     setCounted({});
     setReason({});
-    const ids = getDescendantIds(categories, cat.id);
-    const { data: ps } = await supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed").in("category_id", ids).order("nombre");
+    setUnknown(null);
+    // "none" = los productos que quedaron sin categoría (la IA no siempre acierta y no deben perderse)
+    let query = supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed").order("nombre");
+    if (cat.id === "none") {
+      const valid = categories.map((c) => c.id);
+      query = valid.length ? query.or(`category_id.is.null,category_id.not.in.(${valid.join(",")})`) : query.is("category_id", null);
+    } else {
+      query = query.in("category_id", getDescendantIds(categories, cat.id));
+    }
+    const { data: ps } = await query;
     const products: Product[] = (ps ?? []).map(fromSummary);
     const { data: vs } = products.length ? await supabase.from("product_variants").select("*").in("product_id", products.map((p) => p.id)).order("created_at") : { data: [] as ProductVariant[] };
     const byProduct = new Map<string, ProductVariant[]>();
@@ -75,14 +86,50 @@ export default function CountPage() {
     setRows(list);
   }
 
-  /** Cada lectura del escáner suma 1 al contado de ese producto/variante. */
-  function onCode(code: string) {
+  function addOne(key: string) {
+    setCounted((c) => ({ ...c, [key]: String((parseInt(c[key] ?? "0", 10) || 0) + 1) }));
+    setLastHit(key);
+    setTimeout(() => setLastHit(null), 1200);
+  }
+
+  /** Cada lectura del escáner suma 1 al producto de ese código; si el código es nuevo, pregunta de quién es. */
+  async function onCode(code: string) {
     if (!rows) return;
     const hit = rows.find((r) => r.code && r.code.toUpperCase() === code.toUpperCase());
-    if (!hit) return toast("info", `Código ${code}: no está en esta categoría`);
-    setCounted((c) => ({ ...c, [hit.key]: String((parseInt(c[hit.key] ?? "0", 10) || 0) + 1) }));
-    setLastHit(hit.key);
-    setTimeout(() => setLastHit(null), 1200);
+    if (hit) return addOne(hit.key);
+    // ¿Existe en otra categoría del inventario?
+    let note = "Este código todavía no está guardado en ningún producto.";
+    try {
+      const res = await fetch(`/api/barcode?code=${encodeURIComponent(code)}`);
+      const json = (await res.json().catch(() => ({}))) as { found?: string; product?: { data: Record<string, unknown> } };
+      if (json.found === "own" && json.product) note = `Ese código es de «${String(json.product.data?.nombre ?? "otro producto")}», que está en otra categoría.`;
+    } catch {
+      /* sin conexión: se ofrece asignarlo igual */
+    }
+    setUnknown({ code, note });
+    setAssignQ("");
+  }
+
+  /** Guarda el código leído en el producto (o variante) elegido y lo cuenta. */
+  async function assignCode(r: Row) {
+    if (!unknown) return;
+    const code = unknown.code;
+    if (r.variantId) {
+      const { error } = await supabase.from("product_variants").update({ codigo_barras: code }).eq("id", r.variantId);
+      if (error) return toast("error", /product_variants_codigo/.test(error.message) ? "Ese código ya está en otra variante" : error.message);
+    } else {
+      const { data: p } = await supabase.from("products").select("data").eq("id", r.productId).maybeSingle();
+      if (!p) return toast("error", "No se encontró el producto");
+      const keys = Object.keys(p.data);
+      const key = ["codigo_barras", "codigo", "sku", "barcode", "ean"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "codigo_barras";
+      const { error } = await supabase.from("products").update({ data: { ...p.data, [key]: code } }).eq("id", r.productId);
+      if (error) return toast("error", error.message);
+    }
+    setRows((rs) => (rs ? rs.map((x) => (x.key === r.key ? { ...x, code } : x)) : rs));
+    setUnknown(null);
+    addOne(r.key);
+    navigator.vibrate?.(20);
+    toast("success", `Código guardado en «${r.name}${r.variant ? ` · ${r.variant}` : ""}». La próxima vez se reconocerá solo.`);
   }
 
   const parsed = (r: Row) => (counted[r.key] === undefined || counted[r.key] === "" ? null : Math.max(0, parseInt(counted[r.key], 10) || 0));
@@ -113,7 +160,7 @@ export default function CountPage() {
     } = await supabase.auth.getUser();
     const { data: count, error } = await supabase
       .from("stock_counts")
-      .insert({ user_id: user!.id, category_id: top.id, category_name: top.name, items: toApply.length, differences: stats.diffs, diff_units: stats.units, closed_at: new Date().toISOString() })
+      .insert({ user_id: user!.id, category_id: top.id === "none" ? null : top.id, category_name: top.name, items: toApply.length, differences: stats.diffs, diff_units: stats.units, closed_at: new Date().toISOString() })
       .select()
       .single();
     if (error || !count) {
@@ -180,6 +227,11 @@ export default function CountPage() {
           <>
             <div className="animate-in space-y-2">
               <BarcodeCamera onCode={onCode} label="Escanear para contar (+1 por lectura)" />
+              {rows.some((r) => !r.code) && (
+                <p className="rounded-xl bg-slate-100 px-3 py-2 text-[11px] text-slate-600">
+                  {rows.filter((r) => !r.code).length} de {rows.length} productos todavía no tienen su código guardado. Escanéalos: la app te preguntará de cuál es y lo aprende para la próxima.
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-2 shadow-card ring-1 ring-slate-900/10">
                 <button onClick={() => setOnlyPending((v) => !v)} className={`chip ${onlyPending ? "chip-active" : ""}`}>
                   {onlyPending ? "Viendo solo los que faltan" : "Ocultar los que ya conté"}
@@ -192,6 +244,33 @@ export default function CountPage() {
                 </span>
               </div>
             </div>
+            {unknown && (
+              <div className="animate-in rounded-2xl border-2 border-amber-300 bg-amber-50 p-3">
+                <div className="flex items-start gap-2">
+                  <IconTag size={18} className="mt-0.5 shrink-0 text-amber-700" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-amber-900">Código nuevo: <span className="font-mono">{unknown.code}</span></p>
+                    <p className="text-xs text-amber-800">{unknown.note} Elige de qué producto es y lo guardamos para siempre.</p>
+                  </div>
+                  <button onClick={() => setUnknown(null)} className="btn-ghost btn-sm" aria-label="Cerrar"><IconX size={16} /></button>
+                </div>
+                <input className="input mt-2 py-2" placeholder="Buscar el producto por nombre…" value={assignQ} onChange={(e) => setAssignQ(e.target.value)} autoFocus />
+                <ul className="mt-1.5 max-h-56 space-y-1 overflow-y-auto">
+                  {rows
+                    .filter((r) => !assignQ.trim() || `${r.name} ${r.variant ?? ""}`.toLowerCase().includes(assignQ.trim().toLowerCase()))
+                    .slice(0, 20)
+                    .map((r) => (
+                      <li key={r.key}>
+                        <button onClick={() => assignCode(r)} className="flex w-full items-center gap-2 rounded-xl bg-white px-3 py-2 text-left ring-1 ring-amber-200 hover:ring-amber-400">
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{r.name}{r.variant ? <span className="text-violet-800"> · {r.variant}</span> : null}</span>
+                          {r.code ? <span className="shrink-0 text-[10px] text-slate-400">ya tiene código</span> : null}
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+
             <ul className="stagger space-y-1.5">
               {visibleRows.map((r) => {
                 const c = parsed(r);
@@ -250,7 +329,7 @@ export default function CountPage() {
       ) : (
         <>
           <ul className="stagger grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {tops.map((c) => {
+            {[...tops, { id: "none", user_id: "", parent_id: null, name: "Sin categoría", icon: "🏷️", min_stock_default: null, alerts_off: false, created_at: "" } as Category].map((c) => {
               const col = categoryColor(c.name);
               return (
                 <li key={c.id}>

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import CoachTip from "@/components/CoachTip";
+import BarcodeCamera from "@/components/BarcodeCamera";
+import { CODE_FIELDS } from "@/lib/fields";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductData, ProductVariant, VariantAxis } from "@/types/database";
@@ -35,6 +37,7 @@ export default function ProductDetailClient() {
   const [moreActions, setMoreActions] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [priceHist, setPriceHist] = useState<PriceHistory[]>([]);
   const [axes, setAxes] = useState<VariantAxis[]>([]);
@@ -92,6 +95,8 @@ export default function ProductDetailClient() {
   }, [load]);
 
   const fields = getEffectiveFields(templates, categories, categoryId);
+  // Dato donde vive el código de barras (el definido por la categoría, o uno propio)
+  const codeField = fields.find((f) => CODE_FIELDS.includes(f.name.toLowerCase()))?.name ?? "codigo_barras";
   // Valores guardados que no pertenecen a ningún campo actual (p. ej. campo eliminado)
   const orphanKeys = Object.keys(data).filter((k) => !fields.some((f) => f.name === k));
 
@@ -278,25 +283,59 @@ export default function ProductDetailClient() {
           </div>
 
           {/* Control de stock: mínimo y vencimiento */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             <div>
-              <label className="label" htmlFor="min-stock">Stock mínimo</label>
-              <input id="min-stock" type="number" min={0} inputMode="numeric" className="input tabular-nums" placeholder="3" value={minStock} onChange={(e) => setMinStock(e.target.value)} />
-              <p className="mt-1 text-[11px] text-slate-500">Avisa «por reponer» al llegar aquí. Vacío = el de la categoría.</p>
+              <label className="label" htmlFor="min-stock">Avisarme cuando queden</label>
+              <div className="flex items-center gap-2">
+                <input id="min-stock" type="number" min={0} inputMode="numeric" className="input w-20 shrink-0 py-2 text-center tabular-nums" placeholder="3" value={minStock} onChange={(e) => setMinStock(e.target.value)} />
+                <span className="min-w-0 flex-1 text-xs text-slate-500">unidades o menos. Vacío = usa el de su categoría.</span>
+              </div>
             </div>
             <div>
               <label className="label" htmlFor="expires">Vence el</label>
-              <div className="flex gap-2">
-                <input id="expires" type="date" className="input" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+              <div className="flex flex-wrap items-center gap-2">
+                <input id="expires" type="date" className="input w-auto min-w-[9.5rem] flex-1 py-2" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
                 <button type="button" onClick={() => setExpiresAt("")} className={`chip shrink-0 ${expiresAt === "" ? "chip-active" : ""}`} title="Producto que no vence">
                   Sin fecha
                 </button>
               </div>
-              <p className="mt-1 text-[11px] text-slate-500">{expiresAt ? "Se avisa antes de que venza (días configurables en Ajustes → Avisos)." : "Sin fecha: no vence (no perecedero). Toca el calendario solo si quieres ponerle fecha."}</p>
+              <p className="mt-1 text-[11px] text-slate-500">{expiresAt ? "Se avisa antes de que venza (los días se ajustan en Cuándo avisarme)." : "Sin fecha: no vence. Toca el calendario solo si quieres ponerle una."}</p>
             </div>
           </div>
 
+          {/* Código de barras: se puede leer con la cámara (la IA no siempre lo ve en la foto) */}
+          <div>
+            <label className="label" htmlFor="code">Código de barras</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                id="code"
+                className="input w-auto min-w-[10rem] flex-1 font-mono text-sm"
+                placeholder="Sin código"
+                value={String(data[codeField] ?? "")}
+                onChange={(e) => setData({ ...data, [codeField]: e.target.value })}
+              />
+              <button type="button" onClick={() => setScanning((v) => !v)} className={`chip shrink-0 ${scanning ? "chip-active" : ""}`}>
+                <IconTag size={14} /> {scanning ? "Cerrar cámara" : data[codeField] ? "Volver a escanear" : "Escanear"}
+              </button>
+            </div>
+            {scanning && (
+              <div className="mt-2">
+                <BarcodeCamera
+                  label="Apuntar al código"
+                  onCode={(code) => {
+                    setData((d) => ({ ...d, [codeField]: code }));
+                    setScanning(false);
+                    navigator.vibrate?.(20);
+                    toast("success", `Código ${code} guardado en el formulario. Toca Guardar para confirmarlo.`);
+                  }}
+                />
+              </div>
+            )}
+            <p className="mt-1 text-[11px] text-slate-500">Con el código, el escáner y el conteo reconocen este producto al instante.</p>
+          </div>
+
           {fields.map((f) =>
+            CODE_FIELDS.includes(f.name.toLowerCase()) ? null :
             variants.length > 0 && /^(stock|cantidad|existencias)$/i.test(f.name) ? (
               <div key={f.id}>
                 <label className="label">{fieldLabel(f.name)}</label>
