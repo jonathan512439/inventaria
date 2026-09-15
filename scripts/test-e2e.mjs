@@ -133,7 +133,7 @@ try {
   check(nProducts === 4, `detect no crea productos (siguen ${nProducts})`);
 
   // 11. Clave de IA propia (BYOK): inválida → 400; válida → guardada cifrada; análisis marcado con own_key; quitar
-  r = await fetch(`${BASE}/api/ai-key`, { method: "POST", headers: H, body: JSON.stringify({ key: "AIzaNOVALIDA_0000000000000000000" }) });
+  r = await fetch(`${BASE}/api/ai-key`, { method: "POST", headers: H, body: JSON.stringify({ key: "CLAVE_NO_VALIDA_0000000000000000000" }) });
   check(r.status === 400, `clave inválida rechazada: ${r.status}`);
   r = await fetch(`${BASE}/api/ai-key`, { method: "POST", headers: H, body: JSON.stringify({ key: process.env.GEMINI_API_KEY }) });
   const k1 = await r.json();

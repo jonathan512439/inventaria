@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
   }
-  if (!/^[A-Za-z0-9_-]{20,120}$/.test(key)) return NextResponse.json({ error: "Eso no parece una clave de Gemini (empieza por «AIza…»)." }, { status: 400 });
+  if (!/^[A-Za-z0-9._-]{20,200}$/.test(key)) return NextResponse.json({ error: "Eso no parece una clave de Gemini: pégala completa, sin espacios." }, { status: 400 });
   const check = await validateGeminiKey(key);
   if (!check.ok) return NextResponse.json({ error: check.message }, { status: 400 });
   const { ciphertext, iv } = await encryptKey(key);

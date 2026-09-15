@@ -58,11 +58,11 @@ export default function AiKeyCard() {
             <div className="space-y-2">
               <ol className="list-decimal space-y-0.5 pl-5 text-xs text-slate-600">
                 <li>Entra a <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="font-semibold text-brand-700 underline">aistudio.google.com/apikey</a> con tu cuenta de Google.</li>
-                <li>Toca <b>Create API key</b> y copia la clave (empieza por «AIza…»).</li>
+                <li>Toca <b>Create API key</b> y copia la clave completa.</li>
                 <li>Pégala aquí. Se guarda cifrada y nunca se muestra completa.</li>
               </ol>
               <div className="flex gap-2">
-                <input className="input font-mono text-sm" placeholder="AIza…" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} />
+                <input className="input font-mono text-sm" placeholder="Pega aquí tu clave" value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} />
                 <button onClick={save} disabled={busy || key.trim().length < 20} className="btn-primary shrink-0">{busy ? <Spinner size={16} /> : "Guardar"}</button>
               </div>
             </div>
