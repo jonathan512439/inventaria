@@ -1,6 +1,5 @@
 "use client";
 
-import * as XLSX from "xlsx";
 import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { fieldLabel, getEffectiveFields, getValue, normalizeFieldName } from "./fields";
 
@@ -92,7 +91,9 @@ function autoWidth(rows: Record<string, unknown>[], headers: string[]) {
 }
 
 /** Genera y descarga un .xlsx en el navegador con las columnas definidas por el usuario. */
-export function exportToExcel({ products, categories, templates, fileName = "inventario", sheetPerCategory = false, variants = [], axes = [] }: ExportArgs) {
+export async function exportToExcel({ products, categories, templates, fileName = "inventario", sheetPerCategory = false, variants = [], axes = [] }: ExportArgs) {
+  // Carga bajo demanda: la librería (7 MB) no entra en el bundle del servidor ni en la carga inicial
+  const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
   const usedNames = new Set<string>();
   const variantsOf = new Map<string, ProductVariant[]>();

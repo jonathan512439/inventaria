@@ -51,11 +51,11 @@ export default function ExportPage() {
     });
   }, [products, categories, categoryId, includeSub, status]);
 
-  function doExport() {
+  async function doExport() {
     setExporting(true);
     try {
       const base = categoryId ? categoryPath(categories, categoryId).replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase() : "inventario";
-      exportToExcel({ products: selected, categories, templates, fileName: base, sheetPerCategory, variants, axes });
+      await exportToExcel({ products: selected, categories, templates, fileName: base, sheetPerCategory, variants, axes });
     } finally {
       setExporting(false);
     }

@@ -3,7 +3,6 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, Product, ProductVariant } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
@@ -121,7 +120,8 @@ function Restock() {
     if (!text) return;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
-  function excel() {
+  async function excel() {
+    const XLSX = await import("xlsx");
     const rows = lines.map((l) => ({ Proveedor: l.supplier ?? "", Producto: l.name, Variante: l.variant ?? "", Ubicación: l.where, "Stock actual": l.stock, Mínimo: l.min, "Cantidad a pedir": qtyOf(l) }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();

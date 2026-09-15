@@ -142,7 +142,7 @@ export default function CategoryInventoryPage() {
 
   async function exportVisible() {
     const map = await loadFull(visible.map((p) => p.id));
-    exportToExcel({ products: visible.map((p) => map.get(p.id) ?? p), categories, templates, fileName: title.toLowerCase().replace(/\s+/g, "-"), variants, axes });
+    await exportToExcel({ products: visible.map((p) => map.get(p.id) ?? p), categories, templates, fileName: title.toLowerCase().replace(/\s+/g, "-"), variants, axes });
   }
   const col = categoryColor(top?.name);
   const toggleFilter = (k: Filter) =>
