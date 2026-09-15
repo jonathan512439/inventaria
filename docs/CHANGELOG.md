@@ -3,6 +3,48 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-14 · Plan v2 · Fase 2 — Variantes (talla, color, edad…)
+
+> Fase 1 (inventario visual) cerrada y validada. Esta fase agrega **variantes con stock propio**: «Polera · M · Rojo» tiene su stock y su código; el producto agrupa, la variante cuenta. Un producto sin variantes se comporta exactamente como antes.
+
+### 8.1 Base de datos (`supabase/007_variantes.sql`, ya aplicada)
+- **Qué**: tablas `variant_axes` (qué varía en cada categoría principal: hasta 3 ejes con opciones) y `product_variants` (una fila por combinación: valores, etiqueta, stock, precio propio, costo, código de barras). `stock_movements` gana `variant_id` y `variant_label`. RLS por usuario. **El stock del producto es siempre la suma de sus variantes**: dos disparadores lo recalculan al crear/editar/borrar una variante y bloquean cualquier intento de escribirlo a mano (tabla, ficha, escáner). El código de barras es único entre variantes; la misma combinación no se puede repetir.
+- **Validar**: `npm run test:variants` → 10 comprobaciones en verde (suma, guardia, venta, código repetido, combinación repetida, borrado en cascada).
+
+### 8.2 Ejes por categoría (Mi tienda)
+- **Qué**: en **Ajustes → Mi tienda**, cada categoría tiene el bloque violeta **Variantes**: agrega ejes desde la biblioteca (Talla, Talla número, Color, Edad, Sabor, Tamaño, Volumen, Material, Modelo) o uno propio; edita sus opciones (coma) o quítalo. Los catálogos Ropa (Talla + Color), Calzado (Talla numérica + Color) y Juguetería (Edad) traen sus ejes al instalarse; si la categoría ya existía aparece **Sugerido: + Talla + Color** para agregarlos de un toque. En Ropa/Calzado la talla deja de ser un dato del producto: ahora es un eje.
+- **Validar**: Mi tienda → Ropa → «Sugerido: Talla, Color» → tocar ambos → quedan listados con sus opciones; tocar «Talla» permite editar las opciones.
+
+### 8.3 Foto + IA: variantes propuestas
+- **Qué**: la IA devuelve además `variantes_propuestas` con lo que **se ve** en la foto («talla: S, M, L; color: rojo, azul»), sin inventar. Se guarda en `ai_meta` y solo es una propuesta: nada se crea hasta que el usuario confirma. También al volver a analizar.
+- **Validar**: foto de una etiqueta con varias tallas → en Revisar, el bloque de variantes dice «✨ la IA vio S, M, L» y esas casillas aparecen resaltadas en violeta.
+
+### 8.4 Revisar: «¿Viene en varias tallas / colores?»
+- **Qué**: si la categoría elegida tiene ejes, aparece el bloque violeta con dos botones: **Sí, tiene variantes** / **No, es único**. Con «Sí»: chips por eje (las que vio la IA vienen marcadas; «+ Otra» para escribir una nueva) y la **cuadrícula** filas = 1er eje, columnas = 2º eje (pestañas para un 3º). Se escribe el stock por casilla; **las casillas vacías no se crean**. El campo Stock pasa a mostrar la suma. Sigue habiendo un solo botón: **Confirmar y pasar al siguiente**. Si la categoría no tiene ejes pero la IA vio variantes, un aviso lleva a Mi tienda.
+- **Validar**: Revisar un producto de Ropa → «Sí, tiene variantes» → marcar S, M, L y Rojo, Azul → escribir 3, 2, 0 en tres casillas → Stock total 5 en 3 variantes → Confirmar → en la ficha aparece la cuadrícula con 3/2/0 (la de 0 en rojo, «Agotado: L · Azul»).
+
+### 8.5 Ficha del producto: cuadrícula viva
+- **Qué**: bloque **Variantes** con la cuadrícula: tocar una casilla abre **+/− Stock** para esa variante (venta o retiro con su precio); tocar «+» en una casilla vacía crea la variante y pide cuántas hay. Se pueden agregar tallas/colores nuevos con «+ Otra» y quitar filas/columnas. «Precio y código de barras por variante» permite precio propio (vacío = el del producto), código y quitar la variante. Los últimos movimientos muestran la variante. El campo Stock del formulario es de solo lectura (suma) cuando hay variantes.
+- **Validar**: ficha → tocar la casilla «M · Rojo» → Restar 1 → Sí, es venta → Confirmar → la casilla baja, el stock total baja y `/movements` muestra «Polera · M · Rojo».
+
+### 8.6 Inventario: resumen y alertas por variante
+- **Qué**: en la lista de una categoría cada fila muestra «3 variantes · Talla: S, M, L · Color: Rojo» y una etiqueta roja «N variantes agotadas». El botón **+/− Stock** de la fila pregunta primero **¿Cuál variante?**. El filtro **Agotados** incluye productos con alguna variante en 0. En los estantes (Mi inventario) y en «Por atender» se cuentan las **variantes agotadas** aunque el producto aún tenga stock.
+- **Validar**: Inventario → Ropa → la fila de la polera muestra el resumen y «1 variante agotada»; filtro Agotados la incluye; Mi inventario → tarjeta Ropa muestra «1 variante agotada».
+
+### 8.7 Escáner por variante
+- **Qué**: un código de barras puede pertenecer a una variante. Al escanear: si el código es de una variante, suma directo a ella (+1/+5/+10) y registra la entrada; si el código es del producto (o nuevo) y el producto tiene variantes, pregunta **¿a cuál pertenece?** y **guarda el código en esa variante** para la próxima vez. En lote continuo cada fila con variantes tiene un selector «Variante: ¿cuál?» y no se da de alta hasta elegirla.
+- **Validar**: Escanear un código → «Ya está en tu inventario» → elegir «M · Rojo» → +5 → aviso «+5 a M · Rojo · código guardado»; volver a escanear el mismo código → ya viene con la variante elegida.
+
+### 8.8 Excel por variante
+- **Qué**: en Exportar y en «Excel de esta categoría», los productos con variantes salen **una fila por variante** con columnas **Variante**, **Talla**, **Color**… (según los ejes), su stock, su precio propio si lo tiene y su código de barras. Se agrega la hoja **Resumen** (producto, variantes, detalle «M · Rojo (5)», agotadas, stock total, valor de venta).
+- **Validar**: Exportar → abrir el .xlsx → la polera ocupa 3 filas con Talla/Color y stock por fila; hoja «Resumen» al final.
+
+### 8.9 Ventas y movimientos
+- **Qué**: cada movimiento guarda la variante; la lista y «Más vendidos» la muestran («Polera · M · Rojo»).
+- **Validar**: `/movements` → una venta hecha desde la cuadrícula aparece con la variante en violeta.
+
+---
+
 ## 2026-09-14 · Inventario visual, ventas y escáner
 
 ### 7.1 Tarjetas del inventario: sin desborde en el celular (causa raíz)

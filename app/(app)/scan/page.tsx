@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
+import type { Category, FieldTemplate, Product, ProductVariant, ProductData } from "@/types/database";
 import { applyDefaults, fieldLabel, getEffectiveFields, getValue, normalizeFieldName, productTitle } from "@/lib/fields";
 import { cleanCode, scanFrame } from "@/lib/barcode";
 import { categoryPath } from "@/lib/categories";
@@ -15,7 +15,7 @@ import { IconArrowLeft, IconBox, IconCamera, IconCheck, IconChevronRight, IconPl
 
 interface PublicInfo { nombre: string; marca: string; contenido: string; categorias: string[]; imagen: string | null; fuente: string }
 type Found =
-  | { found: "own"; product: Product }
+  | { found: "own"; product: Product; variant?: ProductVariant | null; variants?: ProductVariant[] }
   | { found: "public"; info: PublicInfo; suggestion: { category_id: string; path: string } | null }
   | { found: "none"; info: null; suggestion: null };
 
@@ -25,6 +25,9 @@ interface Row {
   count: number;
   status: "loading" | "own" | "public" | "none";
   product?: Product;
+  /** Variantes del producto conocido y la elegida para este código */
+  variants?: ProductVariant[];
+  variantId?: string | null;
   info?: PublicInfo | null;
   categoryId: string | null;
   nombre: string;
@@ -152,7 +155,7 @@ export default function ScanPage() {
         rs.map((r) => {
           if (r.code !== c) return r;
           if (!json) return { ...r, status: "none" };
-          if (json.found === "own") return { ...r, status: "own", product: json.product, nombre: productTitle(json.product.data) };
+          if (json.found === "own") return { ...r, status: "own", product: json.product, variants: json.variants ?? [], variantId: json.variant?.id ?? null, nombre: productTitle(json.product.data) };
           if (json.found === "public") return { ...r, status: "public", info: json.info, nombre: json.info.nombre, categoryId: json.suggestion?.category_id ?? null };
           return { ...r, status: "none", info: null };
         })
@@ -236,7 +239,33 @@ export default function ScanPage() {
     router.push(`/products/${json.product.id}`);
   }
 
+  /** Suma stock a una variante concreta; si el código no estaba en esa variante, se le asigna para la próxima vez. */
+  async function addVariantStock(v: ProductVariant, n: number, scanned: string): Promise<ProductVariant | null> {
+    const patch: Partial<ProductVariant> = { stock: v.stock + n };
+    if (!v.codigo_barras && scanned) patch.codigo_barras = scanned;
+    const { error } = await supabase.from("product_variants").update(patch).eq("id", v.id);
+    if (error) {
+      toast("error", /product_variants_codigo/.test(error.message) ? "Ese código ya está en otra variante" : error.message);
+      return null;
+    }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    await supabase.from("stock_movements").insert({ user_id: user!.id, product_id: v.product_id, variant_id: v.id, variant_label: v.label, tipo: "entrada", cantidad: n, motivo: "escáner", stock_resultante: v.stock + n });
+    return { ...v, ...patch } as ProductVariant;
+  }
+
   async function addStock(p: Product, n: number) {
+    const own = result?.found === "own" ? result : null;
+    if (own?.variants?.length) {
+      const v = own.variant ?? null;
+      if (!v) return toast("info", "Elige primero a qué variante pertenece este código");
+      const updated = await addVariantStock(v, n, code);
+      if (!updated) return;
+      toast("success", `+${n} a ${v.label}: ${v.stock} → ${updated.stock}${!v.codigo_barras ? " · código guardado en esta variante" : ""}`);
+      setResult({ ...own, variant: updated, variants: own.variants.map((x) => (x.id === updated.id ? updated : x)) });
+      return;
+    }
     const keys = Object.keys(p.data);
     const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => normalizeFieldName(x) === k)).find(Boolean);
     if (!key) return toast("error", "Este producto no tiene un campo de stock");
@@ -249,12 +278,20 @@ export default function ScanPage() {
 
   // ---- lote ----
   const pendingRows = rows.filter((r) => !r.done && r.status !== "loading");
-  const readyRows = pendingRows.filter((r) => r.status === "own" || ((r.categoryId || batchCategory) && r.nombre.trim()));
+  const readyRows = pendingRows.filter((r) => (r.status === "own" ? !r.variants?.length || !!r.variantId : (r.categoryId || batchCategory) && r.nombre.trim()));
 
   async function saveBatch() {
     setBatchBusy(true);
     let ok = 0;
     for (const r of pendingRows) {
+      if (r.status === "own" && r.product && r.variants?.length) {
+        const v = r.variants.find((x) => x.id === r.variantId);
+        if (!v) continue;
+        const updated = await addVariantStock(v, r.count, r.code);
+        setRows((rs) => rs.map((x) => (x.code === r.code ? { ...x, done: updated ? "stock" : "error" } : x)));
+        if (updated) ok++;
+        continue;
+      }
       if (r.status === "own" && r.product) {
         const keys = Object.keys(r.product.data);
         const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => normalizeFieldName(x) === k)).find(Boolean) ?? "stock";
@@ -360,7 +397,20 @@ export default function ScanPage() {
                     {r.status === "loading" ? (
                       <span className="flex items-center gap-2 text-sm text-slate-500"><Spinner size={14} /> consultando…</span>
                     ) : r.status === "own" ? (
-                      <><span className="block truncate font-semibold text-ink">{r.nombre || "Sin nombre"}</span><span className="block text-xs text-amber-700">Ya en inventario → se suma {r.count} al stock</span></>
+                      <>
+                        <span className="block truncate font-semibold text-ink">{r.nombre || "Sin nombre"}</span>
+                        {r.variants?.length ? (
+                          <span className="mt-1 flex items-center gap-1 text-xs">
+                            <span className="text-violet-800">Variante:</span>
+                            <select className="input w-auto py-1 text-xs" value={r.variantId ?? ""} onChange={(e) => setRows((rs) => rs.map((x) => (x.code === r.code ? { ...x, variantId: e.target.value || null } : x)))}>
+                              <option value="">¿cuál?</option>
+                              {r.variants.map((v) => <option key={v.id} value={v.id}>{v.label} ({v.stock})</option>)}
+                            </select>
+                          </span>
+                        ) : (
+                          <span className="block text-xs text-amber-700">Ya en inventario → se suma {r.count} al stock</span>
+                        )}
+                      </>
                     ) : (
                       <>
                         <input className="input py-1.5 text-sm font-semibold" placeholder="Nombre del producto" value={r.nombre} onChange={(e) => setRows((rs) => rs.map((x) => (x.code === r.code ? { ...x, nombre: e.target.value } : x)))} />
@@ -408,7 +458,21 @@ export default function ScanPage() {
                 </span>
                 <IconChevronRight className="text-slate-300" />
               </Link>
-              <p className="text-xs text-slate-500">Stock actual: <b className="text-ink">{String(getValue(result.product.data, "stock") ?? "—")}</b></p>
+              {result.variants?.length ? (
+                <div className="rounded-2xl bg-violet-50 p-3">
+                  <p className="text-xs font-semibold text-violet-900">{result.variant ? `Este código es de la variante ${result.variant.label}` : "Este producto tiene variantes. ¿A cuál pertenece este código?"}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {result.variants.map((v) => (
+                      <button key={v.id} type="button" onClick={() => setResult({ ...result, variant: v })} className={`rounded-full border-2 px-3 py-1 text-sm font-semibold ${result.variant?.id === v.id ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white text-slate-700"}`}>
+                        {v.label} <span className="opacity-70">{v.stock}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {!result.variant && <p className="mt-1 text-[11px] text-violet-800">El código quedará guardado en la variante que elijas.</p>}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">Stock actual: <b className="text-ink">{String(getValue(result.product.data, "stock") ?? "—")}</b></p>
+              )}
               <div className="grid grid-cols-3 gap-2">
                 {[1, 5, 10].map((n) => (
                   <button key={n} onClick={() => addStock((result as { product: Product }).product, n)} className="btn-secondary"><IconPlus size={16} /> {n}</button>

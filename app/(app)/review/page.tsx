@@ -4,11 +4,13 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
+import type { Category, FieldTemplate, Product, ProductData, ProductVariant, VariantAxis } from "@/types/database";
 import { categoryPath, findSibling, findSimilar, nameKey } from "@/lib/categories";
 import { applyDefaults, canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import { useQueue, queueSummary, removeByProductId } from "@/lib/queue";
 import { getPreset } from "@/lib/presets";
+import { axesFor, combos, matchProposals, sameValues, variantLabel } from "@/lib/variants";
+import VariantGrid from "@/components/VariantGrid";
 import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import ProductTable from "@/components/ProductTable";
@@ -68,6 +70,13 @@ function Review() {
   const [openIn, setOpenIn] = useState<{ id: string; nonce: number } | null>(null);
   const [openPicker, setOpenPicker] = useState<{ step: string | null; nonce: number } | null>(null);
   const [reanalyzing, setReanalyzing] = useState(false);
+  // Variantes: ejes de la categoría, opciones marcadas y stock escrito por celda
+  const [axes, setAxes] = useState<VariantAxis[]>([]);
+  const [variantsOn, setVariantsOn] = useState<boolean | null>(null);
+  const [chosen, setChosen] = useState<Record<string, string[]>>({});
+  const [cellStock, setCellStock] = useState<Record<string, string>>({});
+  const [existingVariants, setExistingVariants] = useState<ProductVariant[]>([]);
+  const cellKey = (values: Record<string, string>) => JSON.stringify(Object.keys(values).sort().map((k) => [k, values[k]]));
 
   /** Vuelve a analizar la foto del producto actual (1 petición de IA). */
   async function reanalyze() {
@@ -134,14 +143,16 @@ function Review() {
   const tableView = params.get("view") === "table";
 
   const load = useCallback(async () => {
-    const [c, t, p] = await Promise.all([
+    const [c, t, p, a] = await Promise.all([
       supabase.from("categories").select("*"),
       supabase.from("field_templates").select("*").order("sort_order"),
       supabase.from("products").select("*").eq("status", "draft").order("created_at", { ascending: true }),
+      supabase.from("variant_axes").select("*").order("sort_order"),
     ]);
     setCategories(c.data ?? []);
     setTemplates(t.data ?? []);
     setProducts(p.data ?? []);
+    setAxes((a.data ?? []) as VariantAxis[]);
     setLoading(false);
   }, [supabase]);
 
@@ -166,7 +177,75 @@ function Review() {
     const fields = getEffectiveFields(templates, categories, current.category_id);
     const data = applyDefaults(fields, canonicalizeData(current.data, fields));
     setDraft({ data, categoryId: current.category_id });
+    // Variantes: las ya guardadas (si volvió a este pendiente) o las que propuso la IA
+    setVariantsOn(null);
+    setChosen({});
+    setCellStock({});
+    setExistingVariants([]);
+    supabase
+      .from("product_variants")
+      .select("*")
+      .eq("product_id", current.id)
+      .then(({ data: vs }) => {
+        const list = (vs ?? []) as ProductVariant[];
+        setExistingVariants(list);
+        if (list.length) {
+          const ch: Record<string, string[]> = {};
+          const st: Record<string, string> = {};
+          list.forEach((v) => {
+            Object.entries(v.values).forEach(([k, val]) => {
+              ch[k] = ch[k] ?? [];
+              if (!ch[k].includes(val)) ch[k].push(val);
+            });
+            st[cellKey(v.values)] = String(v.stock);
+          });
+          setChosen(ch);
+          setCellStock(st);
+          setVariantsOn(true);
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, templates, categories]);
+
+  // Ejes de la categoría elegida y propuestas de la IA emparejadas con ellos
+  const axesHere = useMemo(() => (draft ? axesFor(axes, categories, draft.categoryId) : []), [axes, categories, draft]);
+  const proposals = useMemo(() => matchProposals(current?.ai_meta?.variantes_propuestas, axesHere), [current, axesHere]);
+  useEffect(() => {
+    // Si la IA vio variantes y la categoría las maneja, se pre-marcan (solo si el usuario aún no decidió)
+    if (variantsOn === null && axesHere.length && Object.keys(proposals).length && !existingVariants.length) {
+      setChosen(proposals);
+      setVariantsOn(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposals, axesHere.length]);
+  const variantCells = useMemo(() => (variantsOn && axesHere.length ? combos(axesHere, chosen) : []), [variantsOn, axesHere, chosen]);
+  const variantRows = useMemo(
+    () => variantCells.map((values) => ({ values, raw: cellStock[cellKey(values)] ?? "" })).filter((c) => c.raw.trim() !== ""),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [variantCells, cellStock]
+  );
+  const variantTotal = variantRows.reduce((t, c) => t + (parseInt(c.raw, 10) || 0), 0);
+
+  /** Guarda las variantes del producto: crea/actualiza las casillas con stock y borra las que ya no están. */
+  async function saveVariants(productId: string) {
+    if (!axesHere.length) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const keep = new Set<string>();
+    for (const row of variantRows) {
+      const stock = Math.max(0, parseInt(row.raw, 10) || 0);
+      const found = existingVariants.find((v) => sameValues(v.values, row.values));
+      if (found) {
+        keep.add(found.id);
+        if (found.stock !== stock) await supabase.from("product_variants").update({ stock }).eq("id", found.id);
+      } else {
+        await supabase.from("product_variants").insert({ user_id: user!.id, product_id: productId, values: row.values, label: variantLabel(row.values, axesHere), stock });
+      }
+    }
+    const gone = existingVariants.filter((v) => !keep.has(v.id)).map((v) => v.id);
+    if (gone.length) await supabase.from("product_variants").delete().in("id", gone);
+  }
 
   const fields = useMemo(
     () => (draft ? getEffectiveFields(templates, categories, draft.categoryId) : []),
@@ -194,10 +273,19 @@ function Review() {
     setSaving(true);
     const clean: ProductData = { ...draft.data };
     fields.forEach((f) => (clean[f.name] = coerceValue(f, draft.data[f.name])));
+    const withVariants = variantsOn === true && variantRows.length > 0;
+    if (withVariants) {
+      // Con variantes el stock del producto es la suma de sus casillas
+      const stockField = fields.find((f) => /^(stock|cantidad|existencias)$/i.test(f.name));
+      clean[stockField?.name ?? "stock"] = variantTotal;
+    }
+    // Sin variantes: se borran ANTES de guardar, para que el stock escrito a mano no sea pisado por la suma
+    if (!withVariants && existingVariants.length) await supabase.from("product_variants").delete().eq("product_id", current.id);
     const { error } = await supabase
       .from("products")
       .update({ data: clean, category_id: draft.categoryId, status })
       .eq("id", current.id);
+    if (!error && withVariants) await saveVariants(current.id);
     setSaving(false);
     if (error) return toast("error", error.message);
     if (status === "confirmed") {
@@ -503,17 +591,68 @@ function Review() {
             </div>
           )}
 
+          {/* Variantes: solo si la categoría las maneja (talla, color…) */}
+          {axesHere.length > 0 && (
+            <section className="rounded-2xl border-2 border-violet-200 bg-violet-50/40 p-3">
+              <p className="text-sm font-semibold text-violet-900">
+                ¿Viene en varias {axesHere.map((a) => a.label.toLowerCase()).join(" / ")}?
+                {Object.keys(proposals).length > 0 && <span className="ml-1 text-xs font-normal text-violet-700">✨ la IA vio {Object.values(proposals).flat().slice(0, 6).join(", ")}</span>}
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setVariantsOn(true)} className={`rounded-xl border-2 px-3 py-2 text-sm font-semibold ${variantsOn === true ? "border-violet-600 bg-violet-600 text-white" : "border-slate-300 bg-white text-slate-700"}`}>
+                  Sí, tiene variantes
+                </button>
+                <button type="button" onClick={() => setVariantsOn(false)} className={`rounded-xl border-2 px-3 py-2 text-sm font-semibold ${variantsOn === false ? "border-slate-700 bg-slate-700 text-white" : "border-slate-300 bg-white text-slate-700"}`}>
+                  No, es único
+                </button>
+              </div>
+              {variantsOn === true && (
+                <div className="mt-3">
+                  <VariantGrid
+                    axes={axesHere}
+                    chosen={chosen}
+                    onChosen={setChosen}
+                    suggested={proposals}
+                    getCell={(values) => {
+                      const raw = cellStock[cellKey(values)] ?? "";
+                      return { exists: raw.trim() !== "", stock: raw === "" ? null : raw };
+                    }}
+                    onStockInput={(values, raw) => setCellStock((m) => ({ ...m, [cellKey(values)]: raw }))}
+                  />
+                  <p className="mt-2 text-sm text-violet-900">
+                    Stock total: <b>{variantTotal}</b> en <b>{variantRows.length}</b> variante{variantRows.length === 1 ? "" : "s"}
+                    {variantCells.length > 0 && variantRows.length === 0 && <span className="text-xs text-amber-700"> · escribe el stock en las casillas</span>}
+                  </p>
+                </div>
+              )}
+            </section>
+          )}
+          {axesHere.length === 0 && draft.categoryId && current.ai_meta?.variantes_propuestas && Object.keys(current.ai_meta.variantes_propuestas).length > 0 && (
+            <p className="rounded-2xl bg-violet-50 p-3 text-xs text-violet-900">
+              ✨ La IA vio varias opciones ({Object.values(current.ai_meta.variantes_propuestas).flat().slice(0, 6).join(", ")}). Para llevar el stock de cada una, agrega variantes a <b>{topOfCurrent?.name}</b> en{" "}
+              <Link href="/store" className="font-semibold underline">Mi tienda</Link>.
+            </p>
+          )}
+
           {/* Precio y stock: lo que completa el usuario, grande */}
           {keyFields.length > 0 && (
             <section>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Completa tú</p>
               <div className="grid grid-cols-2 gap-3">
-                {keyFields.map((f) => (
-                  <div key={f.id} className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
-                    <label className="label mb-1">{fieldLabel(f.name)}</label>
-                    <FieldInput field={f} value={draft.data[f.name]} onChange={(v) => setValue(f, v)} className="input-lg text-2xl tabular-nums" />
-                  </div>
-                ))}
+                {keyFields.map((f) =>
+                  variantsOn === true && variantRows.length > 0 && /^(stock|cantidad|existencias)$/i.test(f.name) ? (
+                    <div key={f.id} className="rounded-2xl bg-violet-50 p-3 ring-1 ring-violet-200">
+                      <label className="label mb-1">{fieldLabel(f.name)}</label>
+                      <p className="text-2xl font-bold tabular-nums text-violet-900">{variantTotal}</p>
+                      <p className="text-[11px] text-violet-700">suma de las variantes</p>
+                    </div>
+                  ) : (
+                    <div key={f.id} className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+                      <label className="label mb-1">{fieldLabel(f.name)}</label>
+                      <FieldInput field={f} value={draft.data[f.name]} onChange={(v) => setValue(f, v)} className="input-lg text-2xl tabular-nums" />
+                    </div>
+                  )
+                )}
               </div>
             </section>
           )}

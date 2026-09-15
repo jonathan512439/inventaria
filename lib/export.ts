@@ -1,7 +1,7 @@
 "use client";
 
 import * as XLSX from "xlsx";
-import type { Category, FieldTemplate, Product } from "@/types/database";
+import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { fieldLabel, getEffectiveFields, getValue, normalizeFieldName } from "./fields";
 
 interface ExportArgs {
@@ -12,7 +12,13 @@ interface ExportArgs {
   fileName?: string;
   /** Una hoja por categoría principal (con columna Subcategoría) o una sola hoja con todo */
   sheetPerCategory?: boolean;
+  /** Variantes: una fila por variante (Talla, Color… con su stock y código) + hoja Resumen */
+  variants?: ProductVariant[];
+  axes?: VariantAxis[];
 }
+
+const CODE_KEYS = ["codigo_barras", "codigo", "sku", "barcode", "ean"];
+const hasCodeCol = (cols: { key: string }[]) => cols.some((c) => CODE_KEYS.includes(normalizeFieldName(c.key)));
 
 /** Columnas de datos a exportar para un conjunto de productos: los datos definidos + cualquier clave presente. */
 function columnsFor(products: Product[], categories: Category[], templates: FieldTemplate[]): { key: string; label: string; numeric: boolean }[] {
@@ -50,7 +56,7 @@ function toCell(v: unknown, numeric: boolean): string | number {
   return typeof v === "number" ? v : String(v);
 }
 
-function rowFor(p: Product, cols: ReturnType<typeof columnsFor>, categories: Category[]) {
+function rowFor(p: Product, cols: ReturnType<typeof columnsFor>, categories: Category[], v?: ProductVariant, axisLabels?: Map<string, string>) {
   const { top, sub } = topAndSub(categories, p.category_id);
   const row: Record<string, string | number> = {
     Categoría: top || "Sin categoría",
@@ -58,6 +64,20 @@ function rowFor(p: Product, cols: ReturnType<typeof columnsFor>, categories: Cat
     Estado: p.status === "draft" ? "Pendiente" : "En inventario",
   };
   cols.forEach((c) => (row[c.label] = toCell(getValue(p.data, c.key), c.numeric)));
+  if (axisLabels) {
+    row.Variante = v?.label ?? "";
+    axisLabels.forEach((label, key) => (row[label] = v?.values[key] ?? ""));
+    if (!hasCodeCol(cols)) row["Código de barras"] = v?.codigo_barras ?? "";
+    if (v) {
+      // La variante manda: su stock, su precio (si tiene) y su código
+      cols.forEach((c) => {
+        const n = normalizeFieldName(c.key);
+        if (["stock", "cantidad", "existencias"].includes(n)) row[c.label] = v.stock;
+        if (["precio", "precio_venta", "price"].includes(n) && v.precio !== null) row[c.label] = v.precio;
+        if (CODE_KEYS.includes(n) && v.codigo_barras) row[c.label] = v.codigo_barras;
+      });
+    }
+  }
   row["Etiqueta leída"] = p.ai_meta?.etiqueta ?? "";
   row["Modelo IA"] = p.ai_meta?.modelo ?? "";
   row.Foto = p.image_url ?? "";
@@ -72,9 +92,23 @@ function autoWidth(rows: Record<string, unknown>[], headers: string[]) {
 }
 
 /** Genera y descarga un .xlsx en el navegador con las columnas definidas por el usuario. */
-export function exportToExcel({ products, categories, templates, fileName = "inventario", sheetPerCategory = false }: ExportArgs) {
+export function exportToExcel({ products, categories, templates, fileName = "inventario", sheetPerCategory = false, variants = [], axes = [] }: ExportArgs) {
   const wb = XLSX.utils.book_new();
   const usedNames = new Set<string>();
+  const variantsOf = new Map<string, ProductVariant[]>();
+  variants.forEach((v) => variantsOf.set(v.product_id, [...(variantsOf.get(v.product_id) ?? []), v]));
+  const hasVariants = products.some((p) => variantsOf.has(p.id));
+  // Columnas por eje (Talla, Color…) presentes en las variantes exportadas
+  const axisLabels = new Map<string, string>();
+  if (hasVariants) {
+    products.forEach((p) =>
+      (variantsOf.get(p.id) ?? []).forEach((v) =>
+        Object.keys(v.values).forEach((k) => {
+          if (!axisLabels.has(k)) axisLabels.set(k, axes.find((a) => a.key === k)?.label ?? k[0].toUpperCase() + k.slice(1));
+        })
+      )
+    );
+  }
 
   const safeSheetName = (name: string) => {
     const base = name.replace(/[\\/?*[\]:]/g, " ").slice(0, 28) || "Hoja";
@@ -87,8 +121,13 @@ export function exportToExcel({ products, categories, templates, fileName = "inv
 
   const addSheet = (name: string, list: Product[]) => {
     const cols = columnsFor(list, categories, templates);
-    const headers = ["Categoría", "Subcategoría", "Estado", ...cols.map((c) => c.label), "Etiqueta leída", "Modelo IA", "Foto", "Creado"];
-    const rows = list.map((p) => rowFor(p, cols, categories));
+    const extra = hasVariants ? ["Variante", ...Array.from(axisLabels.values()), ...(hasCodeCol(cols) ? [] : ["Código de barras"])] : [];
+    const headers = ["Categoría", "Subcategoría", "Estado", ...cols.map((c) => c.label), ...extra, "Etiqueta leída", "Modelo IA", "Foto", "Creado"];
+    // Una fila por variante; el producto sin variantes va en una sola fila
+    const rows = list.flatMap((p) => {
+      const vs = variantsOf.get(p.id);
+      return vs?.length ? vs.map((v) => rowFor(p, cols, categories, v, axisLabels)) : [rowFor(p, cols, categories, undefined, hasVariants ? axisLabels : undefined)];
+    });
     const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
     ws["!cols"] = autoWidth(rows, headers);
     ws["!autofilter"] = { ref: `A1:${XLSX.utils.encode_col(headers.length - 1)}${rows.length + 1}` };
@@ -108,6 +147,30 @@ export function exportToExcel({ products, categories, templates, fileName = "inv
       .forEach(([name, list]) => addSheet(name, list));
   } else {
     addSheet("Inventario", products);
+  }
+
+  if (hasVariants) {
+    // Hoja Resumen: una fila por producto con sus variantes y stock total
+    const rows = products.map((p) => {
+      const { top, sub } = topAndSub(categories, p.category_id);
+      const vs = variantsOf.get(p.id) ?? [];
+      const stock = vs.length ? vs.reduce((s, v) => s + v.stock, 0) : Number(getValue(p.data, "stock") ?? 0) || 0;
+      const price = Number(getValue(p.data, "precio") ?? 0) || 0;
+      return {
+        Producto: String(getValue(p.data, "nombre") ?? ""),
+        Categoría: top || "Sin categoría",
+        Subcategoría: sub,
+        Variantes: vs.length,
+        Detalle: vs.map((v) => `${v.label} (${v.stock})`).join(", "),
+        Agotadas: vs.filter((v) => v.stock <= 0).map((v) => v.label).join(", "),
+        "Stock total": stock,
+        "Valor de venta": Math.round(stock * price * 100) / 100,
+      };
+    });
+    const headers = ["Producto", "Categoría", "Subcategoría", "Variantes", "Detalle", "Agotadas", "Stock total", "Valor de venta"];
+    const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+    ws["!cols"] = autoWidth(rows, headers);
+    XLSX.utils.book_append_sheet(wb, ws, safeSheetName("Resumen"));
   }
 
   if (wb.SheetNames.length === 0) {

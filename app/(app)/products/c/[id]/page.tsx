@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, FieldTemplate, Product } from "@/types/database";
+import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { getDescendantIds } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import { categoryColor } from "@/lib/colors";
@@ -36,15 +36,27 @@ export default function CategoryInventoryPage() {
   const [view, setView] = useState<"list" | "table">("list");
   const [limit, setLimit] = useState(40);
   const [adjusting, setAdjusting] = useState<Product | null>(null);
+  const [axes, setAxes] = useState<VariantAxis[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const variantsOf = useMemo(() => {
+    const m = new Map<string, ProductVariant[]>();
+    variants.forEach((v) => m.set(v.product_id, [...(m.get(v.product_id) ?? []), v]));
+    return m;
+  }, [variants]);
 
   const isOrphan = id === "none";
 
   useEffect(() => {
     (async () => {
-      const [c, t] = await Promise.all([supabase.from("categories").select("*"), supabase.from("field_templates").select("*").order("sort_order")]);
+      const [c, t, a] = await Promise.all([
+        supabase.from("categories").select("*"),
+        supabase.from("field_templates").select("*").order("sort_order"),
+        supabase.from("variant_axes").select("*").order("sort_order"),
+      ]);
       const cats = c.data ?? [];
       setCategories(cats);
       setTemplates(t.data ?? []);
+      setAxes((a.data ?? []) as VariantAxis[]);
       let query = supabase.from("products").select("*").eq("status", "confirmed").order("updated_at", { ascending: false });
       if (isOrphan) {
         const valid = cats.map((x) => x.id);
@@ -53,8 +65,13 @@ export default function CategoryInventoryPage() {
         query = query.in("category_id", getDescendantIds(cats, id));
       }
       const { data } = await query;
-      setProducts((data ?? []) as Product[]);
+      const list = (data ?? []) as Product[];
+      setProducts(list);
       setLoading(false);
+      if (list.length) {
+        const { data: vs } = await supabase.from("product_variants").select("*").in("product_id", list.map((p) => p.id)).order("created_at");
+        setVariants((vs ?? []) as ProductVariant[]);
+      }
     })();
   }, [supabase, id, isOrphan]);
 
@@ -71,7 +88,7 @@ export default function CategoryInventoryPage() {
   };
   const inTop = useMemo(() => (top ? products.filter((p) => p.category_id && getDescendantIds(categories, top.id).includes(p.category_id)) : products), [products, categories, top]);
   const scoped = useMemo(() => (sub ? inTop.filter((p) => p.category_id && getDescendantIds(categories, sub).includes(p.category_id)) : inTop), [inTop, sub, categories]);
-  const visible = useMemo(() => applyFilters(scoped, filters), [scoped, filters]);
+  const visible = useMemo(() => applyFilters(scoped, filters, variantsOf), [scoped, filters, variantsOf]);
   const col = categoryColor(top?.name);
   const toggleFilter = (k: Filter) =>
     setFilters((s) => {
@@ -95,7 +112,7 @@ export default function CategoryInventoryPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => exportToExcel({ products: visible, categories, templates, fileName: title.toLowerCase().replace(/\s+/g, "-") })} className="btn-secondary btn-sm" disabled={!visible.length}>
+            <button onClick={() => exportToExcel({ products: visible, categories, templates, fileName: title.toLowerCase().replace(/\s+/g, "-"), variants, axes })} className="btn-secondary btn-sm" disabled={!visible.length}>
               <IconDownload size={16} /> Excel de {sub ? "esta subcategoría" : title}
             </button>
             <button onClick={() => setView(view === "list" ? "table" : "list")} className="btn-secondary btn-sm hidden md:inline-flex">
@@ -141,7 +158,7 @@ export default function CategoryInventoryPage() {
         <>
           <ul className="stagger grid w-full grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
             {visible.slice(0, limit).map((p) => (
-              <ProductRow key={p.id} product={p} categories={categories} templates={templates} showSub={!sub} onAdjust={setAdjusting} />
+              <ProductRow key={p.id} product={p} categories={categories} templates={templates} showSub={!sub} variants={variantsOf.get(p.id)} axes={axes} onAdjust={setAdjusting} />
             ))}
           </ul>
           {visible.length > limit && (
@@ -153,8 +170,12 @@ export default function CategoryInventoryPage() {
       {adjusting && (
         <StockAdjust
           product={adjusting}
+          variants={variantsOf.get(adjusting.id)}
           onClose={() => setAdjusting(null)}
-          onSaved={(u) => setProducts((ps) => ps.map((x) => (x.id === u.id ? u : x)))}
+          onSaved={(u, v) => {
+            setProducts((ps) => ps.map((x) => (x.id === u.id ? u : x)));
+            if (v) setVariants((vs) => vs.map((x) => (x.id === v.id ? v : x)));
+          }}
         />
       )}
     </div>

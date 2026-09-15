@@ -16,6 +16,7 @@ import { PRESETS } from "@/lib/presets";
 import { logUsage } from "@/lib/aiUsage";
 import { getEffectiveFields, coerceValue, applyDefaults } from "@/lib/fields";
 import { categoryPath } from "@/lib/categories";
+import { parseProposals } from "@/lib/variants";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
 
 export const runtime = "edge";
@@ -170,6 +171,9 @@ export async function POST(request: Request) {
   }
   const etiqueta = String(result[META_KEYS.etiqueta] ?? "").trim();
   if (etiqueta) aiMeta.etiqueta = etiqueta.slice(0, 500);
+  // Variantes leídas de la foto: solo una propuesta; el usuario las confirma en Revisar
+  const proposals = parseProposals(String(result[META_KEYS.variantes] ?? ""));
+  if (Object.keys(proposals).length) aiMeta.variantes_propuestas = proposals;
 
   // 4. Datos: guardamos TODO lo que la IA devolvió (así no se pierde si el usuario cambia la subcategoría)
   //    y completamos los campos de la subcategoría final con sus valores por defecto.

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, FieldTemplate, Product, ProductData } from "@/types/database";
+import type { Category, FieldTemplate, Product, ProductData, ProductVariant, VariantAxis } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import CategoryPicker from "@/components/CategoryPicker";
@@ -12,6 +12,7 @@ import FieldInput from "@/components/FieldInput";
 import { IconArrowLeft, IconCheck, IconEdit, IconRefresh, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
 import { useToast } from "@/components/ui/Toast";
 import StockAdjust from "@/components/StockAdjust";
+import ProductVariants from "@/components/ProductVariants";
 import { fmtMoney } from "@/lib/inventory";
 import type { StockMovement } from "@/types/database";
 
@@ -32,6 +33,8 @@ export default function ProductDetailPage() {
   const [reanalyzing, setReanalyzing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [axes, setAxes] = useState<VariantAxis[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
   const toast = useToast();
 
   /** Vuelve a analizar la foto con la IA (1 petición). Conserva precio, stock y datos manuales. */
@@ -56,13 +59,17 @@ export default function ProductDetailPage() {
   }
 
   const load = useCallback(async () => {
-    const [p, c, t] = await Promise.all([
+    const [p, c, t, a, v] = await Promise.all([
       supabase.from("products").select("*").eq("id", id).maybeSingle(),
       supabase.from("categories").select("*"),
       supabase.from("field_templates").select("*").order("sort_order"),
+      supabase.from("variant_axes").select("*").order("sort_order"),
+      supabase.from("product_variants").select("*").eq("product_id", id).order("created_at"),
     ]);
     setCategories(c.data ?? []);
     setTemplates(t.data ?? []);
+    setAxes((a.data ?? []) as VariantAxis[]);
+    setVariants((v.data ?? []) as ProductVariant[]);
     supabase.from("stock_movements").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(8).then(({ data }) => setMovements((data ?? []) as StockMovement[]));
     if (!p.data) setNotFound(true);
     else {
@@ -87,6 +94,10 @@ export default function ProductDetailPage() {
     setError(null);
     const clean: ProductData = { ...data };
     fields.forEach((f) => (clean[f.name] = coerceValue(f, data[f.name])));
+    if (variants.length) {
+      const stockField = fields.find((f) => /^(stock|cantidad|existencias)$/i.test(f.name));
+      clean[stockField?.name ?? "stock"] = variants.reduce((t, v) => t + v.stock, 0);
+    }
     const { error } = await supabase
       .from("products")
       .update({ data: clean, category_id: categoryId, ...(status ? { status } : {}) })
@@ -151,6 +162,7 @@ export default function ProductDetailPage() {
             <IconCheck size={18} /> +/− Stock: sumar, vender o retirar
             <span className="ml-auto text-xs font-normal opacity-80">sin editar el producto</span>
           </button>
+          <ProductVariants product={{ ...product, data }} categories={categories} axes={axes} variants={variants} onChanged={load} />
           {movements.length > 0 && (
             <div className="rounded-2xl border-2 border-slate-200 p-3">
               <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Últimos movimientos</p>
@@ -158,7 +170,7 @@ export default function ProductDetailPage() {
                 {movements.map((m) => (
                   <li key={m.id} className="flex items-center gap-2">
                     <span className={`w-14 shrink-0 rounded-full px-1.5 py-0.5 text-center font-bold ${m.tipo === "venta" ? "bg-emerald-100 text-emerald-800" : m.tipo === "entrada" ? "bg-brand-100 text-brand-800" : "bg-slate-200 text-slate-700"}`}>{m.tipo === "venta" ? "venta" : m.tipo === "entrada" ? "entrada" : "retiro"}</span>
-                    <span className="flex-1 text-slate-600">{new Date(m.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}{m.motivo ? ` · ${m.motivo}` : ""}</span>
+                    <span className="flex-1 text-slate-600">{new Date(m.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}{m.variant_label ? ` · ${m.variant_label}` : ""}{m.motivo ? ` · ${m.motivo}` : ""}</span>
                     <span className="font-bold tabular-nums text-ink">{m.tipo === "entrada" ? "+" : "−"}{m.cantidad}</span>
                     {m.tipo === "venta" && <span className="font-semibold text-emerald-700">Bs {fmtMoney(m.total ?? 0)}</span>}
                   </li>
@@ -200,14 +212,23 @@ export default function ProductDetailPage() {
             <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} onCategoriesChange={setCategories} emptyLabel="Sin categoría" />
           </div>
 
-          {fields.map((f) => (
-            <div key={f.id}>
-              <label className="label flex items-center gap-1">
-                {fieldLabel(f.name)} {f.is_ai_fillable && <IconSparkles size={12} className="text-brand-500" />}
-              </label>
-              <FieldInput field={f} value={data[f.name]} onChange={(v) => setData({ ...data, [f.name]: v })} />
-            </div>
-          ))}
+          {fields.map((f) =>
+            variants.length > 0 && /^(stock|cantidad|existencias)$/i.test(f.name) ? (
+              <div key={f.id}>
+                <label className="label">{fieldLabel(f.name)}</label>
+                <p className="rounded-xl bg-violet-50 px-3 py-2 text-lg font-bold tabular-nums text-violet-900">
+                  {variants.reduce((t, v) => t + v.stock, 0)} <span className="text-xs font-normal text-violet-700">· suma de las variantes (se cambia desde la cuadrícula)</span>
+                </p>
+              </div>
+            ) : (
+              <div key={f.id}>
+                <label className="label flex items-center gap-1">
+                  {fieldLabel(f.name)} {f.is_ai_fillable && <IconSparkles size={12} className="text-brand-500" />}
+                </label>
+                <FieldInput field={f} value={data[f.name]} onChange={(v) => setData({ ...data, [f.name]: v })} />
+              </div>
+            )
+          )}
 
           {orphanKeys.length > 0 && (
             <details className="text-xs text-slate-500">
@@ -263,6 +284,7 @@ export default function ProductDetailPage() {
       {adjusting && product && (
         <StockAdjust
           product={{ ...product, data }}
+          variants={variants}
           onClose={() => setAdjusting(false)}
           onSaved={() => load()}
         />

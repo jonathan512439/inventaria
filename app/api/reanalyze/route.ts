@@ -16,6 +16,7 @@ import { PRESETS } from "@/lib/presets";
 import { logUsage } from "@/lib/aiUsage";
 import { applyDefaults, coerceValue, getEffectiveFields } from "@/lib/fields";
 import { categoryPath } from "@/lib/categories";
+import { parseProposals } from "@/lib/variants";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
 
 export const runtime = "edge";
@@ -127,6 +128,8 @@ export async function POST(request: Request) {
   }
   const etiqueta = String(result[META_KEYS.etiqueta] ?? "").trim();
   if (etiqueta) aiMeta.etiqueta = etiqueta.slice(0, 500);
+  const proposals = parseProposals(String(result[META_KEYS.variantes] ?? ""));
+  if (Object.keys(proposals).length) aiMeta.variantes_propuestas = proposals;
 
   // Datos: se respetan los manuales (precio, stock…) y se reemplazan los de la IA
   const NA = /^(no aplica|n\/a|na|no determinado|desconocido|ninguno|ninguna|-|—)$/i;

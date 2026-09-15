@@ -37,6 +37,7 @@ export const META_KEYS = {
   catalogo: "__catalogo_sugerido",
   categoriaGeneral: "__categoria_general_nueva",
   etiqueta: "__etiqueta",
+  variantes: "__variantes",
 } as const;
 
 /** Opción cuando ningún catálogo preconfigurado sirve. */
@@ -91,6 +92,12 @@ export function buildResponseSchema(fields: FieldTemplate[], ctx: PromptContext)
     description: "Todo el texto legible en el producto/etiqueta/empaque: marca, modelo, talla, código de barras o SKU, precio impreso, contenido. Cadena vacía si no hay texto.",
   };
   order.push(META_KEYS.etiqueta);
+  properties[META_KEYS.variantes] = {
+    type: "STRING",
+    description:
+      'Variantes VISIBLES del producto (tallas, colores, edades, sabores) en formato "talla: S, M, L; color: rojo, azul". Solo lo que se ve o se lee; cadena vacía si es un producto único o no se distingue.',
+  };
+  order.push(META_KEYS.variantes);
 
   for (const f of fields) {
     if (f.field_type === "number") {
@@ -136,6 +143,7 @@ export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string
     "Si un campo pertenece a otro tipo de producto y no tiene sentido para este (p. ej. talla_casco en una bebida), déjalo vacío; nunca escribas 'No aplica'.",
     'Para "nombre" usa un nombre comercial corto y útil para buscar (marca + producto + variante, máx. 8 palabras). Para "descripcion" 1-2 frases concretas.',
     catLine,
+    `Si en la foto se ven varias tallas, colores o edades del MISMO producto (etiqueta con S/M/L, prendas iguales de varios colores, caja "3-5 años"), enuméralas en "${META_KEYS.variantes}" con el formato "eje: valor, valor; eje: valor". Nunca inventes variantes que no se vean.`,
     "Prefiere SIEMPRE una subcategoría existente aunque no sea perfecta; propón una nueva solo si ninguna tiene relación. Las subcategorías nuevas deben ser genéricas (agrupan muchos productos), nunca el nombre de un producto.",
     catalogLine,
     `Campos a completar:\n${fieldList}`,

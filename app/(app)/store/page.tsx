@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, FieldTemplate } from "@/types/database";
+import type { Category, FieldTemplate, VariantAxis } from "@/types/database";
 import { getEffectiveFields, fieldLabel } from "@/lib/fields";
 import PresetPicker from "@/components/PresetPicker";
+import AxisEditor from "@/components/AxisEditor";
+import { PRESETS } from "@/lib/presets";
 import { useToast } from "@/components/ui/Toast";
 import { IconArrowLeft, IconChevronRight, IconPlus, IconSparkles, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 import { categoryColor } from "@/lib/colors";
@@ -20,6 +22,7 @@ export default function StorePage() {
   const toast = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
+  const [axes, setAxes] = useState<VariantAxis[]>([]);
   const [counts, setCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -41,13 +44,15 @@ export default function StorePage() {
   }
 
   const load = useCallback(async () => {
-    const [c, t, p] = await Promise.all([
+    const [c, t, p, a] = await Promise.all([
       supabase.from("categories").select("*").order("name"),
       supabase.from("field_templates").select("*").order("sort_order"),
       supabase.from("products").select("category_id"),
+      supabase.from("variant_axes").select("*").order("sort_order"),
     ]);
     setCategories(c.data ?? []);
     setTemplates(t.data ?? []);
+    setAxes((a.data ?? []) as VariantAxis[]);
     const m = new Map<string, number>();
     (p.data ?? []).forEach((x) => x.category_id && m.set(x.category_id, (m.get(x.category_id) ?? 0) + 1));
     setCounts(m);
@@ -194,6 +199,8 @@ export default function StorePage() {
                     Ajustar datos <IconChevronRight size={12} />
                   </Link>
                 </div>
+
+                <AxisEditor categoryId={t.id} axes={axes.filter((a) => a.category_id === t.id)} suggested={PRESETS.find((p) => p.name.toLowerCase() === t.name.toLowerCase())?.axes} onChanged={load} />
               </section>
             );
           })}

@@ -40,12 +40,41 @@ export type StockMovement = {
   user_id: string;
   product_id: string | null;
   product_name: string | null;
+  variant_id: string | null;
+  variant_label: string | null;
   tipo: MovementType;
   cantidad: number;
   precio_unitario: number | null;
   total: number | null;
   motivo: string | null;
   stock_resultante: number | null;
+  created_at: string;
+};
+
+/** Eje de variación de una categoría principal: talla, color, edad… (máx. 3 por categoría) */
+export type VariantAxis = {
+  id: string;
+  user_id: string;
+  category_id: string;
+  key: string; // 'talla'
+  label: string; // 'Talla'
+  options: string[]; // sugeridas; vacío = libre
+  sort_order: number;
+  created_at: string;
+};
+
+/** Una combinación concreta ("M · Rojo") con su propio stock, precio y código. */
+export type ProductVariant = {
+  id: string;
+  user_id: string;
+  product_id: string;
+  values: Record<string, string>; // {"talla":"M","color":"Rojo"}
+  label: string;
+  codigo_barras: string | null;
+  precio: number | null; // nulo = el del producto
+  costo: number | null;
+  stock: number;
+  visible: boolean;
   created_at: string;
 };
 
@@ -67,6 +96,7 @@ export type AiMeta = {
   categoria_nueva_general?: string | null; // nombre de una categoría (nivel superior) nueva si ningún catálogo encaja
   etiqueta?: string | null; // texto visible: marca, modelo, código, precio impreso
   modelo?: string | null; // modelo de Gemini usado
+  variantes_propuestas?: Record<string, string[]> | null; // {"talla":["S","M","L"],"color":["Rojo"]} leídas de la foto; solo propuesta
 };
 
 export type Product = {
@@ -113,7 +143,7 @@ export interface Database {
       };
       stock_movements: {
         Row: StockMovement;
-        Insert: Omit<StockMovement, "id" | "created_at" | "precio_unitario" | "total" | "motivo" | "stock_resultante" | "product_name"> & {
+        Insert: Omit<StockMovement, "id" | "created_at" | "precio_unitario" | "total" | "motivo" | "stock_resultante" | "product_name" | "variant_id" | "variant_label"> & {
           id?: number;
           created_at?: string;
           precio_unitario?: number | null;
@@ -121,8 +151,30 @@ export interface Database {
           motivo?: string | null;
           stock_resultante?: number | null;
           product_name?: string | null;
+          variant_id?: string | null;
+          variant_label?: string | null;
         };
         Update: Partial<StockMovement>;
+        Relationships: [];
+      };
+      variant_axes: {
+        Row: VariantAxis;
+        Insert: Omit<VariantAxis, "id" | "created_at" | "options" | "sort_order"> & { id?: string; created_at?: string; options?: string[]; sort_order?: number };
+        Update: Partial<VariantAxis>;
+        Relationships: [];
+      };
+      product_variants: {
+        Row: ProductVariant;
+        Insert: Omit<ProductVariant, "id" | "created_at" | "codigo_barras" | "precio" | "costo" | "stock" | "visible"> & {
+          id?: string;
+          created_at?: string;
+          codigo_barras?: string | null;
+          precio?: number | null;
+          costo?: number | null;
+          stock?: number;
+          visible?: boolean;
+        };
+        Update: Partial<ProductVariant>;
         Relationships: [];
       };
       ai_usage: {

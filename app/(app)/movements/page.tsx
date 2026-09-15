@@ -62,8 +62,8 @@ export default function MovementsPage() {
   // Más vendido del periodo
   const byProduct = new Map<string, { name: string; qty: number; total: number }>();
   sales.forEach((r) => {
-    const k = r.product_id ?? r.product_name ?? "?";
-    const cur = byProduct.get(k) ?? { name: r.product_name ?? "Producto", qty: 0, total: 0 };
+    const k = (r.product_id ?? r.product_name ?? "?") + (r.variant_id ? `#${r.variant_id}` : "");
+    const cur = byProduct.get(k) ?? { name: (r.product_name ?? "Producto") + (r.variant_label ? ` · ${r.variant_label}` : ""), qty: 0, total: 0 };
     cur.qty += r.cantidad;
     cur.total += r.total ?? 0;
     byProduct.set(k, cur);
@@ -141,6 +141,7 @@ export default function MovementsPage() {
                   )}
                   <span className="block text-xs text-slate-500">
                     {new Date(r.created_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    {r.variant_label ? <> · <b className="text-violet-800">{r.variant_label}</b></> : null}
                     {r.motivo ? ` · ${r.motivo}` : ""}
                     {r.stock_resultante !== null ? ` · quedó en ${r.stock_resultante}` : ""}
                   </span>

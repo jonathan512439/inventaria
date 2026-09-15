@@ -12,6 +12,12 @@ export interface PresetField {
   default_value?: string;
 }
 
+export interface PresetAxis {
+  key: string;
+  label: string;
+  options: string[];
+}
+
 export interface Preset {
   id: string;
   name: string;
@@ -19,6 +25,8 @@ export interface Preset {
   description: string;
   sections: string[];
   fields: PresetField[];
+  /** Ejes de variación típicos (talla, color…): cada combinación tendrá su propio stock */
+  axes?: PresetAxis[];
 }
 
 /** Datos comunes a todos las categorías (primero los que llena la IA, luego los del usuario). */
@@ -36,14 +44,18 @@ const BASE_USER: PresetField[] = [
   { name: "stock", field_type: "number", is_ai_fillable: false, default_value: "1" },
 ];
 
-const p = (id: string, name: string, icon: string, description: string, sections: string[], extraAi: PresetField[] = [], extraUser: PresetField[] = []): Preset => ({
+const p = (id: string, name: string, icon: string, description: string, sections: string[], extraAi: PresetField[] = [], extraUser: PresetField[] = [], axes?: PresetAxis[]): Preset => ({
   id,
   name,
   icon,
   description,
   sections,
   fields: [...BASE_AI, ...extraAi, ...BASE_USER, ...extraUser],
+  axes,
 });
+
+const TALLA_ROPA: PresetAxis = { key: "talla", label: "Talla", options: ["XS", "S", "M", "L", "XL", "XXL"] };
+const COLOR: PresetAxis = { key: "color", label: "Color", options: ["Negro", "Blanco", "Rojo", "Azul", "Verde", "Amarillo", "Gris", "Rosado", "Beige", "Café"] };
 
 export const PRESETS: Preset[] = [
   p("libreria", "Librería y papelería", "📚", "Cuadernos, útiles, papel, arte y oficina",
@@ -52,12 +64,14 @@ export const PRESETS: Preset[] = [
     [{ name: "unidades_por_paquete", field_type: "number", is_ai_fillable: false, default_value: "1" }]),
   p("ropa", "Ropa", "👕", "Prendas para dama, caballero y niños",
     ["Dama", "Caballero", "Niños", "Ropa interior", "Deportiva", "Accesorios"],
-    [{ name: "color", field_type: "text", is_ai_fillable: true }, { name: "tipo_prenda", field_type: "text", is_ai_fillable: true }, { name: "material", field_type: "text", is_ai_fillable: true }],
-    [{ name: "talla", field_type: "select", is_ai_fillable: true, options: ["XS", "S", "M", "L", "XL", "XXL", "Única"] }]),
+    [{ name: "tipo_prenda", field_type: "text", is_ai_fillable: true }, { name: "material", field_type: "text", is_ai_fillable: true }],
+    [],
+    [TALLA_ROPA, COLOR]),
   p("calzado", "Calzado", "👟", "Zapatos, zapatillas, sandalias",
     ["Dama", "Caballero", "Niños", "Deportivo", "Sandalias", "Botas"],
-    [{ name: "color", field_type: "text", is_ai_fillable: true }, { name: "material", field_type: "text", is_ai_fillable: true }],
-    [{ name: "talla", field_type: "number", is_ai_fillable: false }]),
+    [{ name: "material", field_type: "text", is_ai_fillable: true }],
+    [],
+    [{ key: "talla", label: "Talla", options: ["34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44"] }, COLOR]),
   p("bebidas", "Bebidas", "🥤", "Gaseosas, agua, jugos, cerveza, licores",
     ["Gaseosas", "Agua", "Jugos y néctares", "Energizantes", "Cerveza", "Vinos y licores", "Lácteos"],
     [{ name: "sabor", field_type: "text", is_ai_fillable: true }, { name: "volumen", field_type: "text", is_ai_fillable: true }],
@@ -86,7 +100,9 @@ export const PRESETS: Preset[] = [
     [{ name: "garantia_meses", field_type: "number", is_ai_fillable: false }]),
   p("jugueteria", "Juguetería", "🧸", "Juguetes por edad y tipo",
     ["Bebés", "Muñecas y figuras", "Vehículos", "Juegos de mesa", "Educativos", "Aire libre", "Peluches"],
-    [{ name: "color", field_type: "text", is_ai_fillable: true }, { name: "edad_recomendada", field_type: "text", is_ai_fillable: true }]),
+    [{ name: "color", field_type: "text", is_ai_fillable: true }, { name: "edad_recomendada", field_type: "text", is_ai_fillable: true }],
+    [],
+    [{ key: "edad", label: "Edad", options: ["0-12 meses", "1-2 años", "3-5 años", "6-8 años", "9-12 años", "+12 años"] }]),
   p("repuestos", "Repuestos y autopartes", "🏍️", "Piezas para auto y moto, lubricantes",
     ["Motor", "Frenos", "Suspensión", "Eléctrico", "Lubricantes y filtros", "Llantas", "Accesorios"],
     [{ name: "modelo", field_type: "text", is_ai_fillable: true }, { name: "compatibilidad", field_type: "text", is_ai_fillable: true }, { name: "codigo", field_type: "text", is_ai_fillable: true }]),

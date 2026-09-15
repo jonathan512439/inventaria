@@ -21,6 +21,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [salesMonth, setSalesMonth] = useState<{ total: number; count: number } | null>(null);
+  const [variantsOf, setVariantsOf] = useState<Map<string, { stock: number }[]>>(new Map());
 
   useEffect(() => {
     (async () => {
@@ -34,13 +35,19 @@ export default function ProductsPage() {
       const start = new Date();
       start.setDate(1);
       start.setHours(0, 0, 0, 0);
-      const { data: sales } = await supabase.from("stock_movements").select("total").eq("tipo", "venta").gte("created_at", start.toISOString());
+      const [{ data: sales }, { data: vs }] = await Promise.all([
+        supabase.from("stock_movements").select("total").eq("tipo", "venta").gte("created_at", start.toISOString()),
+        supabase.from("product_variants").select("product_id,stock"),
+      ]);
       setSalesMonth({ total: (sales ?? []).reduce((s, r) => s + (r.total ?? 0), 0), count: (sales ?? []).length });
+      const m = new Map<string, { stock: number }[]>();
+      (vs ?? []).forEach((v) => m.set(v.product_id, [...(m.get(v.product_id) ?? []), { stock: v.stock }]));
+      setVariantsOf(m);
     })();
   }, [supabase]);
 
   const confirmed = useMemo(() => products.filter((p) => p.status === "confirmed"), [products]);
-  const { shelves, orphan, total } = useMemo(() => computeShelves(confirmed, categories), [confirmed, categories]);
+  const { shelves, orphan, total } = useMemo(() => computeShelves(confirmed, categories, variantsOf), [confirmed, categories, variantsOf]);
   const pendingCount = products.length - confirmed.length;
 
   const q = search.trim().toLowerCase();
@@ -78,7 +85,7 @@ export default function ProductsPage() {
             label="Por atender"
             value={String(total.alerts.agotados + total.alerts.sinPrecio)}
             tone={total.alerts.agotados + total.alerts.sinPrecio ? "warn" : undefined}
-            hint={total.alerts.agotados + total.alerts.sinPrecio ? `${total.alerts.agotados} agotados · ${total.alerts.sinPrecio} sin precio` : "todo en orden"}
+            hint={total.alerts.agotados + total.alerts.sinPrecio ? `${total.alerts.agotados} agotados · ${total.alerts.sinPrecio} sin precio${total.alerts.variantesAgotadas ? ` · ${total.alerts.variantesAgotadas} variantes en 0` : ""}` : total.alerts.variantesAgotadas ? `${total.alerts.variantesAgotadas} variantes agotadas` : "todo en orden"}
           />
           <Link href="/movements" className="rounded-2xl bg-emerald-600 p-3 text-white shadow-card transition hover:brightness-110">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Ventas este mes</p>
@@ -224,6 +231,7 @@ function AlertLine({ stats }: { stats: CategoryStats }) {
   const { alerts } = stats;
   const items = [
     alerts.agotados ? { t: `${alerts.agotados} agotado${alerts.agotados === 1 ? "" : "s"}`, c: "bg-rose-100 text-rose-700" } : null,
+    alerts.variantesAgotadas ? { t: `${alerts.variantesAgotadas} variante${alerts.variantesAgotadas === 1 ? "" : "s"} agotada${alerts.variantesAgotadas === 1 ? "" : "s"}`, c: "bg-rose-100 text-rose-700" } : null,
     stats.lowStock ? { t: `${stats.lowStock} con ≤${LOW_STOCK_MAX} unid.`, c: "bg-orange-100 text-orange-800" } : null,
     alerts.sinPrecio ? { t: `${alerts.sinPrecio} sin precio`, c: "bg-amber-100 text-amber-800" } : null,
     alerts.sinFoto ? { t: `${alerts.sinFoto} sin foto`, c: "bg-slate-100 text-slate-600" } : null,

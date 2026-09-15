@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Category, FieldTemplate, Product } from "@/types/database";
+import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
+import { axesFor, summarizeVariants } from "@/lib/variants";
 import { fieldLabel, getEffectiveFields, getValue, productTitle } from "@/lib/fields";
 import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
 import { categoryColor } from "@/lib/colors";
@@ -15,6 +16,9 @@ interface Props {
   templates: FieldTemplate[];
   /** Muestra la subcategoría (cuando la lista mezcla varias) */
   showSub?: boolean;
+  /** Variantes del producto (si tiene) y ejes de su categoría, para el resumen */
+  variants?: ProductVariant[];
+  axes?: VariantAxis[];
   onAdjust: (p: Product) => void;
 }
 
@@ -22,7 +26,7 @@ const HIDDEN = new Set(["nombre", "name", "producto", "titulo", "precio", "price
 const MAX_VISIBLE = 4;
 
 /** Fila de inventario: foto, nombre, datos, precio, stock y atajo ± . Nunca más ancha que la pantalla. */
-export default function ProductRow({ product: p, categories, templates, showSub, onAdjust }: Props) {
+export default function ProductRow({ product: p, categories, templates, showSub, variants = [], axes = [], onAdjust }: Props) {
   const [expanded, setExpanded] = useState(false);
   const price = priceOf(p);
   const stock = stockOf(p);
@@ -31,6 +35,7 @@ export default function ProductRow({ product: p, categories, templates, showSub,
   const top = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) ?? cat : cat;
   const col = categoryColor(top?.name);
   const fields = getEffectiveFields(templates, categories, p.category_id);
+  const vsum = summarizeVariants(variants, axesFor(axes, categories, p.category_id));
 
   // Datos a mostrar: los definidos para su categoría (sin nombre/precio/stock/descripción) + otros guardados
   const details: { label: string; value: string }[] = [];
@@ -90,7 +95,11 @@ export default function ProductRow({ product: p, categories, templates, showSub,
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${out ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"}`}>
                 {out ? "0 en stock" : `${stock} en stock`}
               </span>
+              {vsum && vsum.agotadas > 0 && (
+                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">{vsum.agotadas} variante{vsum.agotadas === 1 ? "" : "s"} agotada{vsum.agotadas === 1 ? "" : "s"}</span>
+              )}
             </div>
+            {vsum && <p className="mt-1 truncate text-[11px] font-medium text-violet-800" title={vsum.text}>{variants.length} variantes · {vsum.text}</p>}
           </div>
         </div>
 

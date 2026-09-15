@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, FieldTemplate, Product } from "@/types/database";
+import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { categoryPath, getDescendantIds } from "@/lib/categories";
 import { exportToExcel } from "@/lib/export";
 import CategoryPicker from "@/components/CategoryPicker";
@@ -14,6 +14,8 @@ export default function ExportPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [axes, setAxes] = useState<VariantAxis[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -24,14 +26,18 @@ export default function ExportPage() {
 
   useEffect(() => {
     (async () => {
-      const [c, t, p] = await Promise.all([
+      const [c, t, p, v, a] = await Promise.all([
         supabase.from("categories").select("*"),
         supabase.from("field_templates").select("*").order("sort_order"),
         supabase.from("products").select("*").order("created_at", { ascending: false }),
+        supabase.from("product_variants").select("*"),
+        supabase.from("variant_axes").select("*"),
       ]);
       setCategories(c.data ?? []);
       setTemplates(t.data ?? []);
       setProducts(p.data ?? []);
+      setVariants((v.data ?? []) as ProductVariant[]);
+      setAxes((a.data ?? []) as VariantAxis[]);
       setLoading(false);
     })();
   }, [supabase]);
@@ -49,7 +55,7 @@ export default function ExportPage() {
     setExporting(true);
     try {
       const base = categoryId ? categoryPath(categories, categoryId).replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase() : "inventario";
-      exportToExcel({ products: selected, categories, templates, fileName: base, sheetPerCategory });
+      exportToExcel({ products: selected, categories, templates, fileName: base, sheetPerCategory, variants, axes });
     } finally {
       setExporting(false);
     }

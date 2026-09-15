@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generatePreset, GeminiError } from "@/lib/gemini";
-import { getPreset, type PresetField } from "@/lib/presets";
+import { getPreset, type PresetAxis, type PresetField } from "@/lib/presets";
 import { nameKey } from "@/lib/categories";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logUsage } from "@/lib/aiUsage";
@@ -32,6 +32,7 @@ interface TypeSpec {
   icon: string;
   sections: string[];
   fields: PresetField[];
+  axes?: PresetAxis[];
 }
 
 /**
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
   }
   for (const id of body.presets ?? []) {
     const p = getPreset(id);
-    if (p) specs.push({ name: p.name, icon: p.icon, sections: p.sections, fields: p.fields });
+    if (p) specs.push({ name: p.name, icon: p.icon, sections: p.sections, fields: p.fields, axes: p.axes });
   }
 
   if (body.description?.trim()) {
@@ -149,6 +150,17 @@ export async function POST(request: Request) {
         }))
       );
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Ejes de variación (talla, color…) del catálogo, si la categoría aún no tiene ninguno
+    if (spec.axes?.length) {
+      const { data: existingAxes } = await supabase.from("variant_axes").select("id").eq("category_id", top!.id).limit(1);
+      if (!existingAxes?.length) {
+        const { error } = await supabase.from("variant_axes").insert(
+          spec.axes.slice(0, 3).map((a, i) => ({ user_id: user.id, category_id: top!.id, key: a.key, label: a.label, options: a.options, sort_order: i }))
+        );
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      }
     }
   }
 

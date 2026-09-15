@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
-import type { MovementType, Product } from "@/types/database";
+import type { MovementType, Product, ProductVariant } from "@/types/database";
 import { normalizeFieldName, productTitle } from "@/lib/fields";
 import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
 import { useToast } from "./ui/Toast";
@@ -11,9 +11,13 @@ import { IconCheck, IconPlus, IconX, Spinner } from "./ui/Icons";
 
 interface Props {
   product: Product;
+  /** Variantes del producto (si tiene): se pide elegir una antes de mover stock */
+  variants?: ProductVariant[];
+  /** Variante ya elegida (p. ej. al tocar una casilla de la cuadrícula) */
+  variant?: ProductVariant | null;
   onClose: () => void;
-  /** Se llama con el producto actualizado tras guardar */
-  onSaved: (updated: Product) => void;
+  /** Se llama con el producto actualizado (stock total) y la variante tocada, si la hubo */
+  onSaved: (updated: Product, variant?: ProductVariant) => void;
 }
 
 const MOTIVOS_SALIDA = ["Retiro personal", "Merma o rotura", "Regalo o muestra", "Devolución al proveedor", "Corrección de conteo"];
@@ -22,11 +26,13 @@ const MOTIVOS_SALIDA = ["Retiro personal", "Merma o rotura", "Regalo o muestra",
  * Atajo para sumar o restar stock sin editar el producto.
  * Al restar se pregunta si es una VENTA (suma a ingresos y al resumen) o SOLO un retiro (no suma nada).
  */
-export default function StockAdjust({ product, onClose, onSaved }: Props) {
+export default function StockAdjust({ product, variants = [], variant = null, onClose, onSaved }: Props) {
   const supabase = createClient();
   const toast = useToast();
-  const current = stockOf(product) ?? 0;
-  const price = priceOf(product);
+  const [sel, setSel] = useState<ProductVariant | null>(variant);
+  const needsVariant = variants.length > 0 && !sel;
+  const current = sel ? sel.stock : stockOf(product) ?? 0;
+  const price = sel?.precio ?? priceOf(product);
   const [mode, setMode] = useState<"add" | "remove">("remove");
   const [qty, setQty] = useState(1);
   const [asSale, setAsSale] = useState<boolean | null>(null); // null = aún no decidió
@@ -40,18 +46,36 @@ export default function StockAdjust({ product, onClose, onSaved }: Props) {
 
   const newStock = mode === "add" ? current + qty : Math.max(0, current - qty);
   const total = asSale ? qty * (Number(salePrice) || 0) : 0;
-  const canSave = qty > 0 && (mode === "add" || asSale !== null) && (!asSale || Number(salePrice) >= 0);
+  const canSave = !needsVariant && qty > 0 && (mode === "add" || asSale !== null) && (!asSale || Number(salePrice) >= 0);
+
+  useEffect(() => {
+    if (sel) setSalePrice(sel.precio !== null ? String(sel.precio) : price !== null ? String(price) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel]);
 
   async function save() {
     if (!canSave) return;
     setSaving(true);
     const keys = Object.keys(product.data);
     const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => normalizeFieldName(x) === k)).find(Boolean) ?? "stock";
-    const data = { ...product.data, [key]: newStock };
-    const { error: e1 } = await supabase.from("products").update({ data }).eq("id", product.id);
-    if (e1) {
-      setSaving(false);
-      return toast("error", e1.message);
+    let data = { ...product.data, [key]: newStock };
+    let updatedVariant: ProductVariant | undefined;
+    if (sel) {
+      // Stock por variante: el total del producto lo recalcula la base de datos (suma de variantes)
+      const { error: ev } = await supabase.from("product_variants").update({ stock: newStock }).eq("id", sel.id);
+      if (ev) {
+        setSaving(false);
+        return toast("error", ev.message);
+      }
+      updatedVariant = { ...sel, stock: newStock };
+      const total = variants.reduce((t, v) => t + (v.id === sel.id ? newStock : v.stock), 0);
+      data = { ...product.data, [key]: total };
+    } else {
+      const { error: e1 } = await supabase.from("products").update({ data }).eq("id", product.id);
+      if (e1) {
+        setSaving(false);
+        return toast("error", e1.message);
+      }
     }
     const tipo: MovementType = mode === "add" ? "entrada" : asSale ? "venta" : "salida";
     const {
@@ -61,6 +85,8 @@ export default function StockAdjust({ product, onClose, onSaved }: Props) {
       user_id: user!.id,
       product_id: product.id,
       product_name: productTitle(product.data) || null,
+      variant_id: sel?.id ?? null,
+      variant_label: sel?.label ?? null,
       tipo,
       cantidad: qty,
       precio_unitario: asSale ? Number(salePrice) || 0 : null,
@@ -79,7 +105,7 @@ export default function StockAdjust({ product, onClose, onSaved }: Props) {
           ? `Venta registrada: ${qty} × Bs ${fmtMoney(Number(salePrice) || 0)} = Bs ${fmtMoney(total)} · stock ${current} → ${newStock}`
           : `−${qty} del stock (${current} → ${newStock}) · no cuenta como venta`
     );
-    onSaved({ ...product, data });
+    onSaved({ ...product, data }, updatedVariant);
     onClose();
   }
 
@@ -92,10 +118,25 @@ export default function StockAdjust({ product, onClose, onSaved }: Props) {
           {product.image_url && <img src={product.image_url} alt="" className="h-12 w-12 rounded-xl object-cover" />}
           <div className="min-w-0 flex-1">
             <p className="truncate font-bold text-ink">{productTitle(product.data) || "Producto"}</p>
-            <p className="text-xs text-slate-500">Stock actual: <b className="text-ink">{current}</b>{price !== null ? ` · precio Bs ${fmtMoney(price)}` : ""}</p>
+            {sel && <p className="truncate text-xs font-semibold text-violet-700">Variante: {sel.label}</p>}
+            <p className="text-xs text-slate-500">Stock actual{sel ? " de esta variante" : ""}: <b className="text-ink">{current}</b>{price !== null ? ` · precio Bs ${fmtMoney(price)}` : ""}</p>
           </div>
           <button onClick={onClose} className="btn-ghost btn-sm -mr-2"><IconX size={18} /></button>
         </div>
+
+        {/* Paso 0 (solo con variantes): ¿cuál? */}
+        {variants.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">¿Cuál variante?</p>
+            <div className="mt-1 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+              {variants.map((v) => (
+                <button key={v.id} type="button" onClick={() => setSel(v)} className={`rounded-full border-2 px-3 py-1 text-sm font-semibold ${sel?.id === v.id ? "border-violet-600 bg-violet-600 text-white" : v.stock <= 0 ? "border-rose-200 bg-rose-50 text-rose-700" : "border-slate-300 bg-white text-slate-700"}`}>
+                  {v.label} <span className="opacity-70">{v.stock}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Paso 1: sumar o restar */}
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">1 · ¿Qué quieres hacer?</p>
@@ -162,7 +203,9 @@ export default function StockAdjust({ product, onClose, onSaved }: Props) {
         {/* Confirmación con el resultado explícito */}
         <button onClick={save} disabled={!canSave || saving} className={`btn-lg mt-5 w-full ${mode === "add" ? "btn-success" : asSale ? "btn-success" : "btn-primary"}`}>
           {saving ? <Spinner /> : mode === "add" ? <IconPlus size={20} /> : <IconCheck size={20} />}
-          {mode === "add"
+          {needsVariant
+            ? "Elige primero la variante"
+            : mode === "add"
             ? `Sumar ${qty} · stock queda en ${newStock}`
             : asSale === null
               ? "Elige si es venta o solo retiro"
