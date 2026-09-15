@@ -40,6 +40,9 @@ export default function BarcodeCamera({ onCode, label = "Escanear" }: Props) {
 
   async function start() {
     setError(null);
+    // El <video> debe estar montado ANTES de pedir la cámara (si no, videoRef es null y fallaba)
+    setOn(true);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
     try {
       const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       audioRef.current ??= new Ctx();
@@ -48,10 +51,11 @@ export default function BarcodeCamera({ onCode, label = "Escanear" }: Props) {
       /* sin audio */
     }
     try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Este navegador no permite usar la cámara. Abre la app en Chrome o Safari.");
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } } });
       streamRef.current = stream;
-      setOn(true);
-      const video = videoRef.current!;
+      const video = videoRef.current;
+      if (!video) throw new Error("No se pudo preparar la vista de la cámara. Vuelve a intentarlo.");
       video.srcObject = stream;
       await video.play();
       const tick = async () => {
@@ -75,9 +79,22 @@ export default function BarcodeCamera({ onCode, label = "Escanear" }: Props) {
         loopRef.current = requestAnimationFrame(tick);
       };
       loopRef.current = requestAnimationFrame(tick);
-    } catch {
+    } catch (e) {
       setOn(false);
-      setError("No se pudo abrir la cámara.");
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      const name = (e as { name?: string })?.name;
+      setError(
+        name === "NotAllowedError"
+          ? "Diste «bloquear» a la cámara. Tócalo en el candado de la barra de direcciones y permite la cámara."
+          : name === "NotFoundError"
+            ? "No se encontró ninguna cámara en este dispositivo."
+            : name === "NotReadableError"
+              ? "La cámara está ocupada por otra app. Ciérrala y vuelve a intentarlo."
+              : e instanceof Error && e.message
+                ? e.message
+                : "No se pudo abrir la cámara. Si la página no es segura (https), el navegador no la permite."
+      );
     }
   }
   function stop() {
@@ -90,16 +107,20 @@ export default function BarcodeCamera({ onCode, label = "Escanear" }: Props) {
 
   return (
     <div>
-      {on ? (
-        <div className={`relative overflow-hidden rounded-2xl bg-black ring-4 transition ${flash ? "ring-emerald-400" : "ring-transparent"}`}>
-          <video ref={videoRef} className="block h-44 w-full object-cover" muted playsInline />
-          <button type="button" onClick={stop} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white"><IconX size={16} /></button>
-          <p className="absolute inset-x-0 bottom-0 bg-black/50 py-1 text-center text-[11px] text-white">Apunta al código · beep = leído</p>
-        </div>
-      ) : (
+      {/* El vídeo se mantiene montado: así la referencia existe cuando se concede el permiso */}
+      <div className={`relative overflow-hidden rounded-2xl bg-black ring-4 transition ${on ? "" : "hidden"} ${flash ? "ring-emerald-400" : "ring-transparent"}`}>
+        <video ref={videoRef} className="block h-44 w-full object-cover" muted playsInline autoPlay />
+        <button type="button" onClick={stop} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white"><IconX size={16} /></button>
+        <p className="absolute inset-x-0 bottom-0 bg-black/50 py-1 text-center text-[11px] text-white">Apunta al código · beep = leído</p>
+      </div>
+      {!on && (
         <button type="button" onClick={start} className="btn-secondary w-full"><IconCamera size={18} /> {label}</button>
       )}
-      {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
+      {error && (
+        <p className="mt-1 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {error} <button type="button" onClick={start} className="font-semibold underline">Reintentar</button>
+        </p>
+      )}
     </div>
   );
 }

@@ -52,6 +52,7 @@ export default function DashboardPage() {
       const list = prods.data ?? [];
       const cats = t.data ?? [];
       const minOf = (r: { min_stock?: number | null; category_id: string | null }) => {
+        void 0;
         if (typeof r.min_stock === "number") return r.min_stock;
         const cat = cats.find((c) => c.id === r.category_id);
         const top = cat?.parent_id ? cats.find((c) => c.id === cat.parent_id) : cat;

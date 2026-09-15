@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { resetCoach, resetTour } from "@/lib/coach";
 import WhatsNew from "@/components/WhatsNew";
 import AiKeyCard from "@/components/AiKeyCard";
-import { IconCheckCircle, IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
+import { IconAlert, IconCheckCircle, IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -75,6 +75,7 @@ export default function SettingsPage() {
         <Row href="/store" icon={<IconFolder />} title="Mi tienda" subtitle={counts ? `${counts.types} categoría${counts.types === 1 ? "" : "s"} · ${counts.sections} subcategorías · qué vendes, datos y variantes` : ""} />
         <Row href="/review" icon={<IconCheckCircle />} title="Revisar pendientes" subtitle="Confirma lo que la IA reconoció" />
         <Row href="/scan" icon={<IconTag />} title="Escanear código de barras" subtitle="Repetidos y reposición sin gastar IA" />
+        <Row href="/alerts" icon={<IconAlert />} title="Avisos de reposición" subtitle="Desde cuántas unidades avisar y de qué categorías o productos" />
         <Row href="/movements" icon={<IconList />} title="Ventas y movimientos" subtitle="Ingresos, entradas y retiros de stock" />
         <Row href="/export" icon={<IconDownload />} title="Exportar a Excel" subtitle="Descarga tu inventario" />
         <Row href="/dashboard#guia" icon={<IconList />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" />

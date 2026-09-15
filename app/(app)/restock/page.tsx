@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import type { Category, Product, ProductVariant } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { SUMMARY_COLS, daysToExpiry, expiringSoon, fmtMoney, fromSummary, minStockOf, needsRestock, stockOf } from "@/lib/inventory";
+import { useFlow } from "@/components/FlowProvider";
+import SwipeRow from "@/components/SwipeRow";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { IconArrowLeft, IconDownload, IconTag } from "@/components/ui/Icons";
@@ -36,6 +38,7 @@ function Restock() {
   const params = useSearchParams();
   const supabase = createClient();
   const toast = useToast();
+  const { alerts } = useFlow();
   const [tab, setTab] = useState<"reponer" | "vencer">(params.get("tab") === "vencer" ? "vencer" : "reponer");
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -75,24 +78,39 @@ function Restock() {
       const vs = byProduct.get(p.id);
       if (vs?.length) {
         // Con variantes: el mínimo del producto aplica a cada variante salvo que la variante tenga el suyo
-        const pmin = minStockOf(p, categories);
+        const pmin = minStockOf(p, categories, alerts);
         vs.forEach((v) => {
           const min = typeof v.min_stock === "number" ? v.min_stock : pmin;
           if (v.stock <= min) out.push({ key: v.id, productId: p.id, name, variant: v.label, where, stock: v.stock, min, suggested: Math.max(1, min * 2 - v.stock), supplier: lastSupplier.get(p.id) ?? null });
         });
-      } else if (needsRestock(p, categories)) {
-        const min = minStockOf(p, categories);
+      } else if (needsRestock(p, categories, alerts)) {
+        const min = minStockOf(p, categories, alerts);
         const stock = stockOf(p) ?? 0;
         out.push({ key: p.id, productId: p.id, name, variant: null, where, stock, min, suggested: Math.max(1, min * 2 - stock), supplier: lastSupplier.get(p.id) ?? null });
       }
     }
     return out.sort((a, b) => a.stock - b.stock || a.name.localeCompare(b.name, "es"));
-  }, [products, variants, categories, lastSupplier]);
+  }, [products, variants, categories, lastSupplier, alerts]);
 
   const expiring = useMemo(
-    () => products.filter(expiringSoon).map((p) => ({ p, days: daysToExpiry(p.expires_at) ?? 0 })).sort((a, b) => a.days - b.days),
-    [products]
+    () => products.filter((p) => expiringSoon(p, alerts, categories)).map((p) => ({ p, days: daysToExpiry(p.expires_at) ?? 0 })).sort((a, b) => a.days - b.days),
+    [products, alerts, categories]
   );
+
+  /** Descartar = no volver a avisar de este producto (se reactiva en Ajustes → Avisos). */
+  async function dismiss(productId: string, name: string) {
+    setProducts((ps) => ps.filter((p) => p.id !== productId));
+    const { error } = await supabase.from("products").update({ alerts_off: true }).eq("id", productId);
+    if (error) return toast("error", error.message);
+    toast("success", `«${name}» ya no aparecerá en los avisos`, {
+      label: "Deshacer",
+      onClick: async () => {
+        await supabase.from("products").update({ alerts_off: false }).eq("id", productId);
+        const { data } = await supabase.from("product_summaries").select(SUMMARY_COLS).eq("id", productId).maybeSingle();
+        if (data) setProducts((ps) => [...ps, fromSummary(data)]);
+      },
+    });
+  }
 
   const qtyOf = (l: Line) => Math.max(0, parseInt(qty[l.key] ?? String(l.suggested), 10) || 0);
   const grouped = useMemo(() => {
@@ -134,8 +152,13 @@ function Restock() {
     <div className="mx-auto max-w-3xl space-y-4">
       <header className="animate-in">
         <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Por reponer y por vencer</h1>
-        <p className="text-sm text-slate-500">Lo que está bajo su stock mínimo, listo para pedir; y lo que vence pronto.</p>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-ink">Por reponer y por vencer</h1>
+            <p className="text-sm text-slate-500">Lo que está bajo su stock mínimo, listo para pedir; y lo que vence pronto.</p>
+          </div>
+          <Link href="/alerts" className="btn-secondary btn-sm">Ajustar avisos</Link>
+        </div>
       </header>
 
       <div className="animate-in grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1">
@@ -165,21 +188,25 @@ function Restock() {
                 </div>
                 <ul className="divide-y divide-slate-100">
                   {ls.map((l) => (
-                    <li key={l.key} className="flex items-center gap-3 py-2">
-                      <Link href={`/products/${l.productId}`} className="min-w-0 flex-1">
-                        <span className="block truncate font-semibold text-ink">{l.name}{l.variant ? <span className="text-violet-800"> · {l.variant}</span> : null}</span>
-                        <span className="block truncate text-xs text-slate-500">{l.where} · stock <b className={l.stock <= 0 ? "text-rose-600" : "text-orange-700"}>{l.stock}</b> · mín. {l.min}</span>
-                      </Link>
-                      <label className="flex items-center gap-1 text-xs text-slate-500">
-                        pedir
-                        <input type="number" min={0} inputMode="numeric" className="input w-20 py-1 text-center text-sm font-bold tabular-nums" value={qty[l.key] ?? String(l.suggested)} onChange={(e) => setQty({ ...qty, [l.key]: e.target.value })} />
-                      </label>
+                    <li key={l.key}>
+                      <SwipeRow onDismiss={() => dismiss(l.productId, l.name)}>
+                        <div className="flex items-center gap-3 bg-white py-2">
+                          <Link href={`/products/${l.productId}`} className="min-w-0 flex-1">
+                            <span className="block truncate font-semibold text-ink">{l.name}{l.variant ? <span className="text-violet-800"> · {l.variant}</span> : null}</span>
+                            <span className="block truncate text-xs text-slate-500">{l.where} · stock <b className={l.stock <= 0 ? "text-rose-600" : "text-orange-700"}>{l.stock}</b> · mín. {l.min}</span>
+                          </Link>
+                          <label className="flex items-center gap-1 text-xs text-slate-500">
+                            pedir
+                            <input type="number" min={0} inputMode="numeric" className="input w-20 py-1 text-center text-sm font-bold tabular-nums" value={qty[l.key] ?? String(l.suggested)} onChange={(e) => setQty({ ...qty, [l.key]: e.target.value })} data-no-swipe />
+                          </label>
+                        </div>
+                      </SwipeRow>
                     </li>
                   ))}
                 </ul>
               </section>
             ))}
-            <p className="text-center text-[11px] text-slate-500">La cantidad sugerida repone hasta el doble del mínimo. Cámbiala antes de compartir.</p>
+            <p className="text-center text-[11px] text-slate-500">La cantidad sugerida repone hasta el doble del mínimo. Cámbiala antes de compartir. <b>Desliza una fila a la izquierda</b> para que ese producto deje de avisarte (se reactiva en <Link href="/alerts" className="underline">Ajustes → Avisos</Link>).</p>
           </>
         )
       ) : expiring.length === 0 ? (
@@ -191,15 +218,17 @@ function Restock() {
         <ul className="stagger space-y-2">
           {expiring.map(({ p, days }) => (
             <li key={p.id}>
-              <Link href={`/products/${p.id}`} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 hover:ring-brand-400">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold text-ink">{String(p.data.nombre || "Sin nombre")}</span>
-                  <span className="block truncate text-xs text-slate-500">{p.category_id ? categoryPath(categories, p.category_id) : "Sin categoría"} · {stockOf(p) ?? 0} en stock · Bs {fmtMoney((Number(p.data.precio) || 0) * (stockOf(p) ?? 0))} en juego</span>
-                </span>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${days < 0 ? "bg-rose-600 text-white" : days <= 7 ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"}`}>
-                  {days < 0 ? `vencido ${-days} d` : days === 0 ? "hoy" : `${days} d`}
-                </span>
-              </Link>
+              <SwipeRow onDismiss={() => dismiss(p.id, String(p.data.nombre || "Producto"))} rounded>
+                <Link href={`/products/${p.id}`} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 hover:ring-brand-400">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold text-ink">{String(p.data.nombre || "Sin nombre")}</span>
+                    <span className="block truncate text-xs text-slate-500">{p.category_id ? categoryPath(categories, p.category_id) : "Sin categoría"} · {stockOf(p) ?? 0} en stock · Bs {fmtMoney((Number(p.data.precio) || 0) * (stockOf(p) ?? 0))} en juego</span>
+                  </span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${days < 0 ? "bg-rose-600 text-white" : days <= 7 ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"}`}>
+                    {days < 0 ? `vencido ${-days} d` : days === 0 ? "hoy" : `${days} d`}
+                  </span>
+                </Link>
+              </SwipeRow>
             </li>
           ))}
         </ul>

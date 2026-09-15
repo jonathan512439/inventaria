@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
 import { syncMoves } from "@/lib/offline";
+import { DEFAULT_ALERTS, type AlertSettings } from "@/lib/inventory";
 import { useToast } from "./ui/Toast";
 
 /** Estado del flujo ① Agregar → ② Revisar → ③ Inventario, compartido por la barra de pasos, el menú y el Inicio. */
@@ -13,12 +14,14 @@ export interface FlowState {
   confirmed: number; // en inventario
   working: number; // fotos en cola / analizando
   loaded: boolean;
+  /** Ajustes de avisos del negocio (mínimo por defecto y días de vencimiento) */
+  alerts: AlertSettings;
   refresh: () => void;
   /** Paso actual según la ruta: 1 agregar, 2 revisar, 3 inventario, 0 otra */
   step: 0 | 1 | 2 | 3;
 }
 
-const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, refresh: () => {}, step: 0 });
+const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, alerts: DEFAULT_ALERTS, refresh: () => {}, step: 0 });
 
 export function stepOf(pathname: string): 0 | 1 | 2 | 3 {
   if (pathname.startsWith("/capture") || pathname.startsWith("/scan") || pathname.startsWith("/products/new")) return 1;
@@ -33,6 +36,7 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
   const queue = useQueue();
   const q = queueSummary(queue.items);
   const [counts, setCounts] = useState({ pending: 0, confirmed: 0, loaded: false });
+  const [alerts, setAlerts] = useState<AlertSettings>(DEFAULT_ALERTS);
 
   const refresh = useCallback(() => {
     const supabase = createClient();
@@ -40,6 +44,16 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
       supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft").is("deleted_at", null),
       supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed").is("deleted_at", null),
     ]).then(([d, c]) => setCounts({ pending: d.count ?? 0, confirmed: c.count ?? 0, loaded: true }));
+    supabase
+      .from("profiles")
+      .select("min_stock_default,expiry_days")
+      .maybeSingle()
+      .then(({ data }) =>
+        setAlerts({
+          minStock: typeof data?.min_stock_default === "number" ? data.min_stock_default : DEFAULT_ALERTS.minStock,
+          expiryDays: typeof data?.expiry_days === "number" ? data.expiry_days : DEFAULT_ALERTS.expiryDays,
+        })
+      );
   }, []);
 
   // Recupera fotos guardadas en el teléfono si la app se cerró a mitad de un lote
@@ -67,8 +81,8 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
   }, [pathname, q.done, refresh]);
 
   const value = useMemo<FlowState>(
-    () => ({ ...counts, working: q.queued + q.processing, refresh, step: stepOf(pathname) }),
-    [counts, q.queued, q.processing, refresh, pathname]
+    () => ({ ...counts, alerts, working: q.queued + q.processing, refresh, step: stepOf(pathname) }),
+    [counts, alerts, q.queued, q.processing, refresh, pathname]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

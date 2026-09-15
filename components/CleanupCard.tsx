@@ -14,14 +14,23 @@ interface Counts {
   noCategory: number;
   noPrice: number;
   trash: number;
+  emptyFields: number;
+  emptyValues: number;
+  orphanValues: number;
 }
 
-type Key = "oldDrafts" | "emptySubs" | "emptyTops" | "orphanPhotos";
+interface Detail {
+  emptyFields: string[];
+  orphanValues: string[];
+}
+
+type Key = "oldDrafts" | "emptySubs" | "emptyTops" | "orphanPhotos" | "emptyFields" | "emptyValues" | "orphanValues";
 
 /** Tarjeta "Ordenar y limpiar": muestra lo que sobra o falta y borra solo lo marcado. */
 export default function CleanupCard() {
   const toast = useToast();
   const [counts, setCounts] = useState<Counts | null>(null);
+  const [detail, setDetail] = useState<Detail | null>(null);
   const [oldDays, setOldDays] = useState(7);
   const [sel, setSel] = useState<Set<Key>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -30,8 +39,9 @@ export default function CleanupCard() {
   async function load() {
     const res = await fetch("/api/cleanup", { cache: "no-store" });
     if (!res.ok) return;
-    const j = (await res.json()) as { counts: Counts; oldDays: number };
+    const j = (await res.json()) as { counts: Counts; detail?: Detail; oldDays: number };
     setCounts(j.counts);
+    setDetail(j.detail ?? null);
     setOldDays(j.oldDays);
   }
   useEffect(() => {
@@ -52,6 +62,9 @@ export default function CleanupCard() {
           { key: "emptySubs", n: counts.emptySubs, title: `${counts.emptySubs} subcategorías sin productos`, hint: "solo las vacías" },
           { key: "emptyTops", n: counts.emptyTops, title: `${counts.emptyTops} categorías sin productos`, hint: "incluye sus subcategorías vacías" },
           { key: "orphanPhotos", n: counts.orphanPhotos, title: `${counts.orphanPhotos} fotos sin producto`, hint: "libera espacio" },
+          { key: "emptyFields", n: counts.emptyFields, title: `${counts.emptyFields} datos que nadie llena`, hint: detail?.emptyFields.slice(0, 4).join(", ") || "columnas siempre vacías" },
+          { key: "emptyValues", n: counts.emptyValues, title: `${counts.emptyValues} productos con casillas vacías guardadas`, hint: "limpia el Excel; no borra información" },
+          { key: "orphanValues", n: counts.orphanValues, title: `${counts.orphanValues} datos sueltos de otra categoría`, hint: detail?.orphanValues.slice(0, 4).join(", ") || "quedaron al cambiar de categoría" },
         ] as { key: Key; n: number; title: string; hint: string }[])
       : []
   ).filter((x) => x.n > 0);

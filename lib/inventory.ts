@@ -18,7 +18,7 @@ function num(p: Product, names: string[]): number | null {
 
 /** Convierte una fila de `product_summaries` en un Product mínimo (data con nombre/precio/stock) para reutilizar los cálculos. */
 /** Columnas ligeras de la vista (sin `search`, que puede ser largo). */
-export const SUMMARY_COLS = "id,user_id,category_id,status,image_url,created_at,updated_at,nombre,marca,precio,precio_compra,stock,codigo_barras,min_stock,expires_at,precio_mayorista,unidades_por_paquete";
+export const SUMMARY_COLS = "id,user_id,category_id,status,image_url,created_at,updated_at,nombre,marca,precio,precio_compra,stock,codigo_barras,min_stock,expires_at,alerts_off,precio_mayorista,unidades_por_paquete";
 
 export function fromSummary(s: ProductSummary): Product {
   return {
@@ -32,6 +32,7 @@ export function fromSummary(s: ProductSummary): Product {
     ai_meta: {},
     min_stock: s.min_stock ?? null,
     expires_at: s.expires_at ?? null,
+    alerts_off: s.alerts_off ?? false,
     data: {
       nombre: s.nombre ?? "",
       marca: s.marca ?? "",
@@ -89,26 +90,41 @@ export interface Summary {
   lowStock: number;
 }
 
-/** Mínimo por defecto cuando ni el producto ni su categoría lo definen. */
+/** Valores de fábrica cuando el usuario no ha ajustado nada. */
 export const LOW_STOCK_MAX = 3;
 export const DEFAULT_MIN_STOCK = LOW_STOCK_MAX;
-/** Días de anticipación para «por vencer». */
 export const EXPIRY_SOON_DAYS = 30;
 
-/** Stock mínimo efectivo: el del producto, si no el de su categoría principal, si no el general. */
-export function minStockOf(p: Product, categories?: Category[]): number {
+/** Ajustes de avisos del negocio (Ajustes → Avisos de reposición). */
+export interface AlertSettings {
+  minStock: number;
+  expiryDays: number;
+}
+export const DEFAULT_ALERTS: AlertSettings = { minStock: DEFAULT_MIN_STOCK, expiryDays: EXPIRY_SOON_DAYS };
+
+/** ¿Esta categoría (o su principal) tiene los avisos silenciados? */
+export function categoryAlertsOff(categories: Category[] | undefined, categoryId: string | null): boolean {
+  if (!categories || !categoryId) return false;
+  const cat = categories.find((c) => c.id === categoryId);
+  if (!cat) return false;
+  const top = cat.parent_id ? categories.find((c) => c.id === cat.parent_id) : cat;
+  return !!cat.alerts_off || !!top?.alerts_off;
+}
+
+/** Stock mínimo efectivo: el del producto, si no el de su categoría principal, si no el del negocio. */
+export function minStockOf(p: Product, categories?: Category[], settings: AlertSettings = DEFAULT_ALERTS): number {
   if (typeof p.min_stock === "number") return p.min_stock;
   if (categories && p.category_id) {
     const cat = categories.find((c) => c.id === p.category_id);
     const top = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) : cat;
     if (typeof top?.min_stock_default === "number") return top.min_stock_default;
   }
-  return DEFAULT_MIN_STOCK;
+  return settings.minStock;
 }
-/** Hay que reponer: stock 0 o por debajo del mínimo (el mínimo 0 desactiva la alerta salvo agotado). */
-export function needsRestock(p: Product, categories?: Category[]): boolean {
-  const s = stockOf(p) ?? 0;
-  return s <= 0 || s <= minStockOf(p, categories);
+/** Hay que reponer: stock por debajo del mínimo. No avisa si el producto o su categoría están silenciados. */
+export function needsRestock(p: Product, categories?: Category[], settings: AlertSettings = DEFAULT_ALERTS): boolean {
+  if (p.alerts_off || categoryAlertsOff(categories, p.category_id)) return false;
+  return (stockOf(p) ?? 0) <= minStockOf(p, categories, settings);
 }
 /** Días hasta el vencimiento (negativo = vencido); null si no tiene fecha. */
 export function daysToExpiry(iso: string | null | undefined): number | null {
@@ -116,15 +132,16 @@ export function daysToExpiry(iso: string | null | undefined): number | null {
   const d = new Date(iso + (iso.length === 10 ? "T00:00:00" : ""));
   return Math.ceil((d.getTime() - Date.now()) / 86400000);
 }
-export function expiringSoon(p: Product): boolean {
+export function expiringSoon(p: Product, settings: AlertSettings = DEFAULT_ALERTS, categories?: Category[]): boolean {
+  if (p.alerts_off || categoryAlertsOff(categories, p.category_id)) return false;
   const d = daysToExpiry(p.expires_at);
-  return d !== null && d <= EXPIRY_SOON_DAYS;
+  return d !== null && d <= settings.expiryDays;
 }
 
-function alertsOf(list: Product[], variantsOf?: VariantsOf, categories?: Category[]): Alerts {
+function alertsOf(list: Product[], variantsOf?: VariantsOf, categories?: Category[], settings: AlertSettings = DEFAULT_ALERTS): Alerts {
   return {
-    porReponer: list.filter((p) => needsRestock(p, categories)).length,
-    porVencer: list.filter(expiringSoon).length,
+    porReponer: list.filter((p) => needsRestock(p, categories, settings)).length,
+    porVencer: list.filter((p) => expiringSoon(p, settings, categories)).length,
     agotados: list.filter((p) => (stockOf(p) ?? 0) <= 0).length,
     sinPrecio: list.filter((p) => priceOf(p) === null).length,
     sinFoto: list.filter((p) => !p.image_url).length,
@@ -133,7 +150,7 @@ function alertsOf(list: Product[], variantsOf?: VariantsOf, categories?: Categor
   };
 }
 
-function summarize(list: Product[], variantsOf?: VariantsOf, categories?: Category[]): Summary {
+function summarize(list: Product[], variantsOf?: VariantsOf, categories?: Category[], settings: AlertSettings = DEFAULT_ALERTS): Summary {
   let units = 0, saleValue = 0, costValue = 0;
   for (const p of list) {
     const s = stockOf(p) ?? 0;
@@ -142,8 +159,8 @@ function summarize(list: Product[], variantsOf?: VariantsOf, categories?: Catego
     costValue += (costOf(p) ?? 0) * s;
   }
   // Poco stock = por debajo del mínimo pero no agotado
-  const lowStock = list.filter((p) => (stockOf(p) ?? 0) > 0 && needsRestock(p, categories)).length;
-  return { products: list.length, units, saleValue, costValue, alerts: alertsOf(list, variantsOf, categories), lowStock };
+  const lowStock = list.filter((p) => (stockOf(p) ?? 0) > 0 && needsRestock(p, categories, settings)).length;
+  return { products: list.length, units, saleValue, costValue, alerts: alertsOf(list, variantsOf, categories, settings), lowStock };
 }
 
 /** "hoy", "ayer", "hace 3 días", "hace 2 meses" */
@@ -157,12 +174,12 @@ export function timeAgo(iso: string): string {
 }
 
 /** Estadísticas por categoría principal (incluye sus subcategorías) + productos sin categoría. */
-export function computeShelves(products: Product[], categories: Category[], variantsOf?: VariantsOf) {
+export function computeShelves(products: Product[], categories: Category[], variantsOf?: VariantsOf, settings: AlertSettings = DEFAULT_ALERTS) {
   const roots = categories.filter((c) => !c.parent_id).sort((a, b) => a.name.localeCompare(b.name, "es"));
   const shelves: CategoryStats[] = roots.map((root) => {
     const ids = new Set(getDescendantIds(categories, root.id));
     const list = products.filter((p) => p.category_id && ids.has(p.category_id));
-    const s = summarize(list, variantsOf, categories);
+    const s = summarize(list, variantsOf, categories, settings);
     const children = categories
       .filter((c) => c.parent_id === root.id)
       .sort((a, b) => a.name.localeCompare(b.name, "es"))
@@ -180,7 +197,7 @@ export function computeShelves(products: Product[], categories: Category[], vari
     return { category: root, ...s, children, topProduct, lastAdded };
   });
   const orphan = products.filter((p) => !p.category_id || !categories.some((c) => c.id === p.category_id));
-  return { shelves, orphan: summarize(orphan, variantsOf, categories), orphanList: orphan, total: summarize(products, variantsOf, categories) };
+  return { shelves, orphan: summarize(orphan, variantsOf, categories, settings), orphanList: orphan, total: summarize(products, variantsOf, categories, settings) };
 }
 
 export function fmtMoney(n: number): string {
@@ -189,13 +206,13 @@ export function fmtMoney(n: number): string {
 
 export type Filter = "agotados" | "sinPrecio" | "sinFoto" | "hoy" | "pendientes" | "porReponer" | "porVencer";
 
-export function applyFilters(list: Product[], filters: Set<Filter>, variantsOf?: Map<string, { stock: number }[]>, categories?: Category[]): Product[] {
+export function applyFilters(list: Product[], filters: Set<Filter>, variantsOf?: Map<string, { stock: number }[]>, categories?: Category[], settings: AlertSettings = DEFAULT_ALERTS): Product[] {
   if (!filters.size) return list;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return list.filter((p) => {
-    if (filters.has("porReponer") && !needsRestock(p, categories)) return false;
-    if (filters.has("porVencer") && !expiringSoon(p)) return false;
+    if (filters.has("porReponer") && !needsRestock(p, categories, settings)) return false;
+    if (filters.has("porVencer") && !expiringSoon(p, settings, categories)) return false;
     // Agotado: sin stock total, o alguna de sus variantes en 0
     if (filters.has("agotados") && (stockOf(p) ?? 0) > 0 && !(variantsOf?.get(p.id) ?? []).some((v) => v.stock <= 0)) return false;
     if (filters.has("sinPrecio") && priceOf(p) !== null) return false;
@@ -204,4 +221,60 @@ export function applyFilters(list: Product[], filters: Set<Filter>, variantsOf?:
     if (filters.has("pendientes") && p.status !== "draft") return false;
     return true;
   });
+}
+
+const MESES: Record<string, number> = {
+  ene: 1, enero: 1, feb: 2, febrero: 2, mar: 3, marzo: 3, abr: 4, abril: 4, may: 5, mayo: 5, jun: 6, junio: 6,
+  jul: 7, julio: 7, ago: 8, agosto: 8, sep: 9, sept: 9, septiembre: 9, set: 9, oct: 10, octubre: 10,
+  nov: 11, noviembre: 11, dic: 12, diciembre: 12,
+  jan: 1, apr: 4, aug: 8, dec: 12,
+};
+const lastDay = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+const iso = (y: number, m: number, d: number) => `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+/**
+ * Normaliza un vencimiento leído de la etiqueta a "AAAA-MM-DD".
+ * Acepta "2027-01-31", "31/01/2027", "01/2027", "2027-01", "ENE 2027", "31 ENE 27".
+ * Cuando solo hay mes y año se usa el último día del mes. Descarta fechas imposibles.
+ */
+export function parseExpiry(raw: string | null | undefined): string | null {
+  const t = (raw ?? "").trim().toLowerCase();
+  if (!t || /^(no|n\/a|na|sin|no aplica|no vence)$/.test(t)) return null;
+  const year = (n: number) => (n < 100 ? 2000 + n : n);
+  let y: number | null = null, m: number | null = null, d: number | null = null;
+
+  let mt = t.match(/(\d{4})[-/.](\d{1,2})(?:[-/.](\d{1,2}))?/); // 2027-01-31 | 2027/01
+  if (mt) {
+    y = +mt[1];
+    m = +mt[2];
+    d = mt[3] ? +mt[3] : null;
+  }
+  if (!y) {
+    mt = t.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/); // 31/01/2027
+    if (mt) {
+      d = +mt[1];
+      m = +mt[2];
+      y = year(+mt[3]);
+    }
+  }
+  if (!y) {
+    mt = t.match(/(\d{1,2})[-/.](\d{2,4})$/); // 01/2027
+    if (mt) {
+      m = +mt[1];
+      y = year(+mt[2]);
+    }
+  }
+  if (!y) {
+    mt = t.match(/(\d{1,2})?\s*([a-záéíóú]{3,10})\.?\s*(\d{2,4})/); // 31 ene 2027 | ene 2027
+    if (mt && MESES[mt[2]]) {
+      d = mt[1] ? +mt[1] : null;
+      m = MESES[mt[2]];
+      y = year(+mt[3]);
+    }
+  }
+  if (!y || !m || m < 1 || m > 12) return null;
+  if (y < 2000 || y > new Date().getFullYear() + 15) return null;
+  const max = lastDay(y, m);
+  if (d && (d < 1 || d > max)) return null;
+  return iso(y, m, d ?? max);
 }

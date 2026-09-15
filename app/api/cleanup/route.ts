@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getValue } from "@/lib/fields";
+import { getEffectiveFields, getValue, normalizeFieldName } from "@/lib/fields";
+import type { ProductData } from "@/types/database";
 
 export const runtime = "edge";
 
 const OLD_DAYS = 7;
 const TRASH_DAYS = 30;
+/** Datos que nunca se tocan aunque no estén definidos en la categoría. */
+const KEEP_KEYS = new Set(["nombre", "name", "producto", "titulo", "precio", "precio_venta", "price", "stock", "cantidad", "existencias", "precio_compra", "costo", "codigo_barras"]);
+
+/** Ids de una categoría y sus subcategorías (sin depender de lib/categories, que tipa Category completo). */
+function descendants(cats: { id: string; parent_id: string | null }[], id: string): string[] {
+  const out = [id];
+  cats.forEach((c) => c.parent_id === id && out.push(c.id));
+  return out;
+}
 
 /** Borra definitivamente (con su foto) lo que lleva más de 30 días en la papelera. */
 async function purgeTrash(userId: string) {
@@ -24,14 +34,61 @@ async function purgeTrash(userId: string) {
 async function summary(userId: string) {
   const admin = createAdminClient();
   await purgeTrash(userId);
-  const [{ data: allProducts }, { data: categories }] = await Promise.all([
+  const [{ data: allProducts }, { data: categories }, { data: templates }] = await Promise.all([
     admin.from("products").select("id,status,category_id,data,image_url,created_at,deleted_at").eq("user_id", userId),
-    admin.from("categories").select("id,name,parent_id").eq("user_id", userId),
+    admin.from("categories").select("*").eq("user_id", userId),
+    admin.from("field_templates").select("*").eq("user_id", userId).order("sort_order"),
   ]);
   const trash = (allProducts ?? []).filter((p) => p.deleted_at);
   const prods = (allProducts ?? []).filter((p) => !p.deleted_at);
   const cats = categories ?? [];
   const withProducts = new Set(prods.map((p) => p.category_id).filter(Boolean) as string[]);
+
+  const tpls = templates ?? [];
+
+  // ---- Datos (columnas) que sobran ----
+  const NEVER = new Set(["nombre", "name", "producto", "titulo", "precio", "precio_venta", "price", "stock", "cantidad", "existencias", "precio_compra", "costo", "codigo_barras"]);
+  const hasValue = (v: unknown) => v !== null && v !== undefined && String(v).trim() !== "";
+
+  // 1) Campos definidos que ningún producto llena (con al menos 3 productos en su ámbito)
+  const emptyFields: { id: string; name: string; scope: string; products: number }[] = [];
+  for (const t of tpls) {
+    if (NEVER.has(normalizeFieldName(t.name)) || t.default_value) continue;
+    const scopeIds = t.category_id ? new Set(descendants(cats, t.category_id)) : null;
+    const inScope = prods.filter((p) => (scopeIds ? p.category_id && scopeIds.has(p.category_id) : true));
+    if (inScope.length < 3) continue;
+    const used = inScope.some((p) => hasValue(getValue(p.data, t.name)));
+    if (!used) emptyFields.push({ id: t.id, name: t.name, scope: t.category_id ? cats.find((c) => c.id === t.category_id)?.name ?? "" : "todas", products: inScope.length });
+  }
+
+  // 2) Valores vacíos guardados en los productos (ensucian el Excel y ocupan espacio)
+  let emptyValues = 0;
+  const emptyValueIds: string[] = [];
+  // 3) Datos sueltos: claves con valor que ya no pertenecen a ningún dato de su categoría
+  const orphanValues: { key: string; products: number }[] = [];
+  const orphanByKey = new Map<string, number>();
+  const orphanIds = new Set<string>();
+  for (const p of prods) {
+    const defined = new Set(getEffectiveFields(tpls, cats, p.category_id).map((f) => normalizeFieldName(f.name)));
+    let hasEmpty = false;
+    for (const [k, v] of Object.entries(p.data ?? {})) {
+      if (!hasValue(v)) {
+        hasEmpty = true;
+        continue;
+      }
+      const norm = normalizeFieldName(k);
+      if (!defined.has(norm) && !NEVER.has(norm)) {
+        orphanByKey.set(k, (orphanByKey.get(k) ?? 0) + 1);
+        orphanIds.add(p.id);
+      }
+    }
+    if (hasEmpty) {
+      emptyValues++;
+      emptyValueIds.push(p.id);
+    }
+  }
+  orphanByKey.forEach((n, key) => orphanValues.push({ key, products: n }));
+  orphanValues.sort((a, b) => b.products - a.products);
 
   const oldLimit = Date.now() - OLD_DAYS * 86400000;
   const drafts = prods.filter((p) => p.status === "draft");
@@ -67,12 +124,22 @@ async function summary(userId: string) {
       noCategory: noCategory.length,
       noPrice: noPrice.length,
       trash: trash.length,
+      emptyFields: emptyFields.length,
+      emptyValues,
+      orphanValues: orphanValues.reduce((s, o) => s + o.products, 0),
+    },
+    detail: {
+      emptyFields: emptyFields.map((f) => `${f.name}${f.scope && f.scope !== "todas" ? ` (${f.scope})` : ""}`),
+      orphanValues: orphanValues.slice(0, 12).map((o) => `${o.key} (${o.products})`),
     },
     ids: {
       oldDrafts: oldDrafts.map((p) => p.id),
       emptySubs: emptySubs.map((c) => c.id),
       emptyTops: emptyTops.map((c) => c.id),
       orphanPhotos,
+      emptyFields: emptyFields.map((f) => f.id),
+      emptyValueIds,
+      orphanIds: Array.from(orphanIds),
     },
     oldDays: OLD_DAYS,
     trashDays: TRASH_DAYS,
@@ -86,7 +153,7 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   const s = await summary(user.id);
-  return NextResponse.json({ counts: s.counts, oldDays: s.oldDays, trashDays: s.trashDays }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ counts: s.counts, detail: s.detail, oldDays: s.oldDays, trashDays: s.trashDays }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -128,6 +195,47 @@ export async function POST(request: Request) {
   if (set.has("orphanPhotos") && s.ids.orphanPhotos.length) {
     await admin.storage.from("product-images").remove(s.ids.orphanPhotos);
     done.orphanPhotos = s.ids.orphanPhotos.length;
+  }
+  if (set.has("emptyFields") && s.ids.emptyFields.length) {
+    // Quita los datos que nadie llena (la información guardada no se toca: esas columnas están vacías)
+    const { error } = await admin.from("field_templates").delete().in("id", s.ids.emptyFields);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    done.emptyFields = s.ids.emptyFields.length;
+  }
+  if ((set.has("emptyValues") || set.has("orphanValues")) && (s.ids.emptyValueIds.length || s.ids.orphanIds.length)) {
+    // Limpia dentro de cada producto: valores vacíos y/o datos sueltos que ya no pertenecen a su categoría
+    const ids = Array.from(new Set([...(set.has("emptyValues") ? s.ids.emptyValueIds : []), ...(set.has("orphanValues") ? s.ids.orphanIds : [])]));
+    const { data: rows } = await admin.from("products").select("id,category_id,data").in("id", ids);
+    const [{ data: cats2 }, { data: tpls2 }] = await Promise.all([
+      admin.from("categories").select("*").eq("user_id", user.id),
+      admin.from("field_templates").select("*").eq("user_id", user.id),
+    ]);
+    let cleanedEmpty = 0;
+    let cleanedOrphan = 0;
+    for (const row of rows ?? []) {
+      const defined = new Set(getEffectiveFields(tpls2 ?? [], cats2 ?? [], row.category_id).map((f) => normalizeFieldName(f.name)));
+      const next: ProductData = {};
+      let changed = false;
+      for (const [k, v] of Object.entries(row.data ?? {})) {
+        const empty = v === null || v === undefined || String(v).trim() === "";
+        const norm = normalizeFieldName(k);
+        const orphan = !empty && !defined.has(norm) && !KEEP_KEYS.has(norm);
+        if (empty && set.has("emptyValues")) {
+          changed = true;
+          cleanedEmpty++;
+          continue;
+        }
+        if (orphan && set.has("orphanValues")) {
+          changed = true;
+          cleanedOrphan++;
+          continue;
+        }
+        next[k] = v as ProductData[string];
+      }
+      if (changed) await admin.from("products").update({ data: next }).eq("id", row.id);
+    }
+    if (set.has("emptyValues")) done.emptyValues = cleanedEmpty;
+    if (set.has("orphanValues")) done.orphanValues = cleanedOrphan;
   }
   if (set.has("emptyTrash")) {
     // Vaciar la papelera: borrado definitivo con fotos

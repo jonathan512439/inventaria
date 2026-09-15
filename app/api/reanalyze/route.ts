@@ -18,6 +18,7 @@ import { resolveAiKey } from "@/lib/aiKey";
 import { applyDefaults, coerceValue, getEffectiveFields } from "@/lib/fields";
 import { categoryPath } from "@/lib/categories";
 import { parseProposals } from "@/lib/variants";
+import { parseExpiry } from "@/lib/inventory";
 import { userExamples } from "@/lib/aiExamples";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
 
@@ -159,9 +160,13 @@ export async function POST(request: Request) {
   });
   applyDefaults(effective, data);
 
+  // Vencimiento leído de la foto: solo se pone si el producto aún no tenía fecha (no pisa lo escrito a mano)
+  const expiresAt = product.expires_at ? null : parseExpiry(String(result[META_KEYS.vencimiento] ?? ""));
+  if (expiresAt) changed.push("vencimiento");
+
   const { data: updated, error } = await admin
     .from("products")
-    .update({ data, category_id: categoryId, ai_meta: { ...(product.ai_meta ?? {}), ...aiMeta } })
+    .update({ data, category_id: categoryId, ai_meta: { ...(product.ai_meta ?? {}), ...aiMeta }, ...(expiresAt ? { expires_at: expiresAt } : {}) })
     .eq("id", product_id)
     .select()
     .single();

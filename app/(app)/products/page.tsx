@@ -9,6 +9,7 @@ import type { Category, Product } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import { categoryColor } from "@/lib/colors";
+import { useFlow } from "@/components/FlowProvider";
 import { SUMMARY_COLS, computeShelves, fmtMoney, fromSummary, priceOf, stockOf, timeAgo, type CategoryStats } from "@/lib/inventory";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Photo from "@/components/ui/Photo";
@@ -26,6 +27,7 @@ export default function ProductsPage() {
   const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [salesMonth, setSalesMonth] = useState<{ total: number; count: number } | null>(null);
   const [variantsOf, setVariantsOf] = useState<Map<string, { stock: number }[]>>(new Map());
+  const { alerts } = useFlow();
 
   useEffect(() => {
     (async () => {
@@ -66,7 +68,7 @@ export default function ProductsPage() {
   }, [supabase]);
 
   const confirmed = useMemo(() => products.filter((p) => p.status === "confirmed"), [products]);
-  const { shelves, orphan, total } = useMemo(() => computeShelves(confirmed, categories, variantsOf), [confirmed, categories, variantsOf]);
+  const { shelves, orphan, total } = useMemo(() => computeShelves(confirmed, categories, variantsOf, alerts), [confirmed, categories, variantsOf, alerts]);
   const pendingCount = products.length - confirmed.length;
 
   // Búsqueda en el servidor (nombre, marca, descripción, etiqueta, código), con espera de 250 ms

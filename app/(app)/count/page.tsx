@@ -178,9 +178,19 @@ export default function CountPage() {
           <ListSkeleton rows={6} />
         ) : (
           <>
-            <div className="animate-in grid gap-2 sm:grid-cols-[1fr_auto]">
+            <div className="animate-in space-y-2">
               <BarcodeCamera onCode={onCode} label="Escanear para contar (+1 por lectura)" />
-              <button onClick={() => setOnlyPending((v) => !v)} className={`chip justify-center ${onlyPending ? "chip-active" : ""}`}>Solo sin contar</button>
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-2 shadow-card ring-1 ring-slate-900/10">
+                <button onClick={() => setOnlyPending((v) => !v)} className={`chip ${onlyPending ? "chip-active" : ""}`}>
+                  {onlyPending ? "Viendo solo los que faltan" : "Ocultar los ya contados"}
+                  <span className="opacity-70">{rows.length - stats.done}</span>
+                </button>
+                <span className="min-w-0 flex-1 text-[11px] text-slate-500">
+                  {onlyPending
+                    ? `Se muestran los ${rows.length - stats.done} productos a los que todavía no les escribiste el contado.`
+                    : `Se muestran los ${rows.length} productos de la categoría. Toca para ver solo los que faltan por contar.`}
+                </span>
+              </div>
             </div>
             <ul className="stagger space-y-1.5">
               {visibleRows.map((r) => {

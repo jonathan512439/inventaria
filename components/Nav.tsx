@@ -30,6 +30,7 @@ const MORE: { href: string; label: string; hint: string; Icon: (p: { size?: numb
   { href: "/store", label: "Mi tienda", hint: "categorías, datos y variantes", Icon: IconFolder },
   { href: "/dashboard#guia", label: "Guía paso a paso", hint: "cómo armar tu inventario", Icon: IconSparkles },
   { href: "/dashboard#limpiar", label: "Ordenar y limpiar", hint: "pendientes viejos, vacías, fotos sueltas", Icon: IconTrash },
+  { href: "/alerts", label: "Avisos de reposición", hint: "desde cuántas unidades avisar", Icon: IconAlert },
   { href: "/settings", label: "Ajustes", hint: "nombre del negocio, cuenta, ayuda", Icon: IconSettings },
 ];
 

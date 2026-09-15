@@ -6,6 +6,9 @@ export type Profile = {
   email: string | null;
   business_name: string | null;
   onboarded_at: string | null;
+  /** Avisos: mínimo por defecto y días de anticipación del vencimiento (null = valores de fábrica) */
+  min_stock_default: number | null;
+  expiry_days: number | null;
   created_at: string;
 };
 
@@ -16,6 +19,7 @@ export type Category = {
   name: string;
   icon: string | null;
   min_stock_default: number | null; // mínimo por defecto para los productos nuevos (categoría principal)
+  alerts_off: boolean; // no avisar de esta categoría
   created_at: string;
 };
 
@@ -169,6 +173,7 @@ export type ProductSummary = {
   search?: string | null;
   min_stock?: number | null;
   expires_at?: string | null;
+  alerts_off?: boolean;
   precio_mayorista?: number | null;
   unidades_por_paquete?: number | null;
 };
@@ -216,6 +221,7 @@ export type Product = {
   image_url: string | null;
   min_stock?: number | null;
   expires_at?: string | null;
+  alerts_off?: boolean; // descartado de los avisos de reposición / vencimiento
   deleted_at?: string | null; // papelera (borrado suave)
   created_at: string;
   updated_at: string;
@@ -233,7 +239,7 @@ export interface Database {
       };
       categories: {
         Row: Category;
-        Insert: Omit<Category, "id" | "created_at" | "icon" | "min_stock_default"> & { id?: string; created_at?: string; icon?: string | null; min_stock_default?: number | null };
+        Insert: Omit<Category, "id" | "created_at" | "icon" | "min_stock_default" | "alerts_off"> & { id?: string; created_at?: string; icon?: string | null; min_stock_default?: number | null; alerts_off?: boolean };
         Update: Partial<Category>;
         Relationships: [];
       };
@@ -396,6 +402,7 @@ export interface Database {
           image_url?: string | null;
           min_stock?: number | null;
           expires_at?: string | null;
+          alerts_off?: boolean;
           deleted_at?: string | null;
         };
         Update: Partial<Product>;

@@ -53,6 +53,7 @@ export const META_KEYS = {
   categoriaGeneral: "__categoria_general_nueva",
   etiqueta: "__etiqueta",
   variantes: "__variantes",
+  vencimiento: "__vencimiento",
 } as const;
 
 /** Opción cuando ningún catálogo preconfigurado sirve. */
@@ -115,6 +116,12 @@ export function buildResponseSchema(fields: FieldTemplate[], ctx: PromptContext)
       'Variantes VISIBLES del producto (tallas, colores, edades, sabores) en formato "talla: S, M, L; color: rojo, azul". Solo lo que se ve o se lee; cadena vacía si es un producto único o no se distingue.',
   };
   order.push(META_KEYS.variantes);
+  properties[META_KEYS.vencimiento] = {
+    type: "STRING",
+    description:
+      'Fecha de vencimiento/caducidad SI está impresa y es legible ("VENCE", "CAD", "EXP", "consumir antes de"). Cópiala tal cual la ves (p. ej. "31/01/2027", "01/2027", "ENE 2027"). Cadena vacía si no se ve o el producto no vence.',
+  };
+  order.push(META_KEYS.vencimiento);
 
   for (const f of fields) {
     if (f.field_type === "number") {
@@ -161,6 +168,7 @@ export function buildPrompt(fields: FieldTemplate[], ctx: PromptContext): string
     'Para "nombre" usa un nombre comercial corto y útil para buscar (marca + producto + variante, máx. 8 palabras). Para "descripcion" 1-2 frases concretas.',
     catLine,
     `Si en la foto se ven varias tallas, colores o edades del MISMO producto (etiqueta con S/M/L, prendas iguales de varios colores, caja "3-5 años"), enuméralas en "${META_KEYS.variantes}" con el formato "eje: valor, valor; eje: valor". Nunca inventes variantes que no se vean.`,
+    `Si el empaque muestra fecha de vencimiento o caducidad, cópiala en "${META_KEYS.vencimiento}" tal como aparece; no inventes ninguna ni uses la fecha de fabricación.`,
     "Prefiere SIEMPRE una subcategoría existente aunque no sea perfecta; propón una nueva solo si ninguna tiene relación. Las subcategorías nuevas deben ser genéricas (agrupan muchos productos), nunca el nombre de un producto.",
     catalogLine,
     ctx.examples?.length

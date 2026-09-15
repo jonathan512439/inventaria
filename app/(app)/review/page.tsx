@@ -72,6 +72,7 @@ function Review() {
   const [openPicker, setOpenPicker] = useState<{ step: string | null; nonce: number } | null>(null);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [expiresAt, setExpiresAt] = useState<string>(""); // vencimiento (lo lee la IA de la foto si está impreso)
 
   /** Duplicado: sumar el stock del pendiente al producto existente y borrar el pendiente (y su foto). */
   async function mergeIntoExisting(existingId: string) {
@@ -225,6 +226,7 @@ function Review() {
     const fields = getEffectiveFields(templates, categories, current.category_id);
     const data = applyDefaults(fields, canonicalizeData(current.data, fields));
     setDraft({ data, categoryId: current.category_id });
+    setExpiresAt(current.expires_at ?? "");
     // Variantes: las ya guardadas (si volvió a este pendiente) o las que propuso la IA
     setVariantsOn(null);
     setChosen({});
@@ -331,7 +333,7 @@ function Review() {
     if (!withVariants && existingVariants.length) await supabase.from("product_variants").delete().eq("product_id", current.id);
     const { error } = await supabase
       .from("products")
-      .update({ data: clean, category_id: draft.categoryId, status })
+      .update({ data: clean, category_id: draft.categoryId, status, expires_at: expiresAt || null })
       .eq("id", current.id);
     if (!error && withVariants) await saveVariants(current.id);
     setSaving(false);
@@ -724,6 +726,18 @@ function Review() {
               </div>
             </section>
           )}
+
+          {/* Vencimiento: lo lee la IA del empaque; se puede cambiar o dejar sin fecha */}
+          <section className={`rounded-2xl border-2 p-3 ${expiresAt ? "border-amber-200 bg-amber-50/50" : "border-slate-200"}`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-ink">¿Vence?</span>
+              {current.expires_at && expiresAt === current.expires_at && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800">✨ leído del empaque</span>}
+              <span className="flex-1" />
+              <input type="date" className="input w-auto py-1.5 text-sm" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+              <button type="button" onClick={() => setExpiresAt("")} className={`chip ${expiresAt === "" ? "chip-active" : ""}`}>Sin fecha</button>
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">{expiresAt ? `Se avisará antes del ${new Date(expiresAt + "T00:00:00").toLocaleDateString("es")}.` : "No perecedero: no se avisará de vencimiento."}</p>
+          </section>
 
           {/* Resto de datos, plegado */}
           {otherFields.length > 0 && (

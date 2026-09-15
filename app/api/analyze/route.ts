@@ -18,6 +18,7 @@ import { resolveAiKey } from "@/lib/aiKey";
 import { getEffectiveFields, coerceValue, applyDefaults } from "@/lib/fields";
 import { categoryPath } from "@/lib/categories";
 import { parseProposals } from "@/lib/variants";
+import { parseExpiry } from "@/lib/inventory";
 import { userExamples } from "@/lib/aiExamples";
 import { findDuplicate } from "@/lib/duplicates";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
@@ -208,13 +209,15 @@ export async function POST(request: Request) {
   const { data: others } = await supabase.from("product_summaries").select("id,nombre,marca,codigo_barras,status").neq("id", productId).limit(2000);
   const nameKeyField = effective.find((f) => /^(nombre|name|producto|titulo)$/i.test(f.name))?.name ?? "nombre";
   const codeField = Object.keys(data).find((k) => /^(codigo_barras|codigo|sku|barcode|ean)$/i.test(k));
+  const expiresAt = parseExpiry(String(result[META_KEYS.vencimiento] ?? ""));
+
   const dup = findDuplicate(others ?? [], { nombre: String(data[nameKeyField] ?? ""), marca: String(data.marca ?? ""), codigo: codeField ? String(data[codeField] ?? "") : null }, productId);
   if (dup) aiMeta.posible_duplicado = { product_id: dup.product_id, nombre: dup.nombre, motivo: dup.motivo };
 
   // 5. Crear pendiente
   const { data: product, error: insErr } = await admin
     .from("products")
-    .insert({ id: productId, user_id: user.id, category_id: categoryId, status: "draft", data, ai_meta: aiMeta, image_url: publicUrl })
+    .insert({ id: productId, user_id: user.id, category_id: categoryId, status: "draft", data, ai_meta: aiMeta, image_url: publicUrl, expires_at: expiresAt })
     .select()
     .single();
   if (insErr) {

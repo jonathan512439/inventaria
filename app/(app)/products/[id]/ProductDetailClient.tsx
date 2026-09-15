@@ -286,8 +286,13 @@ export default function ProductDetailClient() {
             </div>
             <div>
               <label className="label" htmlFor="expires">Vence el</label>
-              <input id="expires" type="date" className="input" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
-              <p className="mt-1 text-[11px] text-slate-500">Avisa 30 días antes. Vacío = no vence.</p>
+              <div className="flex gap-2">
+                <input id="expires" type="date" className="input" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+                <button type="button" onClick={() => setExpiresAt("")} className={`chip shrink-0 ${expiresAt === "" ? "chip-active" : ""}`} title="Producto que no vence">
+                  Sin fecha
+                </button>
+              </div>
+              <p className="mt-1 text-[11px] text-slate-500">{expiresAt ? "Se avisa antes de que venza (días configurables en Ajustes → Avisos)." : "Sin fecha: no vence (no perecedero). Toca el calendario solo si quieres ponerle fecha."}</p>
             </div>
           </div>
 

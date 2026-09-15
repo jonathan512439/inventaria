@@ -6,6 +6,7 @@ import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } fr
 import { axesFor, summarizeVariants } from "@/lib/variants";
 import { fieldLabel, getEffectiveFields, getValue, productTitle } from "@/lib/fields";
 import { daysToExpiry, fmtMoney, minStockOf, needsRestock, priceOf, stockOf } from "@/lib/inventory";
+import { useFlow } from "./FlowProvider";
 import { categoryColor } from "@/lib/colors";
 import Photo from "./ui/Photo";
 import { IconBox, IconChevronRight } from "./ui/Icons";
@@ -28,11 +29,12 @@ const MAX_VISIBLE = 4;
 /** Fila de inventario: foto, nombre, datos, precio, stock y atajo ± . Nunca más ancha que la pantalla. */
 export default function ProductRow({ product: p, categories, templates, showSub, variants = [], axes = [], onAdjust }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const { alerts } = useFlow();
   const price = priceOf(p);
   const stock = stockOf(p);
   const out = (stock ?? 0) <= 0;
-  const low = !out && needsRestock(p, categories);
-  const minStock = minStockOf(p, categories);
+  const low = !out && needsRestock(p, categories, alerts);
+  const minStock = minStockOf(p, categories, alerts);
   const days = daysToExpiry(p.expires_at);
   const cat = p.category_id ? categories.find((c) => c.id === p.category_id) : null;
   const top = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) ?? cat : cat;

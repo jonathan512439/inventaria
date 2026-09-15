@@ -8,6 +8,7 @@ import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } fr
 import { getDescendantIds } from "@/lib/categories";
 import { categoryColor } from "@/lib/colors";
 import { SUMMARY_COLS, applyFilters, fromSummary, type Filter } from "@/lib/inventory";
+import { useFlow } from "@/components/FlowProvider";
 import { exportToExcel } from "@/lib/export";
 import ProductTable from "@/components/ProductTable";
 import ProductRow from "@/components/ProductRow";
@@ -29,6 +30,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 export default function CategoryInventoryClient() {
   const { id } = useParams<{ id: string }>();
   const supabase = createClient();
+  const { alerts } = useFlow();
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
   // Resúmenes ligeros de toda la categoría (para chips, filtros y conteos) + filas completas solo de la página visible
@@ -127,7 +129,7 @@ export default function CategoryInventoryClient() {
   };
   const inTop = useMemo(() => (top ? products.filter((p) => p.category_id && getDescendantIds(categories, top.id).includes(p.category_id)) : products), [products, categories, top]);
   const scoped = useMemo(() => (sub ? inTop.filter((p) => p.category_id && getDescendantIds(categories, sub).includes(p.category_id)) : inTop), [inTop, sub, categories]);
-  const visible = useMemo(() => applyFilters(scoped, filters, variantsOf, categories), [scoped, filters, variantsOf, categories]);
+  const visible = useMemo(() => applyFilters(scoped, filters, variantsOf, categories, alerts), [scoped, filters, variantsOf, categories, alerts]);
   // Página visible: filas completas (datos, variantes) solo para lo que se muestra
   const pageIds = useMemo(() => visible.slice(0, limit).map((p) => p.id), [visible, limit]);
   useEffect(() => {
