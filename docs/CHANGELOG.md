@@ -3,6 +3,35 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-15 · Ajustes tras las pruebas funcionales (Fase 2)
+
+### 12.11 Avisos de reposición configurables (Ajustes → Avisos)
+- **Qué**: nueva pantalla **Ajustes → Avisos de reposición** (también en Más y desde «Por reponer»): (a) **General**: desde cuántas unidades avisar en todo el negocio y cuántos **días antes del vencimiento**; (b) **por categoría**: su propio mínimo y un interruptor para que esa categoría no avise; (c) **Por producto**: buscador con el mínimo de cada uno (vacío = el de su categoría) y su interruptor; (d) **Sin avisos**: lo silenciado, para reactivarlo. Ya no hay ningún número fijo: el 3 y los 30 días son solo el valor de partida.
+- **Validar**: Ajustes → Avisos → poner «avisar desde 6» → Guardar; un producto con stock 5 pasa a «por reponer». Apagar el interruptor de una categoría → sus productos dejan de aparecer en Por reponer y en el Inicio.
+
+### 12.12 Descartar deslizando (Por reponer y Por vencer)
+- **Qué**: deslizar una fila **a la izquierda** la descarta (ese producto deja de avisar), con **Deshacer** en el aviso; en computadora hay una ✕ al pasar el ratón. Lo descartado queda en **Ajustes → Avisos → Sin avisos** para reactivarlo cuando se quiera.
+- **Validar**: en Por reponer, deslizar una fila → desaparece y el aviso ofrece Deshacer; Ajustes → Avisos → Sin avisos → aparece ahí.
+
+### 12.13 Toma de inventario: cámara y «Solo sin contar»
+- **Qué**: **corregido** el fallo «No se pudo abrir la cámara» aun con permisos: se pedía la cámara antes de que existiera la vista de vídeo. Ahora el vídeo se prepara primero y, si algo falla, el mensaje dice la causa real (permiso bloqueado, sin cámara, cámara ocupada, sitio no seguro) con **Reintentar**. El botón «Solo sin contar» pasa a ser **«Ocultar los ya contados» / «Viendo solo los que faltan»** con el número y una frase que explica qué se está viendo.
+- **Validar**: Toma de inventario → categoría → *Escanear para contar* → se abre la cámara y cada lectura suma 1; el botón de filtro explica qué muestra.
+
+### 12.14 La IA lee la fecha de vencimiento del empaque
+- **Qué**: en cada análisis la IA copia la fecha impresa («VENCE», «CAD», «EXP», «consumir antes de») y la app la normaliza: acepta `31/01/2027`, `01/2027`, `2027-01`, `ENE 2027`, `31 ene 27`; si solo hay mes y año usa el último día del mes; descarta lotes y fechas imposibles. Al **volver a analizar** solo se pone si el producto aún no tenía fecha (nunca pisa lo escrito a mano).
+- **Validar**: foto de un envase con vencimiento impreso → en Revisar aparece «¿Vence? · ✨ leído del empaque» con la fecha.
+
+### 12.15 «Sin fecha» para productos que no vencen
+- **Qué**: junto al calendario, en **Revisar** y en la **ficha**, hay un botón **Sin fecha**: deja el producto como no perecedero y evita que se guarde una fecha por tocar el calendario sin querer. El texto de ayuda dice qué pasará en cada caso.
+- **Validar**: abrir un producto → *Sin fecha* → guardar → no vuelve a aparecer en «Por vencer».
+
+### 12.16 Ordenar y limpiar: datos que sobran
+- **Qué**: además de pendientes viejos, categorías vacías y fotos sueltas, ahora detecta y limpia: **datos que nadie llena** (columnas definidas en una categoría con al menos 3 productos y siempre vacías → se borra la columna, no la información), **casillas vacías guardadas** dentro de los productos (ensucian el Excel y ocupan espacio) y **datos sueltos de otra categoría** (claves que quedaron al mover un producto, con su nombre y cuántos productos las tienen). Nunca se tocan nombre, precio, stock, costo ni código de barras.
+- **Validar**: Inicio → Más herramientas → Ordenar y limpiar → marcar las tres filas nuevas → Limpiar; el Excel deja de traer columnas vacías y los formularios dejan de pedir datos que nadie usa.
+- **Comprobado en producción**: 10/10 en la prueba automática (detección y limpieza, conservando lo que sí se usa).
+
+---
+
 ## 2026-09-15 · Plan v3 · Fase 2 — Control real de stock
 
 Migración `supabase/010_control_stock.sql` aplicada: mínimos y vencimientos, papelera, proveedores y compras, toma de inventario, historial de precios; la vista `product_summaries` excluye la papelera y expone mínimo, vencimiento, precio mayorista y unidades por paquete.

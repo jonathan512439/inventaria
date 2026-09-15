@@ -63,7 +63,7 @@ Lo que quedó sin culminar de v2 más lo que salga de las pruebas funcionales de
 
 Que el número de stock sea creíble y avise antes de que falte.
 
-- ✅ (12.1) **Stock mínimo** por producto y por variante (`min_stock`), con valor por defecto por categoría; «por reponer» reemplaza al ≤3 fijo (`LOW_STOCK_MAX`).
+- ✅ (12.1, 12.11) **Stock mínimo** por producto y por variante (`min_stock`), con valor por defecto por categoría; «por reponer» reemplaza al ≤3 fijo (`LOW_STOCK_MAX`).
 - ✅ (12.2) **Lista de reposición** generada sola (producto, variante, faltante, proveedor si existe), compartible por WhatsApp (texto) o Excel.
 - ✅ (12.5) **Toma de inventario física:** tablas `stock_counts` / `stock_count_items`; modo «contar» por categoría con escáner o lista, diferencia contra el sistema, ajuste con motivo (`stock_movements.tipo = 'ajuste'`), acta con fecha y quién contó.
 - ✅ (12.3) **Vencimientos:** `expires_at` por producto y por lote de compra; alertas a 30 / 7 días en Inicio y filtro «por vencer» en el inventario.
@@ -223,6 +223,6 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
-- 2026-09-15 · Fase 2 (12.1–12.9) desplegada.
+- 2026-09-15 · Fase 2 (12.1–12.10) desplegada + ajustes de las pruebas funcionales (12.11–12.16): avisos configurables, descartar deslizando, cámara del conteo, vencimiento por IA y limpieza de datos que sobran.
 - 2026-09-15 · Fase 0 (10.1–10.2) y Fase 1 (11.1–11.6) desplegadas; queda abierta la lista de correcciones de las pruebas funcionales.
 - 2026-09-15 · v3.0 · Plan inicial (sustituye a la página externa publicada el mismo día; a partir de ahora toda planificación vive en este archivo).
