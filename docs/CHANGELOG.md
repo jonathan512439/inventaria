@@ -3,6 +3,33 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-15 · Plan v3 · Fase 1 — Cerrar la promesa central
+
+### 11.1 ¿Ya lo tienes? (duplicados al analizar)
+- **Qué**: al analizar una foto, el servidor compara el resultado con el inventario (y los pendientes): mismo **código de barras**, mismo **nombre** o **nombre muy parecido** (≥ 60 % de palabras en común y misma marca si ambas existen) → `ai_meta.posible_duplicado`. En Revisar aparece el aviso ámbar «¿Es el mismo producto que ya tienes?» con **Sí, sumar N al stock** (suma el stock del pendiente al producto existente, registra una entrada «foto repetida», borra el pendiente y su foto) o **No, es otro** (quita el aviso). Si el existente tiene variantes, se descarta el pendiente y se ofrece abrir su ficha para sumar en la casilla correcta.
+- **Validar**: fotografiar dos veces el mismo producto → en el segundo pendiente sale el aviso con el nombre del primero; «Sí, sumar» deja el stock sumado y un solo producto.
+
+### 11.2 La IA aprende de lo que confirmas
+- **Qué**: cada análisis (y re-análisis) incluye en el prompt hasta 8 productos ya confirmados por el usuario con su ubicación («Ropa > Dama → «Polera básica Adidas» (marca Adidas)», máx. 2 por subcategoría, los más recientes) como ejemplos de estilo. Sin entrenamiento ni coste extra.
+- **Validar**: tras confirmar varios productos escribiendo la marca de cierta forma, los nuevos análisis imitan ese estilo de nombre y ubican productos parecidos en la misma subcategoría.
+
+### 11.3 Foto de estante → varios productos
+- **Qué**: en **Agregar**, nueva opción **Foto de estante · varios productos** (1 análisis). `POST /api/detect` pide a la IA los productos distintos visibles con su recuadro; la app muestra la foto con los recuadros numerados y una lista con casillas (todos marcados). Al confirmar, cada producto marcado se **recorta** (con 6 % de margen) y se **encola como foto individual**, que se analiza como siempre (1 análisis por producto). No se crea nada sin confirmar.
+- **Validar**: Agregar → Foto de estante → foto de una repisa con 5 productos → se ven 5 recuadros; desmarcar 1 → «Agregar 4 productos a la cola» → aparecen 4 pendientes en Revisar.
+
+### 11.4 Clave de IA propia (BYOK)
+- **Qué**: **Ajustes → Clave de IA propia**: el usuario pega su clave de Google Gemini (con instrucciones en 3 pasos). El servidor la comprueba contra Google, la guarda **cifrada** (AES-GCM con `KEY_ENCRYPTION_SECRET`, tabla `ai_keys` sin acceso desde el cliente) y desde entonces todos los análisis (foto, re-análisis, categoría con IA, clasificación, detección) usan esa clave. El **medidor** muestra «con tu clave propia» y cuenta solo su consumo (`ai_usage.own_key`), sin tocar el cupo compartido; el cupo agotado se lleva por clave. Se puede quitar en cualquier momento. Acepta el formato nuevo de claves (con punto).
+- **Validar**: Ajustes → Usar mi propia clave → pegar una clave inválida → error claro; pegar la real → «Usando tu clave (…últimos 4)»; Inicio → el medidor dice «con tu clave propia» y parte de 0.
+
+### 11.5 Sin conexión
+- **Qué**: **Mi inventario** y cada **categoría** guardan una copia en el celular (IndexedDB); sin red se muestran con el aviso «Sin conexión · datos guardados a las HH:MM». **+/− Stock** sin red (o si la red falla a mitad) guarda el movimiento en el celular con aviso; al reconectar (o al abrir la app) se envía aplicando el cambio sobre el **stock real de ese momento** (no pisa cambios hechos desde otro celular) y registra el movimiento con su hora original. Barra superior mientras hay cambios pendientes.
+- **Validar**: abrir Inventario, activar modo avión, recargar → se ve el inventario con el aviso; hacer +/− Stock → «guardado en el celular»; quitar modo avión → aviso «1 cambio… ya se enviaron» y el stock actualizado.
+
+### 11.6 Pruebas
+- `npm run test:e2e` ampliado: duplicado detectado en la segunda foto, `/api/detect` devuelve productos sin crear nada, clave inválida rechazada, clave válida guardada cifrada, medidor con cupo propio y consumo marcado `own_key`, clave quitada. **31/31 en verde contra producción.**
+
+---
+
 ## 2026-09-15 · Plan v3 · Fase 0 — Cierre del Plan v2 y correcciones
 
 ### 10.1 Pruebas e2e con variantes y escáner

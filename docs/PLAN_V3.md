@@ -47,15 +47,15 @@ Lo que quedó sin culminar de v2 más lo que salga de las pruebas funcionales de
 
 **Acepta cuando** `npm run test:e2e` cubre foto → variantes → escáner por variante, la lista de correcciones queda en cero y un inventario de 500 productos abre en menos de 2 s en 3G.
 
-## Fase 1 · Cerrar la promesa central (2 semanas)
+## Fase 1 · Cerrar la promesa central (2 semanas) — desplegada 2026-09-15 (CHANGELOG 11.x)
 
 «Foto → inventario ordenado» tiene que ser rápido, sin duplicados y sin depender del cupo gratuito.
 
-- **Foto de estante → varios productos.** `POST /api/detect`: Gemini devuelve los productos detectados con su recuadro (`{nombre_visible, box:[x0,y0,x1,y1]}`); el cliente recorta cada uno (canvas) y lo encola como foto individual con `lib/queue`. Una petición para detectar + una por producto; el usuario marca cuáles encolar antes de gastar cupo.
-- **Duplicados al analizar.** En `/api/analyze` y en Revisar: comparación por código de barras, `nameKey(nombre)` y marca contra el inventario del usuario; `ai_meta.posible_duplicado = {product_id, motivo}`. En Revisar aparece «Ya lo tienes: … → Sumar stock» (suma y borra el pendiente) o «Es otro producto».
-- **La IA aprende del usuario.** `buildPrompt` recibe hasta 5 productos confirmados de la misma subcategoría (nombre, marca, 2 campos) como ejemplos de estilo; se eligen por `updated_at` reciente. Sin entrenamiento, sin coste extra relevante.
-- **Cupo de IA (BYOK).** Tabla `ai_keys(user_id, provider, key_ciphertext, iv, created_at)`; cifrado AES-GCM con secreto `KEY_ENCRYPTION_SECRET` en Cloudflare; se descifra solo en `lib/gemini` dentro de las rutas de análisis. Ajustes → «Usar mi propia clave de Gemini»; el medidor muestra qué clave se usa.
-- **Sin conexión.** Caché del inventario (IndexedDB, misma técnica de `lib/queue`) para consulta; cola de movimientos de stock que se sincroniza al reconectar («último gana», aviso en pantalla). Service worker sigue sin cachear datos de red.
+- ✅ (11.3) **Foto de estante → varios productos.** `POST /api/detect`: Gemini devuelve los productos detectados con su recuadro (`{nombre_visible, box:[x0,y0,x1,y1]}`); el cliente recorta cada uno (canvas) y lo encola como foto individual con `lib/queue`. Una petición para detectar + una por producto; el usuario marca cuáles encolar antes de gastar cupo.
+- ✅ (11.1) **Duplicados al analizar.** En `/api/analyze` y en Revisar: comparación por código de barras, `nameKey(nombre)` y marca contra el inventario del usuario; `ai_meta.posible_duplicado = {product_id, motivo}`. En Revisar aparece «Ya lo tienes: … → Sumar stock» (suma y borra el pendiente) o «Es otro producto».
+- ✅ (11.2) **La IA aprende del usuario.** `buildPrompt` recibe hasta 5 productos confirmados de la misma subcategoría (nombre, marca, 2 campos) como ejemplos de estilo; se eligen por `updated_at` reciente. Sin entrenamiento, sin coste extra relevante.
+- ✅ (11.4) **Cupo de IA (BYOK).** Tabla `ai_keys(user_id, provider, key_ciphertext, iv, created_at)`; cifrado AES-GCM con secreto `KEY_ENCRYPTION_SECRET` en Cloudflare; se descifra solo en `lib/gemini` dentro de las rutas de análisis. Ajustes → «Usar mi propia clave de Gemini»; el medidor muestra qué clave se usa.
+- ✅ (11.5) **Sin conexión.** Caché del inventario (IndexedDB, misma técnica de `lib/queue`) para consulta; cola de movimientos de stock que se sincroniza al reconectar («último gana», aviso en pantalla). Service worker sigue sin cachear datos de red.
 
 **Acepta cuando** 10 productos de un estante entran con una foto en menos de 2 minutos; el mismo producto fotografiado dos veces no se duplica; con el celular en modo avión se registra una venta y aparece al reconectar; con clave propia el medidor deja de contar contra el cupo del servicio.
 
@@ -216,4 +216,5 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
+- 2026-09-15 · Fase 0 (10.1–10.2) y Fase 1 (11.1–11.6) desplegadas; queda abierta la lista de correcciones de las pruebas funcionales.
 - 2026-09-15 · v3.0 · Plan inicial (sustituye a la página externa publicada el mismo día; a partir de ahora toda planificación vive en este archivo).

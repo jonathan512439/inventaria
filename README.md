@@ -122,7 +122,7 @@ Configuración inicial (una vez):
 
 Cambios de base de datos: `npm run db:sql supabase/<archivo>.sql` (usa `SUPABASE_ACCESS_TOKEN`).
 
-Migraciones aplicadas: `migrations.sql` (001) → `002_lote_defaults.sql` → `003_tipos_de_producto.sql` → `004_profiles_insert.sql` → `005_ai_usage.sql` → `006_stock_movements.sql` → `007_variantes.sql` (ejes por categoría, variantes con stock propio y disparadores que mantienen el stock del producto = suma de variantes). Pruebas: `npm run test:e2e` (flujo completo, consume IA) y `npm run test:variants` (reglas de variantes en la base de datos, sin IA).
+Migraciones aplicadas: `migrations.sql` (001) → `002_lote_defaults.sql` → `003_tipos_de_producto.sql` → `004_profiles_insert.sql` → `005_ai_usage.sql` → `006_stock_movements.sql` → `007_variantes.sql` (ejes por categoría, variantes con stock propio y disparadores que mantienen el stock del producto = suma de variantes) → `008_product_summaries.sql` (vista ligera del inventario) → `009_ai_keys.sql` (clave de IA propia cifrada; `KEY_ENCRYPTION_SECRET` en Cloudflare). Pruebas: `npm run test:e2e` (flujo completo, consume IA) y `npm run test:variants` (reglas de variantes en la base de datos, sin IA).
 
 > ⚠️ No construyas para Cloudflare desde Windows: `vercel build` mezcla los bundles de las rutas (una ruta sirve el código de otra). `npm run deploy` (manual) solo debe usarse en Linux/macOS/WSL.
 
