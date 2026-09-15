@@ -3,6 +3,31 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-15 · Plan v3 · Fase 6 (parte 1) — El negocio y su equipo
+
+Migraciones `014_negocios.sql` → `018_pin_privado.sql` aplicadas. **Verificación de la migración:** conteos iguales antes y después en las 20 tablas y todas las filas con negocio; `npm run test:team` 18/18 y `npm run test:e2e` 58/58 en verde contra producción.
+
+### 16.1 El negocio como unidad de datos
+- **Qué**: cada cuenta existente pasó a ser un **negocio** propio (con su dueño) sin que nada cambie a la vista. Todas las tablas llevan `business_id` y la seguridad (RLS) es **por negocio**: quien es miembro ve y edita lo del negocio; nadie más. La base rellena el negocio en cada alta (no depende de la app) y crea el negocio al registrarse. El número de venta es por negocio y el cierre de caja es uno por negocio y día. Las rutas que escriben con la clave del servidor (foto → producto, alta por código) envían el negocio; Ordenar y limpiar trabaja por negocio.
+- **Validar**: todo sigue igual para ti; en Ajustes aparece **Equipo** con tu nombre como Dueño.
+
+### 16.2 Equipo (`/team`): roles, invitaciones y PIN
+- **Qué**: **Ajustes → Equipo** (y Más → Configurar): la lista de personas con su rol (**Dueño** / **Vendedor**), nombre editable, quitar/reactivar; **Invitar** genera un código de 6 letras (vale 7 días) para vendedor o dueño, con botón de WhatsApp; la persona se registra y entra a `/join` con el código (o abre el enlace). **Mi PIN**: 4 números guardados en una tabla privada (hash con sal; nunca viaja al celular; se bloquea 10 minutos tras 5 intentos).
+- **Validar**: Equipo → Código para vendedor → WhatsApp → desde otra cuenta abrir el enlace → aparece como vendedor; el dueño puede quitarlo y deja de ver el negocio.
+
+### 16.3 ¿Quién atiende? (firma)
+- **Qué**: en el Inicio, cuando hay más de una persona, la pastilla **«Atiende Pedro ▾»**: se toca, se elige la persona y se escribe su PIN. Desde ese momento cada venta, movimiento, conteo, compra, abono o cierre queda **firmado** por ella aunque el celular tenga la sesión del dueño (la base valida que sea miembro activo). «Volver a mi cuenta» quita la firma. Mientras atiende un vendedor, la app se comporta como vendedor.
+- **Validar**: pasar a un vendedor con PIN → registrar una venta → en Ventas y movimientos figura a su nombre.
+
+### 16.4 Lo que el vendedor no ve
+- **Qué**: precio de compra, ganancia (Inventario, Ventas, Caja, tickets, Resumen de hoy, Pregúntale), historial de precios y las pantallas del dueño: Cómo va el negocio, Anotar una compra, Cambiar precios, Descargar en Excel, Mi tienda, Cuándo avisarme, Ordenar y limpiar (muestran «Esto lo maneja el dueño»). En la base, la vista del inventario ya **no entrega el costo** a un vendedor; el ocultamiento completo del costo en `products.data` se remata en la Fase 7 con la matriz de acceso.
+- **Validar**: entrar como vendedor → Más no muestra esas opciones; Inventario no muestra ganancia; la ficha no muestra precio de compra.
+
+### 16.5 Pendiente de la fase (parte 2)
+- Importar Excel con mapeo guiado, respaldos automáticos y exportación total, etiquetas imprimibles con código/QR.
+
+---
+
 ## 2026-09-15 · Plan v3 · Fase 5 — Información que hoy no existe
 
 ### 15.1 Cómo va el negocio (`/reports`)

@@ -24,6 +24,9 @@ const check = (ok, msg) => { console.log(`${ok ? "✓" : "✗"} ${msg}`); if (!o
 const { data: created, error: cErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
 if (cErr) { console.error(cErr.message); process.exit(1); }
 const uid = created.user.id;
+// Las inserciones con la clave de servicio no tienen sesión: se envía el negocio del usuario explícitamente
+const { data: biz } = await admin.from("businesses").select("id").eq("owner_id", uid).single();
+const B = { business_id: biz.id };
 try {
   const { data: sess } = await createClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } }).auth.signInWithPassword({ email, password });
   const ref = new URL(url).hostname.split(".")[0];
@@ -62,7 +65,7 @@ try {
   check(r.status === 200, `classify: ${r.status} → ${cl.subcategory ?? "categoría general"}`);
 
   // 5. Alta manual (inserción directa como hace la pantalla)
-  const { error: insErr } = await admin.from("products").insert({ user_id: uid, category_id: cats.find((c) => c.name === "Regalos").id, status: "confirmed", data: { nombre: "Taza", precio: 12.5, stock: 3 }, ai_meta: {} });
+  const { error: insErr } = await admin.from("products").insert({ user_id: uid, ...B, category_id: cats.find((c) => c.name === "Regalos").id, status: "confirmed", data: { nombre: "Taza", precio: 12.5, stock: 3 }, ai_meta: {} });
   check(!insErr, "alta manual guardada con decimales (12.5)");
 
   // 6. Variantes: catálogo Ropa trae ejes; producto con variantes; stock derivado
@@ -73,11 +76,11 @@ try {
   const { data: axes } = await admin.from("variant_axes").select("key,label,options").eq("category_id", ropa.id).order("sort_order");
   check(axes?.length === 2 && axes[0].key === "talla" && axes[1].key === "color", `ejes de Ropa: ${axes?.map((a) => a.label).join(" + ")}`);
   const dama = cats2.find((c) => c.parent_id === ropa.id && c.name === "Dama");
-  const { data: polera } = await admin.from("products").insert({ user_id: uid, category_id: dama.id, status: "confirmed", data: { nombre: "Polera básica", precio: 35, stock: 1 }, ai_meta: {} }).select().single();
+  const { data: polera } = await admin.from("products").insert({ user_id: uid, ...B, category_id: dama.id, status: "confirmed", data: { nombre: "Polera básica", precio: 35, stock: 1 }, ai_meta: {} }).select().single();
   const { error: vErr } = await admin.from("product_variants").insert([
-    { user_id: uid, product_id: polera.id, values: { talla: "S", color: "Rojo" }, label: "S · Rojo", stock: 3 },
-    { user_id: uid, product_id: polera.id, values: { talla: "M", color: "Rojo" }, label: "M · Rojo", stock: 5, codigo_barras: "E2E-7791234567890" },
-    { user_id: uid, product_id: polera.id, values: { talla: "L", color: "Azul" }, label: "L · Azul", stock: 0 },
+    { user_id: uid, ...B, product_id: polera.id, values: { talla: "S", color: "Rojo" }, label: "S · Rojo", stock: 3 },
+    { user_id: uid, ...B, product_id: polera.id, values: { talla: "M", color: "Rojo" }, label: "M · Rojo", stock: 5, codigo_barras: "E2E-7791234567890" },
+    { user_id: uid, ...B, product_id: polera.id, values: { talla: "L", color: "Azul" }, label: "L · Azul", stock: 0 },
   ]);
   check(!vErr, `variantes creadas ${vErr?.message ?? ""}`);
   const { data: p1 } = await admin.from("products").select("data").eq("id", polera.id).single();
@@ -100,7 +103,7 @@ try {
   // 8. Venta por variante (como hace +/− Stock): stock de la variante baja, el total también, movimiento con variante
   const { data: mRoja } = await admin.from("product_variants").select("*").eq("product_id", polera.id).eq("label", "M · Rojo").single();
   await admin.from("product_variants").update({ stock: mRoja.stock - 2 }).eq("id", mRoja.id);
-  await admin.from("stock_movements").insert({ user_id: uid, product_id: polera.id, product_name: "Polera básica", variant_id: mRoja.id, variant_label: mRoja.label, tipo: "venta", cantidad: 2, precio_unitario: 35, total: 70, stock_resultante: mRoja.stock - 2 });
+  await admin.from("stock_movements").insert({ user_id: uid, ...B, product_id: polera.id, product_name: "Polera básica", variant_id: mRoja.id, variant_label: mRoja.label, tipo: "venta", cantidad: 2, precio_unitario: 35, total: 70, stock_resultante: mRoja.stock - 2 });
   const { data: p2 } = await admin.from("products").select("data").eq("id", polera.id).single();
   check(p2.data.stock === 6, `venta de 2 M rojas → stock total 6 → ${p2.data.stock}`);
   const { data: mv } = await admin.from("stock_movements").select("variant_label,total").eq("product_id", polera.id);
@@ -165,39 +168,40 @@ try {
   ({ data: sTaza } = await admin.from("product_summaries").select("id").eq("id", taza.id).maybeSingle());
   check(!!sTaza, "recuperado de la papelera vuelve al inventario");
   // Compra: proveedor + ítem → stock sube, costo se guarda, movimiento enlazado
-  const { data: sup } = await admin.from("suppliers").insert({ user_id: uid, name: "Distribuidora E2E", phone: "70000000" }).select().single();
-  const { data: pur } = await admin.from("purchases").insert({ user_id: uid, supplier_id: sup.id, supplier_name: sup.name, total: 30, items: 1 }).select().single();
-  await admin.from("purchase_items").insert({ purchase_id: pur.id, user_id: uid, product_id: taza.id, product_name: "Taza", qty: 3, unit_cost: 10, expires_at: "2027-01-31" });
+  const { data: sup } = await admin.from("suppliers").insert({ user_id: uid, ...B, name: "Distribuidora E2E", phone: "70000000" }).select().single();
+  const { data: pur } = await admin.from("purchases").insert({ user_id: uid, ...B, supplier_id: sup.id, supplier_name: sup.name, total: 30, items: 1 }).select().single();
+  await admin.from("purchase_items").insert({ purchase_id: pur.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", qty: 3, unit_cost: 10, expires_at: "2027-01-31" });
   const { data: tz } = await admin.from("products").select("data").eq("id", taza.id).single();
   await admin.from("products").update({ data: { ...tz.data, stock: 10, precio_compra: 10 }, expires_at: "2027-01-31" }).eq("id", taza.id);
-  await admin.from("stock_movements").insert({ user_id: uid, product_id: taza.id, product_name: "Taza", tipo: "entrada", cantidad: 3, precio_unitario: 10, motivo: "compra · Distribuidora E2E", stock_resultante: 10, purchase_id: pur.id });
+  await admin.from("stock_movements").insert({ user_id: uid, ...B, product_id: taza.id, product_name: "Taza", tipo: "entrada", cantidad: 3, precio_unitario: 10, motivo: "compra · Distribuidora E2E", stock_resultante: 10, purchase_id: pur.id });
   const { data: mv2 } = await admin.from("stock_movements").select("purchase_id").eq("product_id", taza.id).eq("tipo", "entrada");
-  ({ data: sTaza } = await admin.from("product_summaries").select("stock,precio_compra,expires_at").eq("id", taza.id).single());
-  check(mv2?.[0]?.purchase_id === pur.id && sTaza.stock === 10 && Number(sTaza.precio_compra) === 10 && sTaza.expires_at === "2027-01-31", `compra registrada: stock 10, costo 10, vence 2027-01-31`);
-  const { data: cnt } = await admin.from("stock_counts").insert({ user_id: uid, category_name: "Regalos", items: 1, differences: 1, diff_units: 2, closed_at: new Date().toISOString() }).select().single();
-  const { error: cie } = await admin.from("stock_count_items").insert({ count_id: cnt.id, user_id: uid, product_id: taza.id, product_name: "Taza", expected: 10, counted: 8, reason: "Merma o rotura" });
+  ({ data: sTaza } = await admin.from("product_summaries").select("stock,expires_at").eq("id", taza.id).single());
+  const { data: tzRow } = await admin.from("products").select("data").eq("id", taza.id).single(); // el costo en la vista solo lo ve el dueño con sesión
+  check(mv2?.[0]?.purchase_id === pur.id && sTaza.stock === 10 && Number(tzRow.data.precio_compra) === 10 && sTaza.expires_at === "2027-01-31", `compra registrada: stock 10, costo 10, vence 2027-01-31`);
+  const { data: cnt } = await admin.from("stock_counts").insert({ user_id: uid, ...B, category_name: "Regalos", items: 1, differences: 1, diff_units: 2, closed_at: new Date().toISOString() }).select().single();
+  const { error: cie } = await admin.from("stock_count_items").insert({ count_id: cnt.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", expected: 10, counted: 8, reason: "Merma o rotura" });
   check(!cie, "acta de conteo con diferencia guardada");
 
   // 13. Ventas: ticket con número correlativo, líneas, ganancia real y cierre de caja
-  const { data: v1 } = await admin.from("sales").insert({ user_id: uid, method: "efectivo", status: "pagado", subtotal: 25, discount: 0, total: 25, paid: 25, cost_total: 20, items: 1 }).select().single();
-  const { data: v2 } = await admin.from("sales").insert({ user_id: uid, method: "qr", status: "parcial", customer_name: "Juanito", subtotal: 12.5, discount: 0, total: 12.5, paid: 5, cost_total: 0, items: 1 }).select().single();
+  const { data: v1 } = await admin.from("sales").insert({ user_id: uid, ...B, method: "efectivo", status: "pagado", subtotal: 25, discount: 0, total: 25, paid: 25, cost_total: 20, items: 1 }).select().single();
+  const { data: v2 } = await admin.from("sales").insert({ user_id: uid, ...B, method: "qr", status: "parcial", customer_name: "Juanito", subtotal: 12.5, discount: 0, total: 12.5, paid: 5, cost_total: 0, items: 1 }).select().single();
   check(v1.number === 1 && v2.number === 2, `tickets numerados: N.º ${v1.number} y N.º ${v2.number}`);
   await admin.from("sale_items").insert([
-    { sale_id: v1.id, user_id: uid, product_id: taza.id, product_name: "Taza", qty: 2, unit_price: 12.5, unit_cost: 10, line_total: 25 },
-    { sale_id: v2.id, user_id: uid, product_id: taza.id, product_name: "Taza", qty: 1, unit_price: 12.5, unit_cost: null, line_total: 12.5 },
+    { sale_id: v1.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", qty: 2, unit_price: 12.5, unit_cost: 10, line_total: 25 },
+    { sale_id: v2.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", qty: 1, unit_price: 12.5, unit_cost: null, line_total: 12.5 },
   ]);
   const { data: sold } = await admin.from("sales").select("total,cost_total,paid,status").eq("user_id", uid);
   const vendido = sold.reduce((x, y) => x + Number(y.total), 0);
   const ganancia = sold.reduce((x, y) => x + Number(y.total) - Number(y.cost_total), 0);
   const porCobrar = sold.filter((y) => y.status !== "pagado").reduce((x, y) => x + Number(y.total) - Number(y.paid), 0);
   check(vendido === 37.5 && ganancia === 17.5 && porCobrar === 7.5, `vendido Bs ${vendido} · ganancia real Bs ${ganancia} · por cobrar Bs ${porCobrar}`);
-  await admin.from("stock_movements").insert({ user_id: uid, product_id: taza.id, product_name: "Taza", tipo: "venta", cantidad: 2, precio_unitario: 12.5, total: 25, stock_resultante: 8, sale_id: v1.id });
+  await admin.from("stock_movements").insert({ user_id: uid, ...B, product_id: taza.id, product_name: "Taza", tipo: "venta", cantidad: 2, precio_unitario: 12.5, total: 25, stock_resultante: 8, sale_id: v1.id });
   const { data: mvs } = await admin.from("stock_movements").select("sale_id").eq("product_id", taza.id).eq("tipo", "venta");
   check(mvs.some((m) => m.sale_id === v1.id), "movimiento de stock enlazado al ticket");
   const today = new Date(); const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  await admin.from("cash_movements").insert({ user_id: uid, tipo: "retiro", amount: 5, note: "bolsas" });
-  const { error: ce1 } = await admin.from("cash_closings").upsert({ user_id: uid, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 20, difference: 0, profit: 17.5 }, { onConflict: "user_id,day" });
-  const { error: ce2 } = await admin.from("cash_closings").upsert({ user_id: uid, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 18, difference: -2, profit: 17.5 }, { onConflict: "user_id,day" });
+  await admin.from("cash_movements").insert({ user_id: uid, ...B, tipo: "retiro", amount: 5, note: "bolsas" });
+  const { error: ce1 } = await admin.from("cash_closings").upsert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 20, difference: 0, profit: 17.5 }, { onConflict: "business_id,day" });
+  const { error: ce2 } = await admin.from("cash_closings").upsert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 18, difference: -2, profit: 17.5 }, { onConflict: "business_id,day" });
   const { data: cls } = await admin.from("cash_closings").select("difference").eq("user_id", uid);
   check(!ce1 && !ce2 && cls.length === 1 && Number(cls[0].difference) === -2, "cierre de caja: uno por día, se actualiza al volver a cerrar");
   for (const path of ["/sell", "/cash", "/movements"]) {
@@ -206,9 +210,9 @@ try {
   }
 
   // 14. Clientes: fiado ligado al cliente, abono FIFO, entrega en consignación
-  const { data: cli } = await admin.from("customers").insert({ user_id: uid, name: "Juanito Pérez", phone: "70011122", credit_limit: 100 }).select().single();
+  const { data: cli } = await admin.from("customers").insert({ user_id: uid, ...B, name: "Juanito Pérez", phone: "70011122", credit_limit: 100 }).select().single();
   await admin.from("sales").update({ customer_id: cli.id, customer_name: cli.name }).eq("id", v2.id); // la venta parcial pasa a su nombre
-  const { data: v3 } = await admin.from("sales").insert({ user_id: uid, customer_id: cli.id, customer_name: cli.name, method: "efectivo", status: "fiado", subtotal: 20, discount: 0, total: 20, paid: 0, cost_total: 10, items: 1 }).select().single();
+  const { data: v3 } = await admin.from("sales").insert({ user_id: uid, ...B, customer_id: cli.id, customer_name: cli.name, method: "efectivo", status: "fiado", subtotal: 20, discount: 0, total: 20, paid: 0, cost_total: 10, items: 1 }).select().single();
   let { data: deudas } = await admin.from("sales").select("total,paid,status,created_at").eq("customer_id", cli.id).neq("status", "pagado").order("created_at");
   const deuda = deudas.reduce((x, y) => x + Number(y.total) - Number(y.paid), 0);
   check(deuda === 27.5, `Juanito debe Bs ${deuda} en ${deudas.length} tickets`);
@@ -222,17 +226,17 @@ try {
     left -= pay;
     if (left <= 0) break;
   }
-  await admin.from("payments").insert({ user_id: uid, customer_id: cli.id, amount: 10, method: "efectivo" });
+  await admin.from("payments").insert({ user_id: uid, ...B, customer_id: cli.id, amount: 10, method: "efectivo" });
   ({ data: deudas } = await admin.from("sales").select("id,total,paid,status").eq("customer_id", cli.id));
   const s2 = deudas.find((x) => x.id === v2.id), s3 = deudas.find((x) => x.id === v3.id);
   check(s2.status === "pagado" && Number(s3.paid) === 2.5 && s3.status === "parcial", `abono FIFO: N.º ${v2.number} pagado, N.º ${v3.number} cobrado 2,5 → debe ${Number(s3.total) - Number(s3.paid)}`);
   // Consignación: entregar 5 (stock baja), rendir 3 vendidas + 1 devuelta → 1 afuera
-  const { data: con } = await admin.from("consignments").insert({ user_id: uid, customer_id: cli.id, customer_name: cli.name }).select().single();
-  const { data: ci } = await admin.from("consignment_items").insert({ consignment_id: con.id, user_id: uid, product_id: taza.id, product_name: "Taza", qty_out: 5, unit_price: 12.5 }).select().single();
+  const { data: con } = await admin.from("consignments").insert({ user_id: uid, ...B, customer_id: cli.id, customer_name: cli.name }).select().single();
+  const { data: ci } = await admin.from("consignment_items").insert({ consignment_id: con.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", qty_out: 5, unit_price: 12.5 }).select().single();
   await admin.from("consignment_items").update({ qty_sold: 3, qty_returned: 1 }).eq("id", ci.id);
   const { data: ci2 } = await admin.from("consignment_items").select("*").eq("id", ci.id).single();
   check(ci2.qty_out - ci2.qty_sold - ci2.qty_returned === 1, `consignación: entregó 5, vendió 3, devolvió 1 → ${ci2.qty_out - ci2.qty_sold - ci2.qty_returned} afuera`);
-  await admin.from("stock_movements").insert({ user_id: uid, product_id: taza.id, product_name: "Taza", tipo: "salida", cantidad: 5, motivo: "entregado a Juanito Pérez", stock_resultante: 3, consignment_id: con.id });
+  await admin.from("stock_movements").insert({ user_id: uid, ...B, product_id: taza.id, product_name: "Taza", tipo: "salida", cantidad: 5, motivo: "entregado a Juanito Pérez", stock_resultante: 3, consignment_id: con.id });
   const { data: cm } = await admin.from("stock_movements").select("consignment_id").eq("consignment_id", con.id);
   check(cm.length === 1, "movimiento de stock enlazado a la entrega");
   for (const path of ["/customers", `/customers/detail?id=${cli.id}`, "/consign"]) {
