@@ -31,6 +31,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
   const supabase = createClient();
   const toast = useToast();
   const [sel, setSel] = useState<ProductVariant | null>(variant);
+  const pack = Math.max(1, parseInt(String(product.data.unidades_por_paquete ?? "1"), 10) || 1);
   const needsVariant = variants.length > 0 && !sel;
   const current = sel ? sel.stock : stockOf(product) ?? 0;
   const price = sel?.precio ?? priceOf(product);
@@ -179,12 +180,18 @@ export default function StockAdjust({ product, variants = [], variant = null, on
 
         {/* Paso 2: cantidad */}
         <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">2 · ¿Cuántas unidades?</p>
-        <div className="mt-1 flex items-center gap-2">
+        <div className="mt-1 flex flex-wrap items-center gap-2">
           {[1, 5, 10].map((n) => (
             <button key={n} onClick={() => setQty(n)} className={`chip ${qty === n ? "chip-active" : ""}`}>{n}</button>
           ))}
+          {pack > 1 && [1, 2].map((k) => (
+            <button key={`p${k}`} onClick={() => setQty(k * pack)} className={`chip ${qty === k * pack ? "chip-active" : ""}`} title={`${k} paquete${k === 1 ? "" : "s"} de ${pack}`}>
+              {k} paq. <span className="opacity-70">= {k * pack}</span>
+            </button>
+          ))}
           <input type="number" min={1} inputMode="numeric" className="input w-24 py-2 text-center text-lg font-bold tabular-nums" value={qty} onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))} />
         </div>
+        {pack > 1 && <p className="mt-1 text-[11px] text-slate-500">Este producto viene en paquetes de {pack} unidades; el stock se lleva por unidad.</p>}
         {mode === "remove" && qty > current && <p className="mt-1 text-xs text-amber-700">Solo hay {current}. El stock quedará en 0.</p>}
 
         {/* Paso 3 (solo al restar): ¿es una venta? */}

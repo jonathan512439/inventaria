@@ -17,6 +17,8 @@ import { cacheGet, cacheSet, isNetworkError } from "@/lib/offline";
 import { IconArrowLeft, IconCamera, IconDownload, IconList, IconTable } from "@/components/ui/Icons";
 
 const FILTERS: { key: Filter; label: string }[] = [
+  { key: "porReponer", label: "Por reponer" },
+  { key: "porVencer", label: "Por vencer" },
   { key: "agotados", label: "Agotados" },
   { key: "sinPrecio", label: "Sin precio" },
   { key: "sinFoto", label: "Sin foto" },
@@ -125,7 +127,7 @@ export default function CategoryInventoryPage() {
   };
   const inTop = useMemo(() => (top ? products.filter((p) => p.category_id && getDescendantIds(categories, top.id).includes(p.category_id)) : products), [products, categories, top]);
   const scoped = useMemo(() => (sub ? inTop.filter((p) => p.category_id && getDescendantIds(categories, sub).includes(p.category_id)) : inTop), [inTop, sub, categories]);
-  const visible = useMemo(() => applyFilters(scoped, filters, variantsOf), [scoped, filters, variantsOf]);
+  const visible = useMemo(() => applyFilters(scoped, filters, variantsOf, categories), [scoped, filters, variantsOf, categories]);
   // Página visible: filas completas (datos, variantes) solo para lo que se muestra
   const pageIds = useMemo(() => visible.slice(0, limit).map((p) => p.id), [visible, limit]);
   useEffect(() => {

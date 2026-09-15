@@ -23,7 +23,7 @@ const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loa
 export function stepOf(pathname: string): 0 | 1 | 2 | 3 {
   if (pathname.startsWith("/capture") || pathname.startsWith("/scan") || pathname.startsWith("/products/new")) return 1;
   if (pathname.startsWith("/review")) return 2;
-  if (pathname.startsWith("/products") || pathname.startsWith("/movements")) return 3;
+  if (["/products", "/movements", "/restock", "/purchases", "/count", "/prices", "/trash"].some((p) => pathname.startsWith(p))) return 3;
   return 0;
 }
 
@@ -37,8 +37,8 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(() => {
     const supabase = createClient();
     Promise.all([
-      supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft"),
-      supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed"),
+      supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft").is("deleted_at", null),
+      supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed").is("deleted_at", null),
     ]).then(([d, c]) => setCounts({ pending: d.count ?? 0, confirmed: c.count ?? 0, loaded: true }));
   }, []);
 

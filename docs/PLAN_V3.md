@@ -59,17 +59,17 @@ Lo que quedó sin culminar de v2 más lo que salga de las pruebas funcionales de
 
 **Acepta cuando** 10 productos de un estante entran con una foto en menos de 2 minutos; el mismo producto fotografiado dos veces no se duplica; con el celular en modo avión se registra una venta y aparece al reconectar; con clave propia el medidor deja de contar contra el cupo del servicio.
 
-## Fase 2 · Control real de stock (2 semanas)
+## Fase 2 · Control real de stock (2 semanas) — desplegada 2026-09-15 (CHANGELOG 12.x)
 
 Que el número de stock sea creíble y avise antes de que falte.
 
-- **Stock mínimo** por producto y por variante (`min_stock`), con valor por defecto por categoría; «por reponer» reemplaza al ≤3 fijo (`LOW_STOCK_MAX`).
-- **Lista de reposición** generada sola (producto, variante, faltante, proveedor si existe), compartible por WhatsApp (texto) o Excel.
-- **Toma de inventario física:** tablas `stock_counts` / `stock_count_items`; modo «contar» por categoría con escáner o lista, diferencia contra el sistema, ajuste con motivo (`stock_movements.tipo = 'ajuste'`), acta con fecha y quién contó.
-- **Vencimientos:** `expires_at` por producto y por lote de compra; alertas a 30 / 7 días en Inicio y filtro «por vencer» en el inventario.
-- **Compras:** `suppliers`, `purchases`, `purchase_items` (cantidad, costo unitario, vencimiento); la entrada actualiza `precio_compra` e historial. Lista de proveedores mínima (nombre, teléfono).
-- **Precios:** cambio masivo por categoría (+10 %, redondeo a 0,50), `price_history`, precio mayorista opcional (`precio_mayorista`); `unidades_por_paquete` funcional (comprar por caja, vender por unidad).
-- **Papelera:** `products.deleted_at` (borrado suave, 30 días); las consultas filtran `deleted_at is null`; recuperación y vaciado desde «Ordenar y limpiar».
+- ✅ (12.1) **Stock mínimo** por producto y por variante (`min_stock`), con valor por defecto por categoría; «por reponer» reemplaza al ≤3 fijo (`LOW_STOCK_MAX`).
+- ✅ (12.2) **Lista de reposición** generada sola (producto, variante, faltante, proveedor si existe), compartible por WhatsApp (texto) o Excel.
+- ✅ (12.5) **Toma de inventario física:** tablas `stock_counts` / `stock_count_items`; modo «contar» por categoría con escáner o lista, diferencia contra el sistema, ajuste con motivo (`stock_movements.tipo = 'ajuste'`), acta con fecha y quién contó.
+- ✅ (12.3) **Vencimientos:** `expires_at` por producto y por lote de compra; alertas a 30 / 7 días en Inicio y filtro «por vencer» en el inventario.
+- ✅ (12.4) **Compras:** `suppliers`, `purchases`, `purchase_items` (cantidad, costo unitario, vencimiento); la entrada actualiza `precio_compra` e historial. Lista de proveedores mínima (nombre, teléfono).
+- ✅ (12.6, 12.7) **Precios:** cambio masivo por categoría (+10 %, redondeo a 0,50), `price_history`, precio mayorista opcional (`precio_mayorista`); `unidades_por_paquete` funcional (comprar por caja, vender por unidad).
+- ✅ (12.8) **Papelera:** `products.deleted_at` (borrado suave, 30 días); las consultas filtran `deleted_at is null`; recuperación y vaciado desde «Ordenar y limpiar».
 
 **Acepta cuando** una categoría de 40 productos se cuenta físicamente en menos de 5 minutos y las diferencias quedan registradas; la lista de reposición sale correcta contra los mínimos; un producto que vence en 7 días aparece en Inicio; un producto borrado se recupera intacto.
 
@@ -216,5 +216,6 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
+- 2026-09-15 · Fase 2 (12.1–12.9) desplegada.
 - 2026-09-15 · Fase 0 (10.1–10.2) y Fase 1 (11.1–11.6) desplegadas; queda abierta la lista de correcciones de las pruebas funcionales.
 - 2026-09-15 · v3.0 · Plan inicial (sustituye a la página externa publicada el mismo día; a partir de ahora toda planificación vive en este archivo).

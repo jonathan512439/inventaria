@@ -9,7 +9,7 @@ import type { Category, Product } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import { categoryColor } from "@/lib/colors";
-import { SUMMARY_COLS, computeShelves, fmtMoney, fromSummary, priceOf, stockOf, timeAgo, LOW_STOCK_MAX, type CategoryStats } from "@/lib/inventory";
+import { SUMMARY_COLS, computeShelves, fmtMoney, fromSummary, priceOf, stockOf, timeAgo, type CategoryStats } from "@/lib/inventory";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Photo from "@/components/ui/Photo";
 import { IllustrationCapture } from "@/components/guide/Illustrations";
@@ -97,6 +97,7 @@ export default function ProductsPage() {
         <div className="flex gap-2">
           <Link href="/products/new" className="btn-primary btn-sm"><IconPlus size={16} /> Producto</Link>
           <Link href="/movements" className="btn-secondary btn-sm border-emerald-400 text-emerald-800"><IconTag size={16} /> Ventas</Link>
+          <Link href="/purchases" className="btn-secondary btn-sm hidden sm:inline-flex"><IconPlus size={16} /> Compra</Link>
           <Link href="/export" className="btn-secondary btn-sm"><IconDownload size={16} /> Excel</Link>
           <Link href="/products/table" className="btn-secondary btn-sm hidden md:inline-flex"><IconTable size={16} /> Tabla</Link>
         </div>
@@ -115,7 +116,11 @@ export default function ProductsPage() {
       {!loading && total.products > 0 && (
         <div className="animate-in grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
           <Stat label="Productos" value={String(total.products)} hint={`en ${shelves.length} categoría${shelves.length === 1 ? "" : "s"}`} />
-          <Stat label="Unidades" value={fmtMoney(total.units)} hint={total.lowStock ? `${total.lowStock} con poco stock` : "en existencia"} />
+          <Link href="/restock" className="rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 transition hover:ring-orange-400">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Por reponer</p>
+            <p className={`text-xl font-bold tabular-nums ${total.alerts.porReponer ? "text-orange-700" : "text-ink"}`}>{total.alerts.porReponer}</p>
+            <p className="truncate text-[11px] text-slate-400">{total.alerts.porReponer ? "ver lista de reposición" : `${fmtMoney(total.units)} unidades en total`}</p>
+          </Link>
           <Stat label="Valor de venta" value={`Bs ${fmtMoney(total.saleValue)}`} tone="ok" hint="precio × stock" />
           {total.costValue > 0 ? (
             <Stat label="Ganancia estimada" value={`Bs ${fmtMoney(total.saleValue - total.costValue)}`} tone="ok" hint={`costo Bs ${fmtMoney(total.costValue)}`} />
@@ -124,9 +129,15 @@ export default function ProductsPage() {
           )}
           <Stat
             label="Por atender"
-            value={String(total.alerts.agotados + total.alerts.sinPrecio)}
-            tone={total.alerts.agotados + total.alerts.sinPrecio ? "warn" : undefined}
-            hint={total.alerts.agotados + total.alerts.sinPrecio ? `${total.alerts.agotados} agotados · ${total.alerts.sinPrecio} sin precio${total.alerts.variantesAgotadas ? ` · ${total.alerts.variantesAgotadas} variantes en 0` : ""}` : total.alerts.variantesAgotadas ? `${total.alerts.variantesAgotadas} variantes agotadas` : "todo en orden"}
+            value={String(total.alerts.agotados + total.alerts.sinPrecio + total.alerts.porVencer)}
+            tone={total.alerts.agotados + total.alerts.sinPrecio + total.alerts.porVencer ? "warn" : undefined}
+            hint={
+              total.alerts.agotados + total.alerts.sinPrecio + total.alerts.porVencer
+                ? [total.alerts.agotados ? `${total.alerts.agotados} agotados` : "", total.alerts.sinPrecio ? `${total.alerts.sinPrecio} sin precio` : "", total.alerts.porVencer ? `${total.alerts.porVencer} por vencer` : "", total.alerts.variantesAgotadas ? `${total.alerts.variantesAgotadas} variantes en 0` : ""].filter(Boolean).join(" · ")
+                : total.alerts.variantesAgotadas
+                  ? `${total.alerts.variantesAgotadas} variantes agotadas`
+                  : "todo en orden"
+            }
           />
           <Link href="/movements" className="rounded-2xl bg-emerald-600 p-3 text-white shadow-card transition hover:brightness-110">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Ventas este mes</p>
@@ -272,8 +283,9 @@ function AlertLine({ stats }: { stats: CategoryStats }) {
   const { alerts } = stats;
   const items = [
     alerts.agotados ? { t: `${alerts.agotados} agotado${alerts.agotados === 1 ? "" : "s"}`, c: "bg-rose-100 text-rose-700" } : null,
+    alerts.porReponer - alerts.agotados > 0 ? { t: `${alerts.porReponer - alerts.agotados} por reponer`, c: "bg-orange-100 text-orange-800" } : null,
+    alerts.porVencer ? { t: `${alerts.porVencer} por vencer`, c: "bg-amber-100 text-amber-800" } : null,
     alerts.variantesAgotadas ? { t: `${alerts.variantesAgotadas} variante${alerts.variantesAgotadas === 1 ? "" : "s"} agotada${alerts.variantesAgotadas === 1 ? "" : "s"}`, c: "bg-rose-100 text-rose-700" } : null,
-    stats.lowStock ? { t: `${stats.lowStock} con ≤${LOW_STOCK_MAX} unid.`, c: "bg-orange-100 text-orange-800" } : null,
     alerts.sinPrecio ? { t: `${alerts.sinPrecio} sin precio`, c: "bg-amber-100 text-amber-800" } : null,
     alerts.sinFoto ? { t: `${alerts.sinFoto} sin foto`, c: "bg-slate-100 text-slate-600" } : null,
   ].filter(Boolean) as { t: string; c: string }[];

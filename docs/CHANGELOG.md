@@ -3,6 +3,47 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-09-15 · Plan v3 · Fase 2 — Control real de stock
+
+Migración `supabase/010_control_stock.sql` aplicada: mínimos y vencimientos, papelera, proveedores y compras, toma de inventario, historial de precios; la vista `product_summaries` excluye la papelera y expone mínimo, vencimiento, precio mayorista y unidades por paquete.
+
+### 12.1 Stock mínimo y «por reponer»
+- **Qué**: cada producto (ficha → **Stock mínimo**) y cada variante puede tener su mínimo; si está vacío se usa el de la categoría (**Mi tienda → Stock mínimo por defecto**) y si no, 3. «Por reponer» = stock ≤ mínimo (incluye agotados). Se ve en la fila del producto («por reponer · mín. 5»), en el filtro **Por reponer** de la categoría, en las alertas de cada estante, en la tarjeta **Por reponer** de Mi inventario y en el Inicio.
+- **Validar**: poner mínimo 5 a un producto con stock 4 → aparece «por reponer» en su fila y cuenta en Mi inventario; subir el stock a 6 → desaparece.
+
+### 12.2 Lista de reposición (`/restock`)
+- **Qué**: **Más → Por reponer y por vencer**: todo lo que está bajo su mínimo (por producto y por variante), agrupado por último proveedor, con la cantidad sugerida (repone hasta el doble del mínimo, editable). **Compartir pedido por WhatsApp** (texto listo, total o por proveedor) o **Excel**. Pestaña **Por vencer** con los que vencen en ≤ 30 días o ya vencieron, con los días y el valor en juego.
+- **Validar**: con 2 productos bajo mínimo → la lista los muestra; cambiar la cantidad → el texto de WhatsApp la respeta.
+
+### 12.3 Vencimientos
+- **Qué**: ficha → **Vence el** (fecha) y también al registrar una compra. Aviso en la fila («vence en 12 d», «vencido hace 3 d»), filtro **Por vencer** en la categoría, alerta en el estante, y el Inicio lo pone como primera tarea cuando hay algo por vencer.
+- **Validar**: poner una fecha a 5 días → fila en rojo, Inicio dice «1 producto por vencer».
+
+### 12.4 Compras y proveedores (`/purchases`)
+- **Qué**: **Más → Compras y proveedores**. **Nueva compra**: proveedor (existente o nuevo con teléfono), nº de factura opcional, productos por búsqueda o **escáner** (+1 por lectura; con variantes pregunta cuál), cantidad, costo unitario (precargado con el último) y vencimiento. Al registrar: sube el stock (producto o variante), guarda el **precio de compra** (con historial), el vencimiento, y un movimiento «entrada · compra · proveedor» enlazado a la compra. Pestaña **Proveedores** para agregar/quitar (teléfono abre WhatsApp).
+- **Validar**: Nueva compra → proveedor nuevo → escanear 2 productos → cantidad 6 y costo 4,50 → Registrar → stock +6, ficha con costo 4,50 e historial «compra», y la compra en la lista con su total.
+
+### 12.5 Toma de inventario (`/count`)
+- **Qué**: **Más → Toma de inventario**: elegir categoría → lista de productos (y variantes) con lo que dice el sistema; escribir el contado o **escanear cada unidad** (+1 por lectura); «Solo sin contar»; diferencia y motivo por fila (conteo, merma, robo, error, devolución). **Cerrar conteo** ajusta solo lo que difiere (movimiento «ajuste» con motivo y enlace al conteo) y deja el acta (productos contados, diferencias, unidades). Historial de conteos.
+- **Validar**: contar una categoría de 5 productos con 1 diferencia → al cerrar, ese producto queda con el contado, aparece un movimiento «ajuste» y el conteo figura en el historial con «1 ajustado».
+
+### 12.6 Cambiar precios (`/prices`)
+- **Qué**: **Más → Cambiar precios**: categoría (o todo), precio de venta o mayorista, **porcentaje / monto fijo / margen sobre el costo**, redondeo a 0,50 · 1 Bs · sin redondear, vista previa (antes → después) y aplicar. Cada cambio queda en **Historial de precios** (ficha), igual que los cambios hechos en la ficha o por compra.
+- **Validar**: Ropa +10 % redondeado a 0,50 → la vista previa muestra 35 → 38,50; aplicar → fichas actualizadas con historial «masivo».
+
+### 12.7 Paquetes
+- **Qué**: si el producto tiene «unidades por paquete» (p. ej. 12), **+/− Stock** ofrece «1 paq. = 12» y «2 paq. = 24»; el stock se lleva siempre por unidad.
+- **Validar**: producto con unidades_por_paquete 6 → en +/− Stock aparecen los chips de paquete.
+
+### 12.8 Papelera (`/trash`)
+- **Qué**: eliminar un producto del inventario lo envía a la **papelera** (recuperable 30 días, con foto; «Deshacer» en el aviso); desaparece del inventario, Excel, escáner, conteos y estadísticas. **Ordenar y limpiar → Papelera** lista lo eliminado con los días restantes: **Recuperar**, borrar uno o **Vaciar papelera**. Lo que supera 30 días se borra solo (con su foto). Los pendientes sin confirmar se siguen borrando directo.
+- **Validar**: eliminar un producto → ya no está en el inventario; Ordenar y limpiar → «1 en la papelera» → Papelera → Recuperar → vuelve intacto.
+
+### 12.9 Pruebas
+- `npm run test:e2e` ampliado: mínimo en la vista, papelera excluida y contada por Ordenar y limpiar, recuperación, compra con proveedor (stock, costo, vencimiento, movimiento enlazado), acta de conteo. **37/37 en verde.**
+
+---
+
 ## 2026-09-15 · Plan v3 · Fase 1 — Cerrar la promesa central
 
 ### 11.1 ¿Ya lo tienes? (duplicados al analizar)

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   if (!code) return NextResponse.json({ error: "Falta el código" }, { status: 400 });
 
   const [{ data: products }, { data: categories }, { data: byVariant }] = await Promise.all([
-    supabase.from("products").select("id,data,category_id,image_url,status"),
+    supabase.from("products").select("id,data,category_id,image_url,status").is("deleted_at", null),
     supabase.from("categories").select("*"),
     supabase.from("product_variants").select("*").eq("codigo_barras", code).limit(1),
   ]);

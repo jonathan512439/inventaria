@@ -82,9 +82,16 @@ export default function ProductTable({ products, categories, templates, mode, on
   }
 
   async function remove(p: Product) {
-    if (!confirm("¿Eliminar este producto? La foto también se borrará.")) return;
+    const soft = p.status === "confirmed";
+    if (!confirm(soft ? "¿Enviar este producto a la papelera? Podrás recuperarlo durante 30 días." : "¿Eliminar este pendiente? La foto también se borrará.")) return;
     setBusy((b) => ({ ...b, [p.id]: true }));
-    // borra imagen (ruta = user_id/uuid.ext dentro del bucket)
+    if (soft) {
+      const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);
+      setBusy((b) => ({ ...b, [p.id]: false }));
+      if (error) return setError(error.message);
+      return onChanged();
+    }
+    // Pendiente: se borra de verdad, con su foto (ruta = user_id/uuid.ext dentro del bucket)
     if (p.image_url) {
       const idx = p.image_url.indexOf("/product-images/");
       if (idx >= 0) await supabase.storage.from("product-images").remove([p.image_url.slice(idx + "/product-images/".length)]);

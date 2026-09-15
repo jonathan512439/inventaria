@@ -29,7 +29,7 @@ export default function ExportPage() {
       const [c, t, p, v, a] = await Promise.all([
         supabase.from("categories").select("*"),
         supabase.from("field_templates").select("*").order("sort_order"),
-        supabase.from("products").select("*").order("created_at", { ascending: false }),
+        supabase.from("products").select("*").is("deleted_at", null).order("created_at", { ascending: false }),
         supabase.from("product_variants").select("*"),
         supabase.from("variant_axes").select("*"),
       ]);

@@ -149,7 +149,34 @@ try {
   r = await fetch(`${BASE}/api/ai-key`, { method: "DELETE", headers: H });
   check(r.status === 200, "clave quitada");
 
-  // 12. Medidor
+  // 12. Control de stock: mínimo, papelera, compra
+  await admin.from("products").update({ min_stock: 5 }).eq("id", taza.id); // stock 7 → no por reponer
+  let { data: sTaza } = await admin.from("product_summaries").select("stock,min_stock").eq("id", taza.id).single();
+  check(sTaza.min_stock === 5 && sTaza.stock === 7, `mínimo guardado (5) y stock 7 en la vista`);
+  await admin.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", taza.id);
+  ({ data: sTaza } = await admin.from("product_summaries").select("id").eq("id", taza.id).maybeSingle());
+  check(sTaza === null, "producto en la papelera desaparece del inventario (vista)");
+  r = await fetch(`${BASE}/api/cleanup`, { headers: H });
+  const cl2 = await r.json();
+  check(r.status === 200 && cl2.counts?.trash === 1, `Ordenar y limpiar cuenta la papelera: ${cl2.counts?.trash}`);
+  await admin.from("products").update({ deleted_at: null }).eq("id", taza.id);
+  ({ data: sTaza } = await admin.from("product_summaries").select("id").eq("id", taza.id).maybeSingle());
+  check(!!sTaza, "recuperado de la papelera vuelve al inventario");
+  // Compra: proveedor + ítem → stock sube, costo se guarda, movimiento enlazado
+  const { data: sup } = await admin.from("suppliers").insert({ user_id: uid, name: "Distribuidora E2E", phone: "70000000" }).select().single();
+  const { data: pur } = await admin.from("purchases").insert({ user_id: uid, supplier_id: sup.id, supplier_name: sup.name, total: 30, items: 1 }).select().single();
+  await admin.from("purchase_items").insert({ purchase_id: pur.id, user_id: uid, product_id: taza.id, product_name: "Taza", qty: 3, unit_cost: 10, expires_at: "2027-01-31" });
+  const { data: tz } = await admin.from("products").select("data").eq("id", taza.id).single();
+  await admin.from("products").update({ data: { ...tz.data, stock: 10, precio_compra: 10 }, expires_at: "2027-01-31" }).eq("id", taza.id);
+  await admin.from("stock_movements").insert({ user_id: uid, product_id: taza.id, product_name: "Taza", tipo: "entrada", cantidad: 3, precio_unitario: 10, motivo: "compra · Distribuidora E2E", stock_resultante: 10, purchase_id: pur.id });
+  const { data: mv2 } = await admin.from("stock_movements").select("purchase_id").eq("product_id", taza.id).eq("tipo", "entrada");
+  ({ data: sTaza } = await admin.from("product_summaries").select("stock,precio_compra,expires_at").eq("id", taza.id).single());
+  check(mv2?.[0]?.purchase_id === pur.id && sTaza.stock === 10 && Number(sTaza.precio_compra) === 10 && sTaza.expires_at === "2027-01-31", `compra registrada: stock 10, costo 10, vence 2027-01-31`);
+  const { data: cnt } = await admin.from("stock_counts").insert({ user_id: uid, category_name: "Regalos", items: 1, differences: 1, diff_units: 2, closed_at: new Date().toISOString() }).select().single();
+  const { error: cie } = await admin.from("stock_count_items").insert({ count_id: cnt.id, user_id: uid, product_id: taza.id, product_name: "Taza", expected: 10, counted: 8, reason: "Merma o rotura" });
+  check(!cie, "acta de conteo con diferencia guardada");
+
+  // 13. Medidor
   r = await fetch(`${BASE}/api/usage`, { headers: H });
   const u = await r.json();
   check(r.status === 200 && Array.isArray(u.models) && u.models.length >= 3, `usage: ${u.models?.length} modelos, ${u.totalToday} análisis hoy`);

@@ -20,7 +20,7 @@ export default function InventoryTablePage() {
     const [c, t, p] = await Promise.all([
       supabase.from("categories").select("*"),
       supabase.from("field_templates").select("*").order("sort_order"),
-      supabase.from("products").select("*").eq("status", "confirmed").order("updated_at", { ascending: false }),
+      supabase.from("products").select("*").eq("status", "confirmed").is("deleted_at", null).order("updated_at", { ascending: false }),
     ]);
     setCategories(c.data ?? []);
     setTemplates(t.data ?? []);

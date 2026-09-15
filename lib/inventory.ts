@@ -18,7 +18,7 @@ function num(p: Product, names: string[]): number | null {
 
 /** Convierte una fila de `product_summaries` en un Product mínimo (data con nombre/precio/stock) para reutilizar los cálculos. */
 /** Columnas ligeras de la vista (sin `search`, que puede ser largo). */
-export const SUMMARY_COLS = "id,user_id,category_id,status,image_url,created_at,updated_at,nombre,marca,precio,precio_compra,stock,codigo_barras";
+export const SUMMARY_COLS = "id,user_id,category_id,status,image_url,created_at,updated_at,nombre,marca,precio,precio_compra,stock,codigo_barras,min_stock,expires_at,precio_mayorista,unidades_por_paquete";
 
 export function fromSummary(s: ProductSummary): Product {
   return {
@@ -30,7 +30,18 @@ export function fromSummary(s: ProductSummary): Product {
     created_at: s.created_at,
     updated_at: s.updated_at,
     ai_meta: {},
-    data: { nombre: s.nombre ?? "", marca: s.marca ?? "", precio: s.precio, precio_compra: s.precio_compra, stock: s.stock, codigo_barras: s.codigo_barras ?? "" },
+    min_stock: s.min_stock ?? null,
+    expires_at: s.expires_at ?? null,
+    data: {
+      nombre: s.nombre ?? "",
+      marca: s.marca ?? "",
+      precio: s.precio,
+      precio_compra: s.precio_compra,
+      stock: s.stock,
+      codigo_barras: s.codigo_barras ?? "",
+      precio_mayorista: s.precio_mayorista ?? null,
+      unidades_por_paquete: s.unidades_por_paquete ?? null,
+    },
   };
 }
 
@@ -45,6 +56,10 @@ export interface Alerts {
   pendientes: number;
   /** Variantes (talla/color…) en 0 dentro de productos que aún tienen stock */
   variantesAgotadas: number;
+  /** Con stock por debajo del mínimo (incluye agotados) */
+  porReponer: number;
+  /** Vencen en ≤ 30 días o ya vencieron */
+  porVencer: number;
 }
 
 type VariantsOf = Map<string, { stock: number }[]>;
@@ -74,10 +89,42 @@ export interface Summary {
   lowStock: number;
 }
 
+/** Mínimo por defecto cuando ni el producto ni su categoría lo definen. */
 export const LOW_STOCK_MAX = 3;
+export const DEFAULT_MIN_STOCK = LOW_STOCK_MAX;
+/** Días de anticipación para «por vencer». */
+export const EXPIRY_SOON_DAYS = 30;
 
-function alertsOf(list: Product[], variantsOf?: VariantsOf): Alerts {
+/** Stock mínimo efectivo: el del producto, si no el de su categoría principal, si no el general. */
+export function minStockOf(p: Product, categories?: Category[]): number {
+  if (typeof p.min_stock === "number") return p.min_stock;
+  if (categories && p.category_id) {
+    const cat = categories.find((c) => c.id === p.category_id);
+    const top = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) : cat;
+    if (typeof top?.min_stock_default === "number") return top.min_stock_default;
+  }
+  return DEFAULT_MIN_STOCK;
+}
+/** Hay que reponer: stock 0 o por debajo del mínimo (el mínimo 0 desactiva la alerta salvo agotado). */
+export function needsRestock(p: Product, categories?: Category[]): boolean {
+  const s = stockOf(p) ?? 0;
+  return s <= 0 || s <= minStockOf(p, categories);
+}
+/** Días hasta el vencimiento (negativo = vencido); null si no tiene fecha. */
+export function daysToExpiry(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const d = new Date(iso + (iso.length === 10 ? "T00:00:00" : ""));
+  return Math.ceil((d.getTime() - Date.now()) / 86400000);
+}
+export function expiringSoon(p: Product): boolean {
+  const d = daysToExpiry(p.expires_at);
+  return d !== null && d <= EXPIRY_SOON_DAYS;
+}
+
+function alertsOf(list: Product[], variantsOf?: VariantsOf, categories?: Category[]): Alerts {
   return {
+    porReponer: list.filter((p) => needsRestock(p, categories)).length,
+    porVencer: list.filter(expiringSoon).length,
     agotados: list.filter((p) => (stockOf(p) ?? 0) <= 0).length,
     sinPrecio: list.filter((p) => priceOf(p) === null).length,
     sinFoto: list.filter((p) => !p.image_url).length,
@@ -86,7 +133,7 @@ function alertsOf(list: Product[], variantsOf?: VariantsOf): Alerts {
   };
 }
 
-function summarize(list: Product[], variantsOf?: VariantsOf): Summary {
+function summarize(list: Product[], variantsOf?: VariantsOf, categories?: Category[]): Summary {
   let units = 0, saleValue = 0, costValue = 0;
   for (const p of list) {
     const s = stockOf(p) ?? 0;
@@ -94,11 +141,9 @@ function summarize(list: Product[], variantsOf?: VariantsOf): Summary {
     saleValue += (priceOf(p) ?? 0) * s;
     costValue += (costOf(p) ?? 0) * s;
   }
-  const lowStock = list.filter((p) => {
-    const s = stockOf(p) ?? 0;
-    return s > 0 && s <= LOW_STOCK_MAX;
-  }).length;
-  return { products: list.length, units, saleValue, costValue, alerts: alertsOf(list, variantsOf), lowStock };
+  // Poco stock = por debajo del mínimo pero no agotado
+  const lowStock = list.filter((p) => (stockOf(p) ?? 0) > 0 && needsRestock(p, categories)).length;
+  return { products: list.length, units, saleValue, costValue, alerts: alertsOf(list, variantsOf, categories), lowStock };
 }
 
 /** "hoy", "ayer", "hace 3 días", "hace 2 meses" */
@@ -117,7 +162,7 @@ export function computeShelves(products: Product[], categories: Category[], vari
   const shelves: CategoryStats[] = roots.map((root) => {
     const ids = new Set(getDescendantIds(categories, root.id));
     const list = products.filter((p) => p.category_id && ids.has(p.category_id));
-    const s = summarize(list, variantsOf);
+    const s = summarize(list, variantsOf, categories);
     const children = categories
       .filter((c) => c.parent_id === root.id)
       .sort((a, b) => a.name.localeCompare(b.name, "es"))
@@ -135,20 +180,22 @@ export function computeShelves(products: Product[], categories: Category[], vari
     return { category: root, ...s, children, topProduct, lastAdded };
   });
   const orphan = products.filter((p) => !p.category_id || !categories.some((c) => c.id === p.category_id));
-  return { shelves, orphan: summarize(orphan, variantsOf), orphanList: orphan, total: summarize(products, variantsOf) };
+  return { shelves, orphan: summarize(orphan, variantsOf, categories), orphanList: orphan, total: summarize(products, variantsOf, categories) };
 }
 
 export function fmtMoney(n: number): string {
   return n.toLocaleString("es", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
-export type Filter = "agotados" | "sinPrecio" | "sinFoto" | "hoy" | "pendientes";
+export type Filter = "agotados" | "sinPrecio" | "sinFoto" | "hoy" | "pendientes" | "porReponer" | "porVencer";
 
-export function applyFilters(list: Product[], filters: Set<Filter>, variantsOf?: Map<string, { stock: number }[]>): Product[] {
+export function applyFilters(list: Product[], filters: Set<Filter>, variantsOf?: Map<string, { stock: number }[]>, categories?: Category[]): Product[] {
   if (!filters.size) return list;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return list.filter((p) => {
+    if (filters.has("porReponer") && !needsRestock(p, categories)) return false;
+    if (filters.has("porVencer") && !expiringSoon(p)) return false;
     // Agotado: sin stock total, o alguna de sus variantes en 0
     if (filters.has("agotados") && (stockOf(p) ?? 0) > 0 && !(variantsOf?.get(p.id) ?? []).some((v) => v.stock <= 0)) return false;
     if (filters.has("sinPrecio") && priceOf(p) !== null) return false;

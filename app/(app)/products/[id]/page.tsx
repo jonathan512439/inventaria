@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/Toast";
 import StockAdjust from "@/components/StockAdjust";
 import ProductVariants from "@/components/ProductVariants";
 import { fmtMoney } from "@/lib/inventory";
-import type { StockMovement } from "@/types/database";
+import type { PriceHistory, StockMovement } from "@/types/database";
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +26,8 @@ export default function ProductDetailPage() {
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
   const [data, setData] = useState<ProductData>({});
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [minStock, setMinStock] = useState<string>("");
+  const [expiresAt, setExpiresAt] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +36,7 @@ export default function ProductDetailPage() {
   const [reanalyzing, setReanalyzing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [priceHist, setPriceHist] = useState<PriceHistory[]>([]);
   const [axes, setAxes] = useState<VariantAxis[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const toast = useToast();
@@ -72,11 +75,14 @@ export default function ProductDetailPage() {
     setAxes((a.data ?? []) as VariantAxis[]);
     setVariants((v.data ?? []) as ProductVariant[]);
     supabase.from("stock_movements").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(8).then(({ data }) => setMovements((data ?? []) as StockMovement[]));
+    supabase.from("price_history").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(6).then(({ data }) => setPriceHist((data ?? []) as PriceHistory[]));
     if (!p.data) setNotFound(true);
     else {
       setProduct(p.data);
       setData(canonicalizeData(p.data.data, getEffectiveFields(t.data ?? [], c.data ?? [], p.data.category_id)));
       setCategoryId(p.data.category_id);
+      setMinStock(p.data.min_stock === null || p.data.min_stock === undefined ? "" : String(p.data.min_stock));
+      setExpiresAt(p.data.expires_at ?? "");
     }
     setLoading(false);
   }, [supabase, id]);
@@ -99,12 +105,25 @@ export default function ProductDetailPage() {
       const stockField = fields.find((f) => /^(stock|cantidad|existencias)$/i.test(f.name));
       clean[stockField?.name ?? "stock"] = variants.reduce((t, v) => t + v.stock, 0);
     }
+    const min = minStock.trim() === "" ? null : Math.max(0, parseInt(minStock, 10) || 0);
+    // Historial de precios: se anota cada cambio de precio de venta / compra
+    const priceChanges: { field: string; old: number | null; nu: number | null }[] = [];
+    for (const f of ["precio", "precio_compra", "precio_mayorista"]) {
+      const before = product.data[f];
+      const after = clean[f];
+      const b = before === null || before === undefined || before === "" ? null : Number(before);
+      const a = after === null || after === undefined || after === "" ? null : Number(after);
+      if ((b ?? null) !== (a ?? null)) priceChanges.push({ field: f, old: b, nu: a });
+    }
     const { error } = await supabase
       .from("products")
-      .update({ data: clean, category_id: categoryId, ...(status ? { status } : {}) })
+      .update({ data: clean, category_id: categoryId, min_stock: min, expires_at: expiresAt || null, ...(status ? { status } : {}) })
       .eq("id", product.id);
     setSaving(false);
     if (error) return setError(error.message);
+    if (priceChanges.length) {
+      await supabase.from("price_history").insert(priceChanges.map((c) => ({ user_id: product.user_id, product_id: product.id, field: c.field, old_value: c.old, new_value: c.nu, source: "ficha" })));
+    }
     toast("success", "Cambios guardados");
     // Tras editar, se vuelve a la lista de donde vino el producto
     if (status === "draft") router.push("/review");
@@ -112,14 +131,32 @@ export default function ProductDetailPage() {
   }
 
   async function remove() {
-    if (!product || !confirm("¿Eliminar este producto y su foto?")) return;
+    if (!product) return;
+    if (product.status === "confirmed") {
+      // Papelera: se puede recuperar durante 30 días (la foto se conserva)
+      if (!confirm("¿Enviar este producto a la papelera? Podrás recuperarlo durante 30 días desde Ordenar y limpiar → Papelera.")) return;
+      const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", product.id);
+      if (error) return setError(error.message);
+      toast("success", "Enviado a la papelera", { label: "Deshacer", onClick: async () => { await supabase.from("products").update({ deleted_at: null }).eq("id", product.id); } });
+      router.push("/products");
+      return;
+    }
+    if (!confirm("¿Eliminar este pendiente y su foto?")) return;
     if (product.image_url) {
       const idx = product.image_url.indexOf("/product-images/");
       if (idx >= 0) await supabase.storage.from("product-images").remove([product.image_url.slice(idx + "/product-images/".length)]);
     }
     const { error } = await supabase.from("products").delete().eq("id", product.id);
     if (error) return setError(error.message);
-    router.push(product.status === "draft" ? "/review" : "/products");
+    router.push("/review");
+  }
+
+  async function restore() {
+    if (!product) return;
+    const { error } = await supabase.from("products").update({ deleted_at: null }).eq("id", product.id);
+    if (error) return setError(error.message);
+    toast("success", "Producto recuperado");
+    load();
   }
 
   if (loading) return <p className="text-sm text-slate-500">Cargando...</p>;
@@ -185,6 +222,22 @@ export default function ProductDetailPage() {
             </div>
           )}
 
+          {priceHist.length > 0 && (
+            <div className="rounded-2xl border-2 border-slate-200 p-3">
+              <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Historial de precios</p>
+              <ul className="space-y-1 text-xs">
+                {priceHist.map((h) => (
+                  <li key={h.id} className="flex items-center gap-2">
+                    <span className="w-24 shrink-0 text-slate-500">{new Date(h.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })} · {h.field === "precio" ? "venta" : h.field === "precio_compra" ? "compra" : "mayorista"}</span>
+                    <span className="tabular-nums text-slate-400 line-through">{h.old_value === null ? "—" : `Bs ${fmtMoney(Number(h.old_value))}`}</span>
+                    <span className="font-bold tabular-nums text-ink">{h.new_value === null ? "—" : `Bs ${fmtMoney(Number(h.new_value))}`}</span>
+                    <span className="ml-auto text-slate-400">{h.source}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Volver a analizar con IA */}
           <div className="rounded-2xl border-2 border-brand-200 bg-brand-50/60 p-3">
             <p className="flex items-center gap-1.5 text-xs font-bold text-brand-900">
@@ -212,9 +265,30 @@ export default function ProductDetailPage() {
         </div>
 
         <div className="animate-in card min-w-0 space-y-4">
+          {product.deleted_at && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-rose-50 p-3 text-sm text-rose-900">
+              <IconTrash size={16} />
+              <span className="flex-1">Este producto está en la <b>papelera</b> desde el {new Date(product.deleted_at).toLocaleDateString("es")}. Se borrará definitivamente a los 30 días.</span>
+              <button onClick={restore} className="btn-success btn-sm">Recuperar</button>
+            </div>
+          )}
           <div>
             <label className="label">Categoría</label>
             <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} onCategoriesChange={setCategories} emptyLabel="Sin categoría" />
+          </div>
+
+          {/* Control de stock: mínimo y vencimiento */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label" htmlFor="min-stock">Stock mínimo</label>
+              <input id="min-stock" type="number" min={0} inputMode="numeric" className="input tabular-nums" placeholder="3" value={minStock} onChange={(e) => setMinStock(e.target.value)} />
+              <p className="mt-1 text-[11px] text-slate-500">Avisa «por reponer» al llegar aquí. Vacío = el de la categoría.</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="expires">Vence el</label>
+              <input id="expires" type="date" className="input" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+              <p className="mt-1 text-[11px] text-slate-500">Avisa 30 días antes. Vacío = no vence.</p>
+            </div>
           </div>
 
           {fields.map((f) =>
@@ -280,8 +354,8 @@ export default function ProductDetailPage() {
                   </button>
                 )}
                 <button className="btn-destructive w-full justify-start" onClick={remove} disabled={saving}>
-                  <IconTrash size={16} /> Eliminar este producto
-                  <span className="ml-auto text-xs font-normal">y su foto</span>
+                  <IconTrash size={16} /> {isDraft ? "Eliminar este pendiente" : "Enviar a la papelera"}
+                  <span className="ml-auto text-xs font-normal">{isDraft ? "y su foto" : "recuperable 30 días"}</span>
                 </button>
               </div>
             )}

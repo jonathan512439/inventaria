@@ -194,7 +194,7 @@ function Review() {
     const [c, t, p, a] = await Promise.all([
       supabase.from("categories").select("*"),
       supabase.from("field_templates").select("*").order("sort_order"),
-      supabase.from("products").select("*").eq("status", "draft").order("created_at", { ascending: true }),
+      supabase.from("products").select("*").eq("status", "draft").is("deleted_at", null).order("created_at", { ascending: true }),
       supabase.from("variant_axes").select("*").order("sort_order"),
     ]);
     setCategories(c.data ?? []);

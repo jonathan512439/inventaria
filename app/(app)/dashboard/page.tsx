@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { queueSummary, useQueue } from "@/lib/queue";
-import { fmtMoney } from "@/lib/inventory";
+import { DEFAULT_MIN_STOCK, EXPIRY_SOON_DAYS, daysToExpiry, fmtMoney } from "@/lib/inventory";
 import { StepByStep, computeStates, type GuideProgress } from "@/components/guide/Guide";
 import AiUsageCard from "@/components/AiUsageCard";
 import CleanupCard from "@/components/CleanupCard";
@@ -20,6 +20,8 @@ interface Stats {
   onboarded: boolean;
   agotados: number;
   sinPrecio: number;
+  porReponer: number;
+  porVencer: number;
   salesToday: { total: number; count: number };
   addedToday: number;
 }
@@ -39,23 +41,35 @@ export default function DashboardPage() {
       const dayStart = new Date();
       dayStart.setHours(0, 0, 0, 0);
       const [d, c, t, p, prods, sales, added] = await Promise.all([
-        supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft"),
-        supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed"),
-        supabase.from("categories").select("id", { count: "exact", head: true }).is("parent_id", null),
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft").is("deleted_at", null),
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed").is("deleted_at", null),
+        supabase.from("categories").select("id,parent_id,min_stock_default"),
         supabase.from("profiles").select("business_name, onboarded_at").maybeSingle(),
-        supabase.from("product_summaries").select("stock,precio").eq("status", "confirmed"),
+        supabase.from("product_summaries").select("stock,precio,min_stock,expires_at,category_id").eq("status", "confirmed"),
         supabase.from("stock_movements").select("total").eq("tipo", "venta").gte("created_at", dayStart.toISOString()),
-        supabase.from("products").select("id", { count: "exact", head: true }).gte("created_at", dayStart.toISOString()),
+        supabase.from("products").select("id", { count: "exact", head: true }).gte("created_at", dayStart.toISOString()).is("deleted_at", null),
       ]);
       const list = prods.data ?? [];
+      const cats = t.data ?? [];
+      const minOf = (r: { min_stock?: number | null; category_id: string | null }) => {
+        if (typeof r.min_stock === "number") return r.min_stock;
+        const cat = cats.find((c) => c.id === r.category_id);
+        const top = cat?.parent_id ? cats.find((c) => c.id === cat.parent_id) : cat;
+        return typeof top?.min_stock_default === "number" ? top.min_stock_default : DEFAULT_MIN_STOCK;
+      };
       const s: Stats = {
         pending: d.count ?? 0,
         confirmed: c.count ?? 0,
-        types: t.count ?? 0,
+        types: cats.filter((c) => !c.parent_id).length,
         business: p.data?.business_name ?? null,
         onboarded: !!p.data?.onboarded_at,
         agotados: list.filter((x) => (x.stock ?? 0) <= 0).length,
         sinPrecio: list.filter((x) => x.precio === null).length,
+        porReponer: list.filter((x) => (x.stock ?? 0) <= minOf(x)).length,
+        porVencer: list.filter((x) => {
+          const d = daysToExpiry(x.expires_at);
+          return d !== null && d <= EXPIRY_SOON_DAYS;
+        }).length,
         salesToday: { total: (sales.data ?? []).reduce((a, r) => a + (r.total ?? 0), 0), count: (sales.data ?? []).length },
         addedToday: added.count ?? 0,
       };
@@ -113,8 +127,10 @@ export default function DashboardPage() {
           ? { title: "Elige qué vendes", text: "Con eso la IA sabe cómo ordenar tus fotos.", href: "/store", cta: "Elegir mis categorías", Icon: IconSparkles, tone: "brand" as const }
           : stats.confirmed === 0
             ? { title: "Agrega tu primer producto", text: "Una foto basta: la IA lee la etiqueta y lo ordena.", href: "/capture", cta: "Tomar la primera foto", Icon: IconCamera, tone: "brand" as const }
-            : stats.agotados > 0
-              ? { title: `${stats.agotados} producto${stats.agotados === 1 ? "" : "s"} agotado${stats.agotados === 1 ? "" : "s"}`, text: "Repón stock o revisa qué falta en tu inventario.", href: "/products", cta: "Ver agotados", Icon: IconAlert, tone: "rose" as const }
+            : stats.porVencer > 0
+              ? { title: `${stats.porVencer} producto${stats.porVencer === 1 ? "" : "s"} por vencer`, text: "Vencen en 30 días o ya vencieron. Revisa qué hacer con ellos.", href: "/restock?tab=vencer", cta: "Ver por vencer", Icon: IconAlert, tone: "amber" as const }
+            : stats.porReponer > 0
+              ? { title: `${stats.porReponer} producto${stats.porReponer === 1 ? "" : "s"} por reponer`, text: stats.agotados ? `${stats.agotados} agotado${stats.agotados === 1 ? "" : "s"}; el resto está bajo el mínimo. La lista de reposición ya está armada.` : "Están bajo su stock mínimo. La lista de reposición ya está armada.", href: "/restock", cta: "Ver lista de reposición", Icon: IconAlert, tone: "rose" as const }
               : { title: "Todo al día", text: "Sigue agregando productos o registra ventas desde el inventario.", href: "/capture", cta: "Agregar productos", Icon: IconCamera, tone: "emerald" as const };
 
   const tones = {
@@ -176,7 +192,7 @@ export default function DashboardPage() {
         <Tile href="/products" label="En inventario" value={String(stats.confirmed)} hint={`${stats.types} categoría${stats.types === 1 ? "" : "s"}`} />
         <Tile href="/review" label="Por revisar" value={String(pending)} hint={pending ? "toca para confirmar" : "nada pendiente"} tone={pending ? "amber" : undefined} />
         <Tile href="/movements" label="Ventas de hoy" value={`Bs ${fmtMoney(stats.salesToday.total)}`} hint={`${stats.salesToday.count} venta${stats.salesToday.count === 1 ? "" : "s"}`} tone="emerald" />
-        <Tile href="/products" label="Por atender" value={String(stats.agotados + stats.sinPrecio)} hint={stats.agotados + stats.sinPrecio ? `${stats.agotados} agotados · ${stats.sinPrecio} sin precio` : "todo en orden"} tone={stats.agotados + stats.sinPrecio ? "rose" : undefined} />
+        <Tile href="/restock" label="Por reponer" value={String(stats.porReponer)} hint={stats.porVencer ? `${stats.porVencer} por vencer · ${stats.sinPrecio} sin precio` : stats.sinPrecio ? `${stats.sinPrecio} sin precio` : "todo en orden"} tone={stats.porReponer + stats.porVencer ? "rose" : undefined} />
       </div>
 
       {/* Accesos directos */}

@@ -7,7 +7,7 @@ import { enqueue } from "@/lib/queue";
 import { resizeImage } from "@/lib/image";
 import { useFlow } from "./FlowProvider";
 import WhatsNew from "./WhatsNew";
-import { IconBox, IconCamera, IconCheckCircle, IconDownload, IconFolder, IconHome, IconImages, IconList, IconSettings, IconSparkles, IconTag, IconTrash, IconX } from "./ui/Icons";
+import { IconAlert, IconBox, IconCamera, IconCheckCircle, IconDownload, IconFolder, IconHome, IconImages, IconList, IconSettings, IconSparkles, IconTag, IconTrash, IconX } from "./ui/Icons";
 import { LogoWordmark } from "./ui/Logo";
 
 /** Barra inferior: Inicio · Revisar · Agregar (centro) · Inventario · Más ▾ */
@@ -22,6 +22,10 @@ const MAIN = [
 const MORE: { href: string; label: string; hint: string; Icon: (p: { size?: number; className?: string }) => JSX.Element }[] = [
   { href: "/scan", label: "Escanear código de barras", hint: "repetidos y reposición sin IA", Icon: IconTag },
   { href: "/movements", label: "Ventas y movimientos", hint: "ingresos, entradas y retiros", Icon: IconList },
+  { href: "/restock", label: "Por reponer y por vencer", hint: "lista de pedido para WhatsApp o Excel", Icon: IconAlert },
+  { href: "/purchases", label: "Compras y proveedores", hint: "llegó mercadería: stock, costo y vencimiento", Icon: IconBox },
+  { href: "/count", label: "Toma de inventario", hint: "contar, comparar y ajustar con acta", Icon: IconCheckCircle },
+  { href: "/prices", label: "Cambiar precios", hint: "por categoría: +%, monto o margen", Icon: IconTag },
   { href: "/export", label: "Exportar a Excel", hint: "todo o por categoría", Icon: IconDownload },
   { href: "/store", label: "Mi tienda", hint: "categorías, datos y variantes", Icon: IconFolder },
   { href: "/dashboard#guia", label: "Guía paso a paso", hint: "cómo armar tu inventario", Icon: IconSparkles },

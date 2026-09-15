@@ -47,7 +47,7 @@ export default function StorePage() {
     const [c, t, p, a] = await Promise.all([
       supabase.from("categories").select("*").order("name"),
       supabase.from("field_templates").select("*").order("sort_order"),
-      supabase.from("products").select("category_id"),
+      supabase.from("products").select("category_id").is("deleted_at", null),
       supabase.from("variant_axes").select("*").order("sort_order"),
     ]);
     setCategories(c.data ?? []);
@@ -201,6 +201,26 @@ export default function StorePage() {
                 </div>
 
                 <AxisEditor categoryId={t.id} axes={axes.filter((a) => a.category_id === t.id)} suggested={PRESETS.find((p) => p.name.toLowerCase() === t.name.toLowerCase())?.axes} onChanged={load} />
+
+                <label className="flex items-center gap-2 rounded-2xl bg-orange-50 px-3 py-2 text-xs text-orange-900">
+                  <span className="flex-1"><b>Stock mínimo</b> por defecto para los productos de esta categoría (aviso «por reponer»)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    className="input w-20 py-1 text-center text-sm font-bold tabular-nums"
+                    placeholder="3"
+                    defaultValue={t.min_stock_default ?? ""}
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim() === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
+                      if (v === (t.min_stock_default ?? null)) return;
+                      const { error } = await supabase.from("categories").update({ min_stock_default: v }).eq("id", t.id);
+                      if (error) return toast("error", error.message);
+                      toast("success", v === null ? "Mínimo por defecto quitado (se usa 3)" : `Mínimo por defecto: ${v}`);
+                      load();
+                    }}
+                  />
+                </label>
               </section>
             );
           })}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { axesFor, summarizeVariants } from "@/lib/variants";
 import { fieldLabel, getEffectiveFields, getValue, productTitle } from "@/lib/fields";
-import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
+import { daysToExpiry, fmtMoney, minStockOf, needsRestock, priceOf, stockOf } from "@/lib/inventory";
 import { categoryColor } from "@/lib/colors";
 import Photo from "./ui/Photo";
 import { IconBox, IconChevronRight } from "./ui/Icons";
@@ -31,6 +31,9 @@ export default function ProductRow({ product: p, categories, templates, showSub,
   const price = priceOf(p);
   const stock = stockOf(p);
   const out = (stock ?? 0) <= 0;
+  const low = !out && needsRestock(p, categories);
+  const minStock = minStockOf(p, categories);
+  const days = daysToExpiry(p.expires_at);
   const cat = p.category_id ? categories.find((c) => c.id === p.category_id) : null;
   const top = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) ?? cat : cat;
   const col = categoryColor(top?.name);
@@ -95,6 +98,12 @@ export default function ProductRow({ product: p, categories, templates, showSub,
               <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${out ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"}`}>
                 {out ? "0 en stock" : `${stock} en stock`}
               </span>
+              {low && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-800">por reponer · mín. {minStock}</span>}
+              {days !== null && days <= 30 && (
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${days < 0 ? "bg-rose-100 text-rose-700" : days <= 7 ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"}`}>
+                  {days < 0 ? `vencido hace ${-days} d` : days === 0 ? "vence hoy" : `vence en ${days} d`}
+                </span>
+              )}
               {vsum && vsum.agotadas > 0 && (
                 <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">{vsum.agotadas} variante{vsum.agotadas === 1 ? "" : "s"} agotada{vsum.agotadas === 1 ? "" : "s"}</span>
               )}

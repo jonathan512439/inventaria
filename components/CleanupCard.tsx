@@ -13,6 +13,7 @@ interface Counts {
   orphanPhotos: number;
   noCategory: number;
   noPrice: number;
+  trash: number;
 }
 
 type Key = "oldDrafts" | "emptySubs" | "emptyTops" | "orphanPhotos";
@@ -59,6 +60,7 @@ export default function CleanupCard() {
     ? [
         { n: counts.noCategory, title: `${counts.noCategory} productos sin categoría`, href: "/review" },
         { n: counts.noPrice, title: `${counts.noPrice} productos sin precio`, href: "/products" },
+        { n: counts.trash, title: `${counts.trash} en la papelera (se borran a los 30 días)`, href: "/trash" },
       ].filter((x) => x.n > 0)
     : [];
 
