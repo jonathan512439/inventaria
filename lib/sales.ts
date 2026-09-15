@@ -20,6 +20,7 @@ export interface SaleOptions {
   /** Lo cobrado ahora (= total si está pagado) */
   paid: number;
   discount: number;
+  customerId?: string | null;
   customerName?: string | null;
   note?: string | null;
 }
@@ -64,6 +65,7 @@ export async function registerSale(supabase: SupabaseClient<Database>, lines: Ca
       paid,
       cost_total: costTotal,
       items: valid.length,
+      customer_id: opts.customerId ?? null,
       customer_name: opts.customerName?.trim() || null,
       note: opts.note?.trim() || null,
     })

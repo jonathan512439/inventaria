@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import type { PayMethod, Product, ProductVariant, Sale, SaleItem, SaleStatus } from "@/types/database";
+import type { Customer, PayMethod, Product, ProductVariant, Sale, SaleItem, SaleStatus } from "@/types/database";
+import CustomerPicker from "@/components/CustomerPicker";
+import { debtOf } from "@/lib/customers";
 import { SUMMARY_COLS, fmtMoney, fromSummary, stockOf } from "@/lib/inventory";
 import { productTitle } from "@/lib/fields";
 import { METHOD_LABEL, cartSubtotal, lineTotal, registerSale, suggestedPrice, ticketText, type CartLine } from "@/lib/sales";
@@ -28,7 +30,8 @@ export default function SellPage() {
   const [status, setStatus] = useState<SaleStatus>("pagado");
   const [paid, setPaid] = useState("");
   const [discount, setDiscount] = useState("");
-  const [customer, setCustomer] = useState("");
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customerDebt, setCustomerDebt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<{ sale: Sale; items: SaleItem[] } | null>(null);
   const [business, setBusiness] = useState<string | null>(null);
@@ -49,6 +52,17 @@ export default function SellPage() {
         setRecent((ps ?? []).map(fromSummary));
       });
   }, [supabase]);
+
+  // Deuda actual del cliente elegido (para avisar del límite)
+  useEffect(() => {
+    if (!customer) return setCustomerDebt(0);
+    supabase
+      .from("sales")
+      .select("*")
+      .eq("customer_id", customer.id)
+      .neq("status", "pagado")
+      .then(({ data }) => setCustomerDebt(debtOf((data ?? []) as Sale[])));
+  }, [customer, supabase]);
 
   useEffect(() => {
     const term = q.trim().toLowerCase();
@@ -100,16 +114,22 @@ export default function SellPage() {
 
   async function finish() {
     if (!lines.length) return;
-    if (status !== "pagado" && !customer.trim()) return toast("info", "Escribe el nombre de quién debe, para acordarte");
+    if (status !== "pagado" && !customer) return toast("info", "Elige o crea el cliente que va a deber");
+    const overLimit = !!customer && customer.credit_limit !== null && status !== "pagado" && customerDebt + (total - paidNum) > Number(customer.credit_limit);
     const ok = await confirm({
       title: "¿Cerramos la venta?",
-      body: stockWarn.length ? `Ojo: ${stockWarn.length} producto${stockWarn.length === 1 ? "" : "s"} se vende${stockWarn.length === 1 ? "" : "n"} por encima del stock que dice la app; el stock quedará en 0.` : "El stock baja al instante y queda el ticket.",
+      body: overLimit
+        ? `Ojo: ${customer!.name} pasaría su límite de fiado (Bs ${fmtMoney(Number(customer!.credit_limit))}). Ya debe Bs ${fmtMoney(customerDebt)}.`
+        : stockWarn.length
+          ? `Ojo: ${stockWarn.length} producto${stockWarn.length === 1 ? "" : "s"} se vende${stockWarn.length === 1 ? "" : "n"} por encima del stock que dice la app; el stock quedará en 0.`
+          : "El stock baja al instante y queda el ticket.",
       details: [
         { label: "Productos", value: `${lines.length} · ${units} unid.` },
         ...(disc ? [{ label: "Descuento", value: `−Bs ${fmtMoney(disc)}` }] : []),
         { label: "Total", value: `Bs ${fmtMoney(total)}`, tone: "ok" as const },
         { label: "Pago", value: `${METHOD_LABEL[method]}${status !== "pagado" ? ` · cobrado Bs ${fmtMoney(paidNum)}` : ""}` },
-        ...(status !== "pagado" ? [{ label: `Debe ${customer.trim()}`, value: `Bs ${fmtMoney(total - paidNum)}`, tone: "warn" as const }] : []),
+        ...(customer ? [{ label: "Cliente", value: customer.name }] : []),
+        ...(status !== "pagado" ? [{ label: "Queda debiendo", value: `Bs ${fmtMoney(total - paidNum)}`, tone: "warn" as const }] : []),
       ],
       confirmLabel: status === "pagado" ? `Cobrar Bs ${fmtMoney(total)}` : "Registrar venta",
       tone: "success",
@@ -117,12 +137,12 @@ export default function SellPage() {
     if (!ok) return;
     setSaving(true);
     try {
-      const out = await registerSale(supabase, lines, { method, status, paid: paidNum, discount: disc, customerName: status !== "pagado" ? customer : null });
+      const out = await registerSale(supabase, lines, { method, status, paid: paidNum, discount: disc, customerId: customer?.id ?? null, customerName: customer?.name ?? null });
       setDone(out);
       setLines([]);
       setDiscount("");
       setPaid("");
-      setCustomer("");
+      setCustomer(null);
       setStatus("pagado");
       flow.refresh();
       navigator.vibrate?.(30);
@@ -257,6 +277,11 @@ export default function SellPage() {
       {/* Pago */}
       {lines.length > 0 && (
         <section className="animate-in card space-y-3 p-4">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Cliente {status === "pagado" ? "(opcional)" : ""}</p>
+            <CustomerPicker value={customer} onChange={setCustomer} required={status !== "pagado"} />
+            {customer && customerDebt > 0 && <p className="mt-1 text-xs text-amber-800">Ya debe Bs {fmtMoney(customerDebt)}{customer.credit_limit !== null ? ` · límite Bs ${fmtMoney(Number(customer.credit_limit))}` : ""}.</p>}
+          </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-600">Subtotal</span>
             <span className="font-semibold tabular-nums">Bs {fmtMoney(subtotal)}</span>
@@ -287,17 +312,13 @@ export default function SellPage() {
             </div>
             {status !== "pagado" && (
               <div className="mt-2 grid gap-2 rounded-2xl bg-amber-50 p-3 sm:grid-cols-2">
-                <label className="text-xs font-semibold text-amber-900">
-                  ¿Quién debe?
-                  <input className="input mt-1 py-1.5" placeholder="Nombre del cliente" value={customer} onChange={(e) => setCustomer(e.target.value)} />
-                </label>
                 {status === "parcial" && (
                   <label className="text-xs font-semibold text-amber-900">
                     ¿Cuánto paga ahora? (Bs)
                     <input type="number" min={0} step="any" inputMode="decimal" className="input mt-1 py-1.5 tabular-nums" value={paid} onChange={(e) => setPaid(e.target.value)} />
                   </label>
                 )}
-                <p className="text-[11px] text-amber-800 sm:col-span-2">Queda pendiente <b>Bs {fmtMoney(total - paidNum)}</b>. Lo verás en Ventas y movimientos; el seguimiento por cliente llega en la próxima fase.</p>
+                <p className="text-[11px] text-amber-800 sm:col-span-2">Queda pendiente <b>Bs {fmtMoney(total - paidNum)}</b> a nombre de {customer ? <b>{customer.name}</b> : "el cliente que elijas arriba"}. Lo verás en su ficha, con sus productos, para cobrarlo o recordárselo por WhatsApp.</p>
               </div>
             )}
           </div>

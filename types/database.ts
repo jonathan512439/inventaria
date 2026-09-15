@@ -76,6 +76,55 @@ export type SaleItem = {
   created_at: string;
 };
 
+export type Customer = {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string | null;
+  note: string | null;
+  credit_limit: number | null; // null = sin límite
+  deleted_at: string | null;
+  created_at: string;
+};
+
+/** Abono de un cliente contra su saldo (se aplica a las ventas más antiguas primero). */
+export type Payment = {
+  id: string;
+  user_id: string;
+  customer_id: string;
+  amount: number;
+  method: PayMethod;
+  note: string | null;
+  created_at: string;
+};
+
+/** Entrega en consignación: mercadería tuya en manos de un revendedor hasta que la vende o la devuelve. */
+export type Consignment = {
+  id: string;
+  user_id: string;
+  customer_id: string;
+  customer_name: string | null;
+  status: "abierta" | "liquidada";
+  note: string | null;
+  created_at: string;
+  closed_at: string | null;
+};
+
+export type ConsignmentItem = {
+  id: string;
+  consignment_id: string;
+  user_id: string;
+  product_id: string | null;
+  variant_id: string | null;
+  product_name: string | null;
+  variant_label: string | null;
+  qty_out: number;
+  qty_sold: number;
+  qty_returned: number;
+  unit_price: number;
+  created_at: string;
+};
+
 export type CashMovement = { id: string; user_id: string; tipo: "ingreso" | "retiro"; amount: number; note: string | null; created_at: string };
 
 export type CashClosing = {
@@ -105,6 +154,7 @@ export type StockMovement = {
   purchase_id?: string | null;
   count_id?: string | null;
   sale_id?: string | null;
+  consignment_id?: string | null;
   tipo: MovementType;
   cantidad: number;
   precio_unitario: number | null;
@@ -328,6 +378,7 @@ export interface Database {
           purchase_id?: string | null;
           count_id?: string | null;
           sale_id?: string | null;
+          consignment_id?: string | null;
         };
         Update: Partial<StockMovement>;
         Relationships: [];
@@ -358,6 +409,40 @@ export interface Database {
         Row: AiUsage;
         Insert: Omit<AiUsage, "id" | "created_at" | "quota_limit" | "own_key"> & { id?: string; created_at?: string; quota_limit?: number | null; own_key?: boolean };
         Update: Partial<AiUsage>;
+        Relationships: [];
+      };
+      customers: {
+        Row: Customer;
+        Insert: Omit<Customer, "id" | "created_at" | "phone" | "note" | "credit_limit" | "deleted_at"> & { id?: string; created_at?: string; phone?: string | null; note?: string | null; credit_limit?: number | null; deleted_at?: string | null };
+        Update: Partial<Customer>;
+        Relationships: [];
+      };
+      payments: {
+        Row: Payment;
+        Insert: Omit<Payment, "id" | "created_at" | "method" | "note"> & { id?: string; created_at?: string; method?: PayMethod; note?: string | null };
+        Update: Partial<Payment>;
+        Relationships: [];
+      };
+      consignments: {
+        Row: Consignment;
+        Insert: Omit<Consignment, "id" | "created_at" | "closed_at" | "status" | "customer_name" | "note"> & { id?: string; created_at?: string; closed_at?: string | null; status?: "abierta" | "liquidada"; customer_name?: string | null; note?: string | null };
+        Update: Partial<Consignment>;
+        Relationships: [];
+      };
+      consignment_items: {
+        Row: ConsignmentItem;
+        Insert: Omit<ConsignmentItem, "id" | "created_at" | "product_id" | "variant_id" | "product_name" | "variant_label" | "qty_sold" | "qty_returned" | "unit_price"> & {
+          id?: string;
+          created_at?: string;
+          product_id?: string | null;
+          variant_id?: string | null;
+          product_name?: string | null;
+          variant_label?: string | null;
+          qty_sold?: number;
+          qty_returned?: number;
+          unit_price?: number;
+        };
+        Update: Partial<ConsignmentItem>;
         Relationships: [];
       };
       sales: {

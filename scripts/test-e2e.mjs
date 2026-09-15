@@ -2,7 +2,8 @@
  * Prueba de extremo a extremo: registro → categoría → foto → producto analizado → subcategoría → alta manual
  *   → variantes (ejes del catálogo, stock derivado) → escáner por variante → venta por variante
  *   → duplicado detectado → foto de estante (detect) → clave de IA propia (BYOK)
- *   → control de stock (mínimo, papelera, compra, conteo) → ventas (tickets, ganancia, caja).
+ *   → control de stock (mínimo, papelera, compra, conteo) → ventas (tickets, ganancia, caja)
+ *   → clientes (fiado, abono, consignación).
  *   npm run test:e2e                 (contra http://localhost:3000)
  *   BASE_URL=https://inventaria.pages.dev npm run test:e2e
  * Crea un usuario temporal y lo elimina al terminar. Consume 1-2 peticiones de IA.
@@ -204,7 +205,42 @@ try {
     check(rp.status === 200, `${path} → ${rp.status}`);
   }
 
-  // 14. Medidor
+  // 14. Clientes: fiado ligado al cliente, abono FIFO, entrega en consignación
+  const { data: cli } = await admin.from("customers").insert({ user_id: uid, name: "Juanito Pérez", phone: "70011122", credit_limit: 100 }).select().single();
+  await admin.from("sales").update({ customer_id: cli.id, customer_name: cli.name }).eq("id", v2.id); // la venta parcial pasa a su nombre
+  const { data: v3 } = await admin.from("sales").insert({ user_id: uid, customer_id: cli.id, customer_name: cli.name, method: "efectivo", status: "fiado", subtotal: 20, discount: 0, total: 20, paid: 0, cost_total: 10, items: 1 }).select().single();
+  let { data: deudas } = await admin.from("sales").select("total,paid,status,created_at").eq("customer_id", cli.id).neq("status", "pagado").order("created_at");
+  const deuda = deudas.reduce((x, y) => x + Number(y.total) - Number(y.paid), 0);
+  check(deuda === 27.5, `Juanito debe Bs ${deuda} en ${deudas.length} tickets`);
+  // Abono de 10 aplicado a lo más antiguo (v2 debía 7,5 → pagado; v3 recibe 2,5)
+  let left = 10;
+  for (const d of deudas) {
+    const due = Number(d.total) - Number(d.paid);
+    const pay = Math.min(due, left);
+    const paid = Number(d.paid) + pay;
+    await admin.from("sales").update({ paid, status: paid >= Number(d.total) ? "pagado" : "parcial" }).eq("customer_id", cli.id).eq("created_at", d.created_at);
+    left -= pay;
+    if (left <= 0) break;
+  }
+  await admin.from("payments").insert({ user_id: uid, customer_id: cli.id, amount: 10, method: "efectivo" });
+  ({ data: deudas } = await admin.from("sales").select("id,total,paid,status").eq("customer_id", cli.id));
+  const s2 = deudas.find((x) => x.id === v2.id), s3 = deudas.find((x) => x.id === v3.id);
+  check(s2.status === "pagado" && Number(s3.paid) === 2.5 && s3.status === "parcial", `abono FIFO: N.º ${v2.number} pagado, N.º ${v3.number} cobrado 2,5 → debe ${Number(s3.total) - Number(s3.paid)}`);
+  // Consignación: entregar 5 (stock baja), rendir 3 vendidas + 1 devuelta → 1 afuera
+  const { data: con } = await admin.from("consignments").insert({ user_id: uid, customer_id: cli.id, customer_name: cli.name }).select().single();
+  const { data: ci } = await admin.from("consignment_items").insert({ consignment_id: con.id, user_id: uid, product_id: taza.id, product_name: "Taza", qty_out: 5, unit_price: 12.5 }).select().single();
+  await admin.from("consignment_items").update({ qty_sold: 3, qty_returned: 1 }).eq("id", ci.id);
+  const { data: ci2 } = await admin.from("consignment_items").select("*").eq("id", ci.id).single();
+  check(ci2.qty_out - ci2.qty_sold - ci2.qty_returned === 1, `consignación: entregó 5, vendió 3, devolvió 1 → ${ci2.qty_out - ci2.qty_sold - ci2.qty_returned} afuera`);
+  await admin.from("stock_movements").insert({ user_id: uid, product_id: taza.id, product_name: "Taza", tipo: "salida", cantidad: 5, motivo: "entregado a Juanito Pérez", stock_resultante: 3, consignment_id: con.id });
+  const { data: cm } = await admin.from("stock_movements").select("consignment_id").eq("consignment_id", con.id);
+  check(cm.length === 1, "movimiento de stock enlazado a la entrega");
+  for (const path of ["/customers", `/customers/detail?id=${cli.id}`, "/consign"]) {
+    const rp = await fetch(`${BASE}${path}`, { headers: { cookie: H.cookie } });
+    check(rp.status === 200, `${path.split("?")[0]} → ${rp.status}`);
+  }
+
+  // 15. Medidor
   r = await fetch(`${BASE}/api/usage`, { headers: H });
   const u = await r.json();
   check(r.status === 200 && Array.isArray(u.models) && u.models.length >= 3, `usage: ${u.models?.length} modelos, ${u.totalToday} análisis hoy`);

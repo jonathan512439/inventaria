@@ -32,6 +32,8 @@ const MORE_GROUPS: { title: string; items: MoreItem[] }[] = [
     items: [
       { href: "/sell", label: "Vender", hint: "Cobra varios productos a la vez y envía el ticket", Icon: IconTag },
       { href: "/cash", label: "Caja de hoy", hint: "Cuánto entró, cuánto salió y cerrar el día", Icon: IconList },
+      { href: "/customers", label: "Clientes", hint: "Quién te compra, quién te debe y cobrar fiados", Icon: IconHome },
+      { href: "/consign", label: "Mercadería entregada", hint: "Lo que dejaste con revendedores y rendir cuentas", Icon: IconBox },
       { href: "/scan", label: "Escanear un código", hint: "Apunta al código de barras para sumar stock o dar de alta", Icon: IconTag },
       { href: "/movements", label: "Ventas y movimientos", hint: "Cuánto vendiste, tu ganancia y qué entró o salió", Icon: IconList },
       { href: "/restock", label: "Qué falta y qué caduca", hint: "Lo que se está acabando y lo que vence pronto", Icon: IconAlert },
