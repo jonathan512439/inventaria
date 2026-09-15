@@ -39,8 +39,14 @@ Migración `supabase/010_control_stock.sql` aplicada: mínimos y vencimientos, p
 - **Qué**: eliminar un producto del inventario lo envía a la **papelera** (recuperable 30 días, con foto; «Deshacer» en el aviso); desaparece del inventario, Excel, escáner, conteos y estadísticas. **Ordenar y limpiar → Papelera** lista lo eliminado con los días restantes: **Recuperar**, borrar uno o **Vaciar papelera**. Lo que supera 30 días se borra solo (con su foto). Los pendientes sin confirmar se siguen borrando directo.
 - **Validar**: eliminar un producto → ya no está en el inventario; Ordenar y limpiar → «1 en la papelera» → Papelera → Recuperar → vuelve intacto.
 
-### 12.9 Pruebas
-- `npm run test:e2e` ampliado: mínimo en la vista, papelera excluida y contada por Ordenar y limpiar, recuperación, compra con proveedor (stock, costo, vencimiento, movimiento enlazado), acta de conteo. **37/37 en verde.**
+### 12.9 Despliegue: pantallas estáticas (límite de 25 MiB de Cloudflare)
+- **Qué**: al añadir las pantallas de esta fase, el Worker llegó a 32 MB y Cloudflare rechazó el despliegue (límite 25 MiB): cada ruta dinámica cargaba su propia copia del runtime de Next (~1,36 MB × 22 rutas). La capa `(app)` era dinámica solo por una comprobación de sesión **redundante con el middleware**, así que ahora se sirve **estática**: quedan 4 funciones (`/`, `/auth/confirm`, `/products/[id]`, `/products/c/[id]`) y las de API. **Worker: 32 MB → 4,8 MB.** Además, la librería de Excel (7 MB) se carga solo al pulsar Excel, no en el bundle del servidor.
+- **Seguridad**: sin cambios de fondo. El middleware sigue validando al usuario contra Supabase en cada petición (sin sesión, `/products` → 307 a `/login`), RLS protege los datos y las páginas estáticas no contienen datos de nadie; `AuthGuard` redirige en el navegador si la sesión caduca.
+- **Validar**: abrir cualquier pantalla con sesión → carga normal; cerrar sesión y abrir `/products` → va a login. Las 17 pantallas responden 200 en producción.
+
+### 12.10 Pruebas
+- `npm run test:e2e` ampliado: mínimo en la vista, papelera excluida y contada por Ordenar y limpiar, recuperación, compra con proveedor (stock, costo, vencimiento, movimiento enlazado), acta de conteo. **37/37 en verde contra producción.**
+- Prueba de pantallas en producción: las 17 responden 200 con sesión y `/products` redirige a login sin ella.
 
 ---
 

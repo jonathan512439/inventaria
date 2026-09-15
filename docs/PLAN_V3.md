@@ -201,6 +201,13 @@ ai_keys(user_id, provider, key_ciphertext, iv, created_at)
 
 Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_movements`…) ganan `business_id` en la Fase 6; hasta entonces siguen ancladas a `user_id`.
 
+## Restricciones de despliegue (Cloudflare)
+
+- El Worker no puede superar **25 MiB sin comprimir**. Cada **ruta dinámica** de página cuesta ~1,36 MB (copia del runtime de Next), así que las pantallas de la app se sirven **estáticas** y solo son dinámicas las rutas con parámetro y las de API (2026-09-15: 4,8 MB en total).
+- Antes de añadir una pantalla nueva: que sea un componente cliente bajo `(app)` **sin** `export const runtime = "edge"` (si lleva parámetro en la URL, se envuelve en un server component con `runtime = "edge"`, como `/products/[id]`).
+- Librerías pesadas (xlsx, heic2any) siempre con `await import(...)` dentro de la función que las usa, nunca en el nivel superior del módulo.
+- La autenticación de pantallas la garantiza `middleware.ts` (valida al usuario en cada petición) + RLS; la capa `(app)` no consulta la sesión en el servidor.
+
 ## Riesgos y decisiones
 
 | Riesgo | Cómo se maneja |

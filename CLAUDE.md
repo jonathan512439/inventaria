@@ -15,6 +15,7 @@
 - Nunca construir para Cloudflare desde Windows (`vercel build` mezcla bundles): el despliegue es solo por GitHub Actions.
 - Nunca usar `wrangler login` / `supabase login` globales: tokens por proyecto en `.env.local` (el usuario tiene otras cuentas para otro proyecto).
 - Gemini solo desde el servidor; cupo gratuito de 20 peticiones/día por modelo (cadena de modelos en `lib/gemini`).
+- Cloudflare limita el Worker a 25 MiB: las pantallas de `(app)` deben ser estáticas (sin `runtime = "edge"`; las rutas con parámetro van envueltas en un server component edge) y las librerías pesadas se importan dinámicamente. Ver «Restricciones de despliegue» en `docs/PLAN_V3.md`.
 - Prioridad móvil; el escritorio debe seguir funcional. Lenguaje sin tecnicismos para usuarios no técnicos; vocabulario fijo: Categoría, Subcategoría, Variante, Pendiente, En inventario, Agotado.
 
 ## Plan vigente
