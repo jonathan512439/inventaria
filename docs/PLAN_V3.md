@@ -172,7 +172,7 @@ La prueba recorre plan × rol × recurso e intenta leer, crear, editar y borrar 
 
 ---
 
-## Brechas para ofrecerlo como servicio serio (análisis 2026-09-23 · propuesta, pendiente de aprobación)
+## Brechas para ofrecerlo como servicio serio (análisis 2026-09-23 · aprobada por el usuario el mismo día)
 
 Estado de partida: Fases 0–6 desplegadas; Fases 7 y 8 sin empezar (en el código no existen `plan_features`, `has_feature`, `lib/access.ts`, `audit_log`, validación zod, límites de tasa ni monitoreo). Se ordena por lo que impide cobrar (A), lo que hace creíble el «con IA» (B) y lo que falta en inventario (C).
 
@@ -220,6 +220,38 @@ Estado de partida: Fases 0–6 desplegadas; Fases 7 y 8 sin empezar (en el códi
 4. **Fase 10 · IA que decide:** B3, B4, B6, B8.
 5. **Fase 11 · Inventario avanzado:** costo promedio, unidades/granel, FEFO, B5, B7.
 6. Después: sucursales, API/webhooks, facturación según el mercado.
+
+### B10 · Jev (TypeSafe AI) como modelo de decisiones — análisis 2026-09-23
+
+**Qué es.** Modelo de TypeSafe AI (San Francisco), en acceso anticipado desde el 15-16 sep 2026 (`jev-1.13.0`). No genera texto: recibe un **estado** (texto o JSON) y **preguntas tipadas**, y devuelve el valor con probabilidades y confianza calibrada. Tres tipos: `Choice` (una opción de hasta 255, con probabilidad por opción), `Score` (2–10 niveles ordenados) y `Noul` (sí/no, 0–1). API `POST https://api.typesafe.ai/v1/systemone` (SDK `@typesafe-ai/sdk` pide Node 20; en el edge de Cloudflare se llama con `fetch`). Latencia 70–500 ms; contexto 64k tokens; límites 1.200 peticiones/min.
+
+**Lo que NO puede hacer (y por eso no reemplaza a Gemini):** no lee imágenes (solo texto), no redacta respuestas, no extrae valores de texto libre, no cuenta, no hace cálculos ni fechas. Quedan en Gemini: análisis de foto, detección en estante, factura por foto (B4), contar por foto (B5), redactar «Pregúntale» y el resumen diario. La reposición (B3) es cálculo en SQL.
+
+**Dónde sí aporta en InventarIA** (el texto de entrada ya existe tras el análisis de la foto o en la planilla):
+
+| Uso | Hoy | Con Jev | Pregunta |
+|---|---|---|---|
+| J1 · Subcategoría automática (`/api/classify`) | Coincidencia de palabras y, si falla, una llamada de texto a Gemini (`pickSubcategory`) que gasta el cupo gratuito | Sustituye la llamada a Gemini; con confianza ≥ 0,85 asigna sola, por debajo muestra las 2 opciones más probables en Revisar | `Choice` sobre las subcategorías (estado: nombre, marca, descripción, etiqueta leída) |
+| J2 · Duplicados (11.1) | `nameKey` + marca + código: exacto, no detecta «Coca Cola 2L» vs «Coca-Cola 2 litros» | El código filtra 5 candidatos por texto; Jev decide si alguno es el mismo producto | `Noul` por candidato (≥ 0,8 → «Ya lo tienes») |
+| J3 · Mapeo al importar Excel (16.5) | Sinónimos fijos (`guessTarget`) → columnas desconocidas quedan en «otro» | Para las columnas en «otro»: encabezado + 5 valores de ejemplo → destino propuesto (el usuario sigue confirmando en la vista previa) | `Choice` sobre los destinos del mapeo |
+| J4 · Categoría del catálogo público (`/api/barcode`) | `suggestCategory` por palabras | `Choice` sobre las categorías del negocio con los datos del catálogo | `Choice` |
+| J5 · Enrutar «Pregúntale» (B7) | — | Elige qué consulta de solo lectura ejecutar antes de que Gemini redacte | `Choice` sobre las funciones SQL |
+| J6 · Motivo de ajustes y avisos (B6) | Texto libre | Clasifica el motivo (vencido, dañado, error de conteo, faltante sin explicar) y la gravedad del aviso | `Choice` + `Score` |
+
+**Costos.** Entrada 0,042 US$ por millón de tokens; salida gratis; 5 US$ de crédito al registrarse (≈ 119 M tokens). Estimación por decisión: J1 ≈ 800 tokens (≈ 0,00003 US$), J2 ≈ 300 por candidato, J3 ≈ 6.000 por planilla de 30 columnas (≈ 0,00025 US$). Escenario 100 negocios × 1.500 decisiones/mes × 800 tokens = 120 M tokens ≈ **5 US$/mes**; el crédito inicial cubre el piloto completo. Con entradas tan cortas la diferencia de precio frente a un Gemini de pago es pequeña: **el valor real es sacar decisiones del cupo de Gemini (A1), responder en < 0,5 s y tener confianza calibrada** para decidir cuándo preguntar al usuario (B2).
+
+**Riesgos.**
+- Producto de una semana en acceso anticipado: lista de espera, sin SLA, y precio y límites que pueden cambiar al salir del acceso anticipado.
+- El español funciona pero con menor precisión que el inglés, y no hay evaluación publicada.
+- Es sensible a texto manipulado (inyección): los datos vienen del propio negocio, pero una planilla o un catálogo externo pueden traer texto hostil. Jev solo propone y nunca decide solo nada irreversible.
+- Los datos salen a un tercero en EE. UU.: debe figurar en la política de privacidad (A7).
+
+**Cómo se integra (si se aprueba), dentro de la Fase 9 junto a B1:**
+1. `lib/ai/decide.ts`: `decideChoice(state, options, instructions)` y `decideYesNo(...)` con `fetch` a la API, versión fija `jev-1.13.0`, tiempo máximo 2 s y **respaldo automático al camino actual** (palabras o Gemini) si falla, se agota o no hay clave. Secreto `TYPESAFE_API_KEY` solo en Cloudflare.
+2. Registro por llamada en `ai_usage` (`purpose = decide:<uso>`, `model`, `confidence`, tokens) para medir costo y acierto.
+3. Prueba de aceptación antes de activarlo: `npm run ai:eval:decide` con 100 casos reales en español por uso (J1–J3); se activa por uso solo si acierta ≥ al camino actual y la confianza está calibrada (acierto ≥ 90 % cuando confianza ≥ 0,85).
+4. Orden: J1 → J2 → J3 (los de mayor uso y menor riesgo); J4–J6 después.
+5. Interruptor por uso en configuración del servidor para apagarlo sin desplegar.
 
 ---
 
@@ -274,7 +306,7 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
-- 2026-09-23 · Análisis de brechas para servicio serio (A1–A8, B1–B9, C) y orden propuesto de Fases 9–11; pendiente de aprobación.
+- 2026-09-23 · Análisis de brechas (A1–A8, B1–B9, C) aprobado; se añade B10 (Jev como modelo de decisiones, a evaluar en la Fase 9).
 - 2026-09-15 · Fase 6 completa (16.1–16.7): negocio, equipo, roles, PIN, firma, importar Excel, respaldos semanales y etiquetas. El respaldo por correo pasa a la Fase 8 junto con el resumen diario.
 - 2026-09-15 · Fase 5 (15.1–15.4) desplegada; el envío automático del resumen diario pasa a la Fase 8.
 - 2026-09-15 · Fase 4 (14.1–14.6) desplegada.
