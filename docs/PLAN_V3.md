@@ -172,6 +172,57 @@ La prueba recorre plan × rol × recurso e intenta leer, crear, editar y borrar 
 
 ---
 
+## Brechas para ofrecerlo como servicio serio (análisis 2026-09-23 · propuesta, pendiente de aprobación)
+
+Estado de partida: Fases 0–6 desplegadas; Fases 7 y 8 sin empezar (en el código no existen `plan_features`, `has_feature`, `lib/access.ts`, `audit_log`, validación zod, límites de tasa ni monitoreo). Se ordena por lo que impide cobrar (A), lo que hace creíble el «con IA» (B) y lo que falta en inventario (C).
+
+### A · Bloqueantes para cobrar (sin esto no es un servicio)
+
+| # | Brecha | Evidencia en el código | Qué implementar |
+|---|---|---|---|
+| A1 | **Capacidad de IA compartida y gratuita** | Una sola `GEMINI_API_KEY` gratuita: ~20 peticiones/día × ~6 modelos ≈ 120 análisis/día **para todos los clientes juntos**; `exhaustedUntil` vive en memoria del isolate (se pierde y no se comparte) | Clave de pago (nivel 1 de Google) para el plan Pro; `ai_usage.business_id` + cupo mensual por negocio aplicado en servidor antes de llamar a Gemini (`ai_quota(business_id)` en SQL); estado de agotamiento en tabla, no en memoria |
+| A2 | **Fase 7 completa** (planes y acceso) | Rutas API validan sesión pero no plan/rol de forma uniforme; sin zod; sin límites de tasa | Lo descrito en Fase 7 + `npm run test:access` dentro de `deploy.yml` |
+| A3 | **Fotos públicas** | Bucket `product-images` con `public = true` (`migrations.sql`): cualquiera con la URL ve las fotos | Bucket privado + URLs firmadas (caducidad 1 h) servidas por lote desde la vista de productos |
+| A4 | **Infraestructura de capa gratuita** | Supabase Free: pausa tras 7 días sin uso, sin recuperación en el tiempo, 500 MB / 1 GB | Supabase Pro (PITR diario) antes del primer cliente de pago; el respaldo semanal a Excel se queda como segunda red |
+| A5 | **Sin observabilidad** | No hay monitoreo de errores ni de disponibilidad | Sentry (o Cloudflare Logpush) en rutas API y cliente; chequeo de disponibilidad externo; alerta cuando `ai_usage.status = error` > 10 % en 1 h |
+| A6 | **Pruebas fuera del despliegue** | `deploy.yml` solo corre `tsc` y `lint`; `test:e2e`, `test:team`, `test:import` son manuales | Proyecto Supabase de pruebas + job de CI que corre las pruebas sin IA en cada push; `test:e2e` con IA una vez al día |
+| A7 | **Legal y datos** | Sin términos, privacidad ni aviso de que las fotos se envían a Google | Términos, privacidad, consentimiento del envío a IA, borrado de cuenta y negocio completo (hoy solo borrado suave de clientes) |
+| A8 | **Anular / devolver ventas** | `012_ventas.sql` no tiene anulación ni devolución | `sales.voided_at`, `sale_returns` que reponen stock, restan caja y quedan firmadas; solo dueño |
+
+### B · Lo que hace creíble el «con IA» (hoy la IA solo da de alta productos y resume)
+
+| # | Función | Cómo | Depende de |
+|---|---|---|---|
+| B1 | **Medir la calidad de la IA** | Guardar la propuesta original (`ai_meta.original`) y comparar al confirmar → tasa de corrección por campo, categoría y modelo; set de 50–100 fotos etiquetadas en `scripts/fixtures` y `npm run ai:eval` que falla si la precisión baja | — |
+| B2 | **Confianza por campo** | El esquema pide `{valor, confianza}`; Revisar resalta en ámbar solo lo dudoso («revisa esto») para confirmar más rápido | B1 |
+| B3 | **Reposición inteligente** | Velocidad de venta (28 días, ponderada) + días de entrega del proveedor → «se agota en N días» y cantidad sugerida en `/restock`; el mínimo fijo pasa a ser respaldo. Cálculo en SQL, sin IA; la IA solo explica | Ventas con historial |
+| B4 | **Factura del proveedor por foto** | `POST /api/invoice`: foto de la nota de compra → líneas (producto emparejado, cantidad, costo, vencimiento) → borrador de compra en `/purchases` para confirmar | — |
+| B5 | **Contar por foto** | Extender `/api/detect` para devolver cantidad por producto en un estante y proponerla en `/count` (el usuario confirma) | — |
+| B6 | **Alertas de faltantes y anomalías** | Reglas en SQL (diferencias de conteo repetidas por categoría o persona, ventas bajo costo, descuadres de caja por quién atendió, ajustes sin motivo); la IA redacta el aviso en el resumen diario | Fase 6 (firma) |
+| B7 | **«Pregúntale» escalable** | Hoy arma un resumen de ≤400 productos y 90 días: con inventarios grandes responde con datos incompletos. Pasar a llamadas a herramientas (funciones SQL de solo lectura con parámetros: ventas por rango, producto, cliente) | A2 |
+| B8 | **Resumen diario automático** (ya en Fase 8) | Web Push + correo programado, con B3 y B6 dentro | B3, B6 |
+| B9 | **Independencia del proveedor** | `lib/gemini` detrás de una interfaz `lib/ai` con un segundo proveedor de respaldo, para no depender del cupo ni de caídas de uno solo | A1 |
+
+### C · Inventario que un cliente serio va a pedir
+
+- **Costo promedio ponderado** en compras (hoy la entrada reemplaza `precio_compra` por el último costo → la ganancia real se distorsiona cuando el costo sube o baja).
+- **Unidad de medida y granel** (kg, litro, metro) con cantidades decimales en stock y venta.
+- **Lotes con salida por vencimiento (FEFO)**: el vencimiento por lote de compra existe, pero la venta no descuenta del lote que vence primero.
+- **Sucursales y traspasos** (el modelo por negocio ya lo permite; hoy está fuera del plan).
+- **Facturación fiscal**: decisión comercial. Si el mercado objetivo la exige, integrarse con el sistema de facturación del país como módulo aparte; si no, se deja explícito que el ticket no es factura.
+- **Integraciones**: API con claves por negocio y webhooks (stock y venta), para tienda en línea o contabilidad.
+
+### Orden propuesto
+
+1. **Fase 7** + A3, A6, A8 (seguridad y acceso, en CI).
+2. **Fase 8** + A1, A4, A5, A7 (se puede cobrar).
+3. **Fase 9 · IA medible:** B1, B2, B9.
+4. **Fase 10 · IA que decide:** B3, B4, B6, B8.
+5. **Fase 11 · Inventario avanzado:** costo promedio, unidades/granel, FEFO, B5, B7.
+6. Después: sucursales, API/webhooks, facturación según el mercado.
+
+---
+
 ## Modelo de datos nuevo (resumen)
 
 ```
@@ -223,6 +274,7 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
+- 2026-09-23 · Análisis de brechas para servicio serio (A1–A8, B1–B9, C) y orden propuesto de Fases 9–11; pendiente de aprobación.
 - 2026-09-15 · Fase 6 completa (16.1–16.7): negocio, equipo, roles, PIN, firma, importar Excel, respaldos semanales y etiquetas. El respaldo por correo pasa a la Fase 8 junto con el resumen diario.
 - 2026-09-15 · Fase 5 (15.1–15.4) desplegada; el envío automático del resumen diario pasa a la Fase 8.
 - 2026-09-15 · Fase 4 (14.1–14.6) desplegada.
