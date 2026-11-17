@@ -9,6 +9,10 @@ concurrency:
   group: deploy-pages
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,7 +21,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
@@ -41,3 +45,13 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Avisar si falló
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Falló: ${{ github.workflow }}"
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number -q '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "Volvió a fallar: $run"; else gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "El despliegue no se completó (commit ${{ github.sha }}). Ejecución: $run"; fi

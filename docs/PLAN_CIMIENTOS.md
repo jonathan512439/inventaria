@@ -1,0 +1,141 @@
+# Fase 6.9 · Cimientos — plan detallado de corrección
+
+Origen: `AUDITORIA.md` → «Auditoría 2 · 2026-11-17» (hallazgos C1–C6, S1–S12, N1–N7, E1–E6, M1–M8, V1–V8). Resumen y lugar en el calendario: `PLAN_V3.md` → «Fase 6.9». Aprobado por el usuario el 2026-11-17 («comienza con C0 y luego C1»).
+
+**Regla de fondo:** toda escritura que mueve dinero o stock pasa por una función SQL atómica (`rpc`) que hace todo o nada. El navegador no calcula ni escribe stock, costos ni totales; solo llama a la función y muestra el resultado.
+
+Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 17.1 = C1, …), su migración numerada y su prueba automática.
+
+## Estado (actualizar al cerrar cada paso)
+
+| Paso | Estado | Migración | Prueba | CHANGELOG |
+|---|---|---|---|---|
+| C0 · Operación y alertas | ✅ 2026-11-17 | — | ejecución manual de `keepalive` y `backup` | 17.0 |
+| C1 · Campos del sistema como columnas | ⏳ en curso | `020_campos_sistema.sql` | `npm run test:fields` + `test:variants` | 17.1 |
+| C2 · Operaciones atómicas | pendiente | `021_operaciones.sql` | `npm run test:ops` | 17.2 |
+| C3 · El dinero como pagos | pendiente | `022_pagos.sql` | `npm run test:ops` (ampliada) | 17.3 |
+| C4 · Ajustes del negocio y zona horaria | pendiente | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
+| C5 · Permisos en la base | pendiente | `024_permisos.sql` (+ `025_fotos_privadas.sql`) | `npm run test:access` | 17.5 |
+| C6 · Calidad continua | pendiente | `schema_migrations` | CI | 17.6 |
+| C7 · Interfaz | pendiente | — | manual + `test:e2e` | 17.7 |
+
+## Contexto para retomar (decisiones tomadas)
+
+- **Transición `data` → columnas (C1).** `products` gana columnas del sistema. Un solo disparador (`products_sync_fields`) las sincroniza **en los dos sentidos**: si cambia la columna, se copia a `data` (con la clave que ya usa el producto: `stock`/`cantidad`/`existencias`…); si cambia `data`, se copia a la columna. Así el código actual (que escribe `data`) sigue funcionando y las funciones de C2 escriben la columna directamente. Con variantes, el stock siempre es la suma de las variantes (absorbe el antiguo `products_stock_guard`).
+- **`data` deja de ser la fuente en C2.** Desde C2 nadie escribe stock por `data`; el formulario de producto sigue pudiendo editar `data` (el disparador lo refleja). Retirar los campos del sistema de `data` queda para después de C5 (cuando el costo salga a su propia tabla).
+- **Vender sin stock registrado (C2):** se permite (la tienda no puede negarse a vender). El stock queda en 0 y el movimiento guarda `faltante` (unidades vendidas por encima de lo registrado), visible en Movimientos y en el conteo. Nunca se recorta en silencio.
+- **Idempotencia (C2):** cada operación lleva un `id` generado en el celular (`crypto.randomUUID()`); repetirla devuelve el resultado ya guardado. Es lo que permite reintentar sin duplicar y la venta sin conexión.
+- **Costos ocultos de verdad (C5):** el costo sale de `products.data` a la tabla `product_costs` (solo dueño). `sale_items.unit_cost` → `sale_item_costs` (solo dueño). Las vistas para el vendedor no tienen esas columnas.
+- **Pruebas** contra el proyecto de producción con usuarios temporales hasta C6 (proyecto de pruebas aparte).
+
+---
+
+## C0 · Operación y alertas (cierra §2.0 y M8)
+
+| Qué | Dónde |
+|---|---|
+| Restaurar el proyecto pausado | Hecho a mano por el usuario el 2026-11-17 (`ACTIVE_HEALTHY`). |
+| Mantener la base activa: consulta real cada 2 días | `.github/workflows/keepalive.yml` (REST `businesses?select=id&limit=1` + `auth/v1/health` con la clave anónima) |
+| Aviso cuando falla un workflow: abre (o comenta) un issue «Falló: <workflow>» | último paso `if: failure()` en `deploy.yml`, `backup.yml`, `keepalive.yml` (`permissions: issues: write`) |
+| Node 22 en el despliegue | `deploy.yml` |
+| Mensajes de error sencillos (red, cupo, permisos, duplicados, credenciales) | `lib/errors.ts` → `friendlyError(e)`; usado en login y registro (en C7 se extiende a todos los `toast`) |
+
+**Acepta cuando:** el login funciona; `backup.yml` lanzado a mano termina en verde; `keepalive.yml` lanzado a mano termina en verde; sin red, el login dice «No pudimos conectar con el servidor…».
+
+## C1 · Campos del sistema como columnas (cierra C2-base, M2, E1, E2, S11)
+
+**Migración `020_campos_sistema.sql`:**
+1. `pg_trgm` en el esquema `extensions`.
+2. Columnas en `products`: `nombre text`, `marca text`, `precio numeric(12,2)`, `precio_compra numeric(12,2)`, `precio_mayorista numeric(12,2)`, `stock numeric(14,3)`, `codigo_barras text`, `unidades_por_paquete numeric(12,3)`, `codigo_norm text` (= `upper(btrim(codigo_barras))`, para buscar por código), `search text` (nombre, marca, descripción, etiqueta leída y código en minúsculas).
+3. Relleno desde `data` con los alias de siempre (`jkey`/`safe_num`) con los disparadores apagados (no toca `updated_at`).
+4. Disparador `products_sync_fields` (BEFORE INSERT OR UPDATE) descrito arriba; se elimina `products_stock_guard_trg`.
+5. Índices: `(business_id, status) where deleted_at is null`, `(business_id, codigo_norm) where codigo_norm is not null`, GIN trigram sobre `search`.
+6. `product_summaries` lee las columnas (mismas columnas y orden; el costo sigue oculto al vendedor).
+7. Variantes: el código de barras pasa a ser único **por negocio** (`unique (business_id, codigo_barras)`).
+
+**Código:** `app/api/barcode/route.ts` busca por `codigo_norm` (una fila, no todo el inventario); `types/database.ts` con las columnas nuevas; `scripts/test-variants.mjs` crea sus filas con el negocio del usuario temporal; prueba nueva `scripts/test-fields.mjs`.
+
+**Verificación de la migración:** para cada producto, columna = valor leído de `data` (0 diferencias); suma de stock igual antes y después; `product_summaries` devuelve las mismas filas.
+
+**Acepta cuando:** `test:fields` y `test:variants` en verde; escanear un código encuentra el producto con una sola consulta; la búsqueda sigue funcionando.
+
+## C2 · Operaciones atómicas (cierra C1, C3, C4, C5, N4, N7, M1)
+
+**Migración `021_operaciones.sql`** (todas `security definer`, con `set search_path = public`, comprobando que quien llama es miembro activo de `current_business_id()` y que cada producto/variante pertenece a ese negocio):
+
+| Función | Reemplaza a | Notas |
+|---|---|---|
+| `next_number(bid, kind)` sobre `business_counters(business_id, kind, value)` | `sales_number()` con `max+1` | `update … returning`; `unique (business_id, number)` en `sales` |
+| `adjust_stock(p_id, p_product, p_variant, p_delta, p_tipo, p_motivo, p_precio, p_at)` | `StockAdjust`, `lib/offline.syncMoves`, `scan` (+N), `review` (sumar al existente) | `stock_movements.client_id uuid unique` para idempotencia; `p_at` conserva la hora real del movimiento sin conexión |
+| `register_sale(p_id, p_lines, p_method, p_status, p_paid, p_discount, p_customer, p_note)` | `lib/sales.registerSale` | costo vigente leído en el servidor; número por contador; stock por `update … set stock = stock - qty`; `faltante` si no alcanzaba |
+| `register_purchase(p_id, p_supplier, p_doc, p_note, p_lines)` | `purchases/page.tsx` | actualiza costo, `price_history`, vencimiento |
+| `consign_out(p_id, p_customer, p_lines)` / `consign_settle(p_consignment, p_rows, p_pay, p_method)` | `consign/page.tsx` | la liquidación crea la venta **sin** volver a mover stock (corrige el doble conteo) |
+| `apply_count(p_count, p_rows)` | `count/page.tsx` | ajuste por diferencia, motivo y acta en una transacción |
+| `set_prices(p_rows, p_source)` | `prices/page.tsx`, `ProductDetailClient` (precios) | escribe `price_history` |
+
+`stock_movements` gana `client_id uuid unique` y `faltante integer not null default 0`.
+
+**Código:** `lib/data/stock.ts`, `lib/data/sales.ts`, `lib/data/purchases.ts`, `lib/data/consign.ts`, `lib/data/counts.ts`, `lib/data/prices.ts` (una función por `rpc`, con tipos). Se eliminan los 12 sitios con «leer → escribir»: `lib/sales.ts`, `lib/offline.ts`, `consign`, `count` (2), `prices`, `purchases`, `review`, `scan` (2), `labels` (código interno: pasa a `set_product_code`). La cola sin conexión pasa a llamar `adjust_stock` con el mismo `id` (reintento seguro) y marca como `fallido` tras 5 rechazos del servidor (visible en la barra sin conexión, con «Descartar»).
+
+**Prueba `scripts/test-ops.mjs`:** 10 ventas simultáneas de 1 unidad sobre stock 10 → stock 0 y números 1…10 sin repetir; la misma venta enviada dos veces → una sola; venta de un vendedor → `cost_total` correcto; vender 5 con stock 3 → stock 0 y `faltante = 2`; entrega 20 → liquidación 15 vendidas / 5 devueltas → stock y movimientos sin doble salida.
+
+## C3 · El dinero como pagos (cierra N1, N2, N6, C6)
+
+**Migración `022_pagos.sql`:**
+- `payments` gana `sale_id uuid null`, `kind text check (kind in ('venta','abono'))`, `client_id uuid unique`; `customer_id` pasa a opcional (venta pagada sin cliente).
+- `payment_allocations(payment_id, sale_id, amount)`: cómo se repartió cada abono entre ventas (FIFO). `sales.paid` y `sales.status` se recalculan por disparador desde los pagos de la venta + asignaciones.
+- **Relleno:** por cliente, se re-simulan los abonos existentes en orden FIFO para separar el pago inicial de cada venta (`sales.paid` actual − lo asignado por abonos) y se crea su pago `kind = 'venta'` con la fecha de la venta. Verificación: saldo por cliente y `paid` por venta iguales antes y después.
+- Vista `customer_balances` (ventas − pagos; negativo = a favor).
+- `register_sale` acepta `p_payments jsonb` (`[{method, amount}]`) → pago mixto real; `register_payment(p_id, p_customer, p_amount, p_method, p_note)` atómico.
+- `cash_summary(p_day)` (pagos del día por medio + ingresos/retiros) y `close_cash(p_day, p_counted, p_note)` que guarda una fila nueva por cierre (historial; ya no `upsert`).
+
+**Código:** caja (`cash/page.tsx`) lee `cash_summary`; clientes y Vender leen `customer_balances`; hoja de cobro con «varios medios».
+
+**Acepta cuando:** un abono en QR de una venta de la semana pasada aparece en la caja de hoy como QR y el cierre de ayer no cambia; venta de Bs 100 con 60 efectivo + 40 QR cuadra en la caja; un sobrepago queda como saldo a favor.
+
+## C4 · Ajustes del negocio y zona horaria (cierra N3, N5, E4, V6)
+
+**Migración `023_ajustes_negocio.sql`:** `businesses` gana `timezone text default 'America/La_Paz'`, `currency text default 'Bs'`, `min_stock_default`, `expiry_days`; se copian del perfil del dueño (`profiles.business_name` → `businesses.name` si el negocio se llama «Mi negocio»). `business_day(ts)` = fecha en la zona del negocio. `session_context()` devuelve en una llamada: negocio, mi rol, miembros, ajustes, conteos de pendientes/inventario.
+
+**Código:** `FlowProvider` usa `session_context()` al abrir y tras cambios (no en cada ruta); se reemplazan las lecturas de `profiles.business_name` (`sell`, `dashboard`, `digest`, `customers/detail`, `settings`, `api/ask`, `api/setup`, `PresetPicker`); `fmtMoney(n)` usa la moneda del negocio; cortes de día de caja y reportes en SQL con `business_day`.
+
+**Acepta cuando:** el vendedor ve el nombre real del negocio en el ticket; una venta a las 21:00 (hora de Bolivia) cae en el día correcto; navegar entre pantallas no repite las 7 consultas.
+
+## C5 · Permisos en la base (cierra S1–S10, S12; adelanta la Fase 7)
+
+**Migración `024_permisos.sql`:**
+- `is_owner(bid)`; políticas separadas por operación en lugar de `for all`:
+  - catálogo (`categories`, `field_templates`, `variant_axes`, `suppliers`, `purchases*`): lectura miembros (proveedores/compras solo dueño), escritura dueño.
+  - `products`/`product_variants`: lectura e inserción/edición miembros; borrar y mandar a la papelera solo dueño (disparador sobre `deleted_at`).
+  - `sales`, `sale_items`, `payments`, `stock_movements`, `consignment*`, `cash_closings`, `stock_count*`: sin `insert/update/delete` directos (solo por las funciones de C2/C3); anulación (A8) solo dueño.
+  - `customers`: miembros crean/editan; borrar solo dueño.
+- **Costos:** tabla `product_costs(business_id, product_id, variant_id, precio_compra)` y `sale_item_costs(sale_item_id, unit_cost)`, solo dueño; el disparador de C1 saca `precio_compra/costo` de `data` hacia `product_costs`; `cash_closings.profit` y `sales.cost_total` pasan a vistas del dueño; `price_history` del costo solo dueño; bucket `backups` solo dueño.
+- **Negocio activo:** lectura y escritura limitadas a `current_business_id()`; `switch_business(bid)` + selector en Ajustes si hay más de uno.
+- **Firma:** `user_id` lo fija un disparador (actor válido o `auth.uid()`) e inmutable en `update`; `verify_pin` devuelve un token firmado (HMAC con secreto en tabla privada, 12 h) que viaja en `x-actor-token`; `set_actor` solo acepta tokens válidos.
+- `businesses`: el dueño solo cambia `name` y ajustes (disparador rechaza `plan`, `plan_until`, `owner_id`); no se puede quitar al último dueño.
+
+**Rutas API:** `lib/access.ts` con `requireMember()` / `requireRole('dueno')` (negocio activo); `/api/cleanup` exige dueño, trabaja solo el negocio activo y la purga de la papelera pasa al cron de respaldos; `/api/usage POST` solo con clave propia y filtrando `user_id`; consumo de IA contado por petición (sin arreglo global).
+
+**Interfaz:** `FlowProvider` con `ready`; rol por defecto `vendedor` hasta saberlo; `OwnerOnly` espera; «Volver a mi cuenta» pide PIN; cerrar sesión borra IndexedDB (`inventaria-offline` y cola de fotos) y el actor; caché con clave por negocio.
+
+**`025_fotos_privadas.sql` (A3/S12):** bucket `product-images` privado; `lib/photos.ts` firma URLs por lote (1 h) y las guarda en memoria; `Photo` las usa.
+
+**Prueba `scripts/test-access.mjs`:** con la clave anónima, un vendedor no lee `precio_compra`/`unit_cost`/ganancia, no borra productos ni ventas, no cambia `user_id`, no cambia el plan; un usuario en dos negocios solo ve el activo; `x-actor` sin token se ignora.
+
+## C6 · Calidad continua (cierra M3, M6, M7)
+
+- Proyecto Supabase de pruebas (tokens propios en `.env.local` como `TEST_*`, nunca login global).
+- `schema_migrations(name, applied_at)` + `scripts/db-migrate.mjs` (`npm run db:migrate`): aplica en orden los `supabase/0*.sql` que falten.
+- `npm run db:types` → `supabase gen types typescript` con el token del proyecto; `types/database.ts` pasa a generado + alias propios en `types/app.ts`.
+- `vitest` para reglas puras (`lib/inventory`, `lib/import`, `parseExpiry`, `lib/customers`, `lib/errors`).
+- `deploy.yml`: job `test` (unitarias + `test:variants`, `test:fields`, `test:ops`, `test:access` contra el proyecto de pruebas) del que depende el despliegue; `test:e2e` (con IA) una vez al día.
+
+## C7 · Interfaz (cierra V1–V5, V7, V8, M4, M5)
+
+- Barra inferior según rol y etapa (con inventario: Inicio · **Vender** · Escanear · Inventario · Más); vendedor sin «Revisar» si no hay pendientes.
+- Menú «Más» por tareas (Vender y cobrar · Mercadería · Números · Configurar), un icono propio por destino (nuevos en `components/ui/Icons.tsx`), buscador.
+- Escala tipográfica en `tailwind.config.ts`; mínimo 12 px informativo y 14 px en acciones (reemplazar `text-[9-11px]`).
+- `aria-label` en botones de icono; `eslint-plugin-jsx-a11y`.
+- `friendlyError` en todos los `toast("error", …)`.
+- Hoja de cobro con teclado grande y vuelto.
+- Partir `review` (872 líneas), `scan`, `consign`, `ProductDetailClient` en hooks de datos + componentes; `lib/ai/productAnalysis.ts` compartido por `analyze` y `reanalyze`.

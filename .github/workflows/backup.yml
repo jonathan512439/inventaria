@@ -6,6 +6,10 @@ on:
     - cron: "0 3 * * 0"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   backup:
     runs-on: ubuntu-latest
@@ -22,3 +26,14 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      # Un respaldo roto pasó 6 semanas sin que nadie lo supiera (docs/AUDITORIA.md §2.0): ahora abre un issue.
+      - name: Avisar si falló
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Falló: ${{ github.workflow }}"
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number -q '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "Volvió a fallar: $run"; else gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "El respaldo semanal no se generó. Ejecución: $run"; fi

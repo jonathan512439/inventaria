@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient as createPlainClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyError } from "@/lib/errors";
 
 /** URL pública de la app: los enlaces del correo siempre apuntan aquí (se pueden abrir desde cualquier dispositivo). */
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
@@ -28,13 +29,15 @@ export default function RegisterPage() {
     const plain = createPlainClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
       auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
-    const { data, error } = await plain.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: `${appUrl()}/auth/confirm` },
-    });
+    const { data, error } = await plain.auth
+      .signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${appUrl()}/auth/confirm` },
+      })
+      .catch((e: unknown) => ({ data: { session: null, user: null }, error: e as Error }));
     setLoading(false);
-    if (error) return setError(error.message);
+    if (error) return setError(friendlyError(error));
     // Si la confirmación de correo está desactivada, ya hay sesión: la guardamos en cookies.
     if (data.session) {
       await createClient().auth.setSession(data.session);

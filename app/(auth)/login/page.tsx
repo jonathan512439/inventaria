@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient as createPlainClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyError } from "@/lib/errors";
 
 function LoginForm() {
   const router = useRouter();
@@ -26,7 +27,7 @@ function LoginForm() {
       email,
       options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/confirm` },
     });
-    if (error) return setError(error.message);
+    if (error) return setError(friendlyError(error));
     setResent(true);
   }
 
@@ -35,18 +36,12 @@ function LoginForm() {
     setError(null);
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password }).catch((e: unknown) => ({ error: e as Error & { code?: string } }));
     setLoading(false);
     setUnconfirmed(false);
     if (error) {
-      if (error.message === "Email not confirmed") setUnconfirmed(true);
-      setError(
-        error.message === "Invalid login credentials"
-          ? "Correo o contraseña incorrectos."
-          : error.message === "Email not confirmed"
-            ? "Debes confirmar tu correo antes de iniciar sesión."
-            : error.message
-      );
+      if (/email not confirmed/i.test(error.message) || error.code === "email_not_confirmed") setUnconfirmed(true);
+      setError(friendlyError(error));
       return;
     }
     router.replace(params.get("next") || "/dashboard");

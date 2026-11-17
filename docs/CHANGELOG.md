@@ -3,6 +3,18 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-17 · Fase 6.9 · C0 — La base no se vuelve a dormir sin aviso
+
+Plan detallado y estado de la Fase 6.9: [PLAN_CIMIENTOS.md](PLAN_CIMIENTOS.md). Incidente: [AUDITORIA.md §2.0](AUDITORIA.md).
+
+### 17.0 Operación y alertas
+- **Qué**: el proyecto de Supabase estuvo **pausado** (plan gratuito, ~7 días sin uso) desde ~2026-10-05 hasta su restauración manual el 2026-11-17; por eso no se podía iniciar sesión, y el respaldo semanal falló 6 domingos seguidos sin que nadie se enterara. Ahora:
+  - `keepalive.yml`: cada 2 días hace una consulta real a la base y al servicio de sesión, para que no se pause.
+  - `keepalive.yml`, `backup.yml` y `deploy.yml` **abren un issue** «Falló: …» en GitHub cuando fallan (o comentan el que ya está abierto). GitHub avisa por correo al dueño del repositorio.
+  - El despliegue usa Node 22.
+  - `lib/errors.ts` (`friendlyError`): convierte errores técnicos en mensajes sencillos. El login y el registro ya no muestran textos en inglés; sin conexión dicen «No pudimos conectar con el servidor. Revisa tu internet o intenta de nuevo en unos minutos.».
+- **Validar**: iniciar sesión funciona; en GitHub → Actions, «Mantener la base activa» y «Respaldo semanal» lanzados a mano terminan en verde; con el celular en modo avión, «Entrar» muestra el mensaje de conexión.
+
 ## 2026-09-15 · Plan v3 · Fase 6 — El negocio y su equipo, importar, respaldos y etiquetas
 
 Migraciones `014_negocios.sql` → `019_respaldos.sql` aplicadas. **Verificación de la migración:** conteos iguales antes y después en las 20 tablas y todas las filas con negocio; `npm run test:team` 18/18 y `npm run test:e2e` 58/58 en verde contra producción.

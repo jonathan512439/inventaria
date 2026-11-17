@@ -125,7 +125,9 @@ Depende de: Fase 3.
 
 **Acepta cuando** dos personas trabajan sobre el mismo inventario desde dos celulares y cada movimiento muestra quién lo hizo; el vendedor no ve costos ni ganancia; un Excel de 300 filas se importa sin errores.
 
-## Fase 6.9 · Cimientos (propuesta 2026-11-17, pendiente de aprobación) — 2,5 semanas
+## Fase 6.9 · Cimientos (aprobada 2026-11-17, en curso) — 2,5 semanas
+
+Plan detallado, decisiones y estado por paso: **[PLAN_CIMIENTOS.md](PLAN_CIMIENTOS.md)**.
 
 Corrige lo hallado en `AUDITORIA.md` → «Auditoría 2» antes de construir planes encima. Principio: **toda escritura con dinero o stock pasa por una función SQL atómica; el navegador nunca calcula ni escribe stock, costos ni totales.** Cada paso se despliega y documenta por separado (CHANGELOG 17.x).
 
@@ -324,7 +326,7 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
-- 2026-11-17 · Auditoría 2 (`AUDITORIA.md`): proyecto Supabase pausado desde ~2026-10-05 (respaldos fallando 6 semanas) y hallazgos C1–C6, S1–S12, N1–N7, E1–E6, M1–M8, V1–V8. Se propone la **Fase 6.9 · Cimientos** antes de la Fase 7 (pendiente de aprobación).
+- 2026-11-17 · Auditoría 2 (`AUDITORIA.md`): proyecto Supabase pausado desde ~2026-10-05 (respaldos fallando 6 semanas) y hallazgos C1–C6, S1–S12, N1–N7, E1–E6, M1–M8, V1–V8. Se propone la **Fase 6.9 · Cimientos** antes de la Fase 7; aprobada el mismo día, con plan detallado en `PLAN_CIMIENTOS.md`.
 - 2026-09-23 · Análisis de brechas (A1–A8, B1–B9, C) aprobado; se añade B10 (Jev como modelo de decisiones, a evaluar en la Fase 9).
 - 2026-09-15 · Fase 6 completa (16.1–16.7): negocio, equipo, roles, PIN, firma, importar Excel, respaldos semanales y etiquetas. El respaldo por correo pasa a la Fase 8 junto con el resumen diario.
 - 2026-09-15 · Fase 5 (15.1–15.4) desplegada; el envío automático del resumen diario pasa a la Fase 8.

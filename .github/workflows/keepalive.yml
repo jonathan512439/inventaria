@@ -1,0 +1,39 @@
+name: Mantener la base activa
+
+# Supabase Free pausa el proyecto tras ~7 días sin actividad (incidente 2026-10 → 2026-11, ver docs/AUDITORIA.md §2.0).
+# Una consulta real cada 2 días lo mantiene despierto. Si falla, abre un issue para enterarse a tiempo.
+on:
+  schedule:
+    - cron: "17 12 */2 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar la base y el servicio de sesión
+        env:
+          URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          ANON: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          set -e
+          code=$(curl -s -o /dev/null -w "%{http_code}" -m 30 --retry 3 --retry-delay 10 -H "apikey: $ANON" -H "Authorization: Bearer $ANON" "$URL/rest/v1/businesses?select=id&limit=1")
+          echo "REST: $code"
+          test "$code" = "200"
+          code=$(curl -s -o /dev/null -w "%{http_code}" -m 30 --retry 3 --retry-delay 10 -H "apikey: $ANON" "$URL/auth/v1/health")
+          echo "Auth: $code"
+          test "$code" = "200"
+
+      - name: Avisar si falló
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Falló: ${{ github.workflow }}"
+          run="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number -q '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "Volvió a fallar: $run"; else gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "La base de Supabase no respondió. Revisa si el proyecto está pausado (panel de Supabase → Restore) y la ejecución: $run"; fi
