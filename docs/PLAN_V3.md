@@ -31,6 +31,7 @@ Cierra los huecos de la promesa central, hace confiable el stock, agrega ventas 
 | 4 | Clientes: fiado, entregas y reportes | 2 semanas |
 | 5 | Información que hoy no existe | 1,5 semanas |
 | 6 | Equipo y datos | 2 semanas |
+| 6.9 | Cimientos (propuesta tras la Auditoría 2) | 2,5 semanas |
 | 7 | División en planes con acceso controlado | 2 semanas |
 | 8 | Lanzamiento | 1 semana |
 
@@ -123,6 +124,23 @@ Depende de: Fase 3.
 - Sucursales y traspasos: fuera de este plan; el modelo de negocio los deja preparados.
 
 **Acepta cuando** dos personas trabajan sobre el mismo inventario desde dos celulares y cada movimiento muestra quién lo hizo; el vendedor no ve costos ni ganancia; un Excel de 300 filas se importa sin errores.
+
+## Fase 6.9 · Cimientos (propuesta 2026-11-17, pendiente de aprobación) — 2,5 semanas
+
+Corrige lo hallado en `AUDITORIA.md` → «Auditoría 2» antes de construir planes encima. Principio: **toda escritura con dinero o stock pasa por una función SQL atómica; el navegador nunca calcula ni escribe stock, costos ni totales.** Cada paso se despliega y documenta por separado (CHANGELOG 17.x).
+
+| Paso | Qué | Cierra | Acepta cuando |
+|---|---|---|---|
+| C0 (hoy) | Restaurar el proyecto Supabase; `keepalive.yml` cada 2 días; aviso cuando falla un workflow; login con mensaje claro ante errores de red; Node 22 en `deploy.yml`. | 2.0, M8 | El login funciona; el respaldo del domingo pasa; un workflow fallido genera aviso. |
+| C1 | **Columnas del sistema en `products`** (`nombre, marca, precio, precio_compra, precio_mayorista, stock numeric, codigo_barras, unidades_por_paquete`) copiadas desde `data`, sincronizadas por disparador mientras dure la transición; `product_summaries` lee columnas; índices `(business_id, status, deleted_at)`, `(business_id, codigo_barras)`, `pg_trgm` sobre la búsqueda; `unique (business_id, codigo_barras)` en variantes. | C2, M2, E1, E2, S11 | Conteo y suma de stock iguales antes y después; buscar en 5.000 productos < 300 ms. |
+| C2 | **Funciones atómicas** `register_sale` (costo y número desde el servidor, contador por negocio, id idempotente), `register_payment`, `register_purchase`, `consign_out`, `consign_settle`, `apply_count`, `adjust_stock`, `close_cash`. `lib/data/*` las envuelve; se eliminan los 12 «leer → escribir» del cliente. | C1, C3–C6, N4, M1 | `test:sales` (nuevo): 2 ventas simultáneas del mismo producto dejan el stock correcto; corte a mitad no deja ticket huérfano; vendedor vende → `cost_total` correcto. |
+| C3 | **Dinero por pagos:** cada cobro (al vender o abono) es una fila de `payments` con medio; pago mixto = varias filas; caja y saldo del cliente se calculan desde pagos; saldo a favor. | N1, N2, N6 | Abono en QR de una venta de la semana pasada aparece en la caja de hoy como QR; el cierre de ayer no cambia. |
+| C4 | **Negocio como dueño de los ajustes:** `businesses.name`, `timezone` (`America/La_Paz`), `currency`, `min_stock_default`, `expiry_days` (migración copia los del perfil del dueño); cortes de día en SQL; `rpc('session_context')` única al abrir (negocio, rol, miembros, ajustes). | N3, N5, E4, V6 | El vendedor ve el nombre real en tickets; una venta a las 21:00 cae en el día correcto. |
+| C5 | **Permisos en la base (adelanto de la Fase 7):** RLS por operación y rol (borrados y costos solo dueño), lectura limitada al negocio activo, `user_id` lo pone un disparador e inmutable, `x-actor` → token firmado de `verify_pin`, PIN también para volver al dueño, `businesses.plan` solo por service role, `backups` solo dueño, `/api/cleanup` y `/api/usage` con rol y filtrado por usuario, interfaz con estado de carga y rol mínimo por defecto, limpiar datos locales al cerrar sesión. | S1–S10 | `test:access` (primera versión, roles sin planes): con la clave anónima un vendedor no lee `precio_compra`/`unit_cost`/`profit`, no borra ni cambia `user_id`; un usuario en 2 negocios solo ve el activo. |
+| C6 | **Calidad continua:** proyecto Supabase de pruebas, `vitest` para reglas puras, `npm run db:types` generado, migraciones con registro (`schema_migrations`), CI corre `test:variants`, `test:team`, `test:sales`, `test:access` sin IA en cada push. | M3, M6, M7 | Un push que rompe una regla de stock o de acceso no se despliega. |
+| C7 | **Interfaz:** barra inferior según rol y etapa (Vender visible), menú «Más» reagrupado con iconos propios y buscador, tamaño mínimo 12 px, `aria-label` en botones de icono, `lib/errors.ts` con mensajes simples, hoja de cobro con vuelto. Partir `review`, `scan`, `consign` en hooks + componentes. | V1–V5, V7, V8, M4, M5 | Vender en 2 toques desde el Inicio; ningún error en inglés llega a la pantalla. |
+
+Orden: C0 → C1 → C2 → C3 → C4 → C5 → C6 → C7 (C6 puede avanzar en paralelo desde C2). Con C5 hecho, la Fase 7 se reduce a planes (`plan_features`, `has_feature`, `lib/access.ts`, matriz completa, auditoría).
 
 ## Fase 7 · División en planes con acceso controlado (2 semanas) — seguridad rigurosa
 
@@ -306,6 +324,7 @@ Todas las tablas actuales (`categories`, `products`, `product_variants`, `stock_
 
 ## Registro de cambios de este plan
 
+- 2026-11-17 · Auditoría 2 (`AUDITORIA.md`): proyecto Supabase pausado desde ~2026-10-05 (respaldos fallando 6 semanas) y hallazgos C1–C6, S1–S12, N1–N7, E1–E6, M1–M8, V1–V8. Se propone la **Fase 6.9 · Cimientos** antes de la Fase 7 (pendiente de aprobación).
 - 2026-09-23 · Análisis de brechas (A1–A8, B1–B9, C) aprobado; se añade B10 (Jev como modelo de decisiones, a evaluar en la Fase 9).
 - 2026-09-15 · Fase 6 completa (16.1–16.7): negocio, equipo, roles, PIN, firma, importar Excel, respaldos semanales y etiquetas. El respaldo por correo pasa a la Fase 8 junto con el resumen diario.
 - 2026-09-15 · Fase 5 (15.1–15.4) desplegada; el envío automático del resumen diario pasa a la Fase 8.
