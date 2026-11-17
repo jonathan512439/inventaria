@@ -18,7 +18,9 @@ import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import StockAdjust from "@/components/StockAdjust";
 import ProductVariants from "@/components/ProductVariants";
-import { fmtMoney } from "@/lib/inventory";
+import { fmtMoney, stockOf } from "@/lib/inventory";
+import { STOCK_KEYS, newOpId, setStock, withoutStock } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import type { PriceHistory, StockMovement } from "@/types/database";
 
 export default function ProductDetailClient() {
@@ -116,29 +118,30 @@ export default function ProductDetailClient() {
     setError(null);
     const clean: ProductData = { ...data };
     fields.forEach((f) => (clean[f.name] = coerceValue(f, data[f.name])));
-    if (variants.length) {
-      const stockField = fields.find((f) => /^(stock|cantidad|existencias)$/i.test(f.name));
-      clean[stockField?.name ?? "stock"] = variants.reduce((t, v) => t + v.stock, 0);
-    }
     const min = minStock.trim() === "" ? null : Math.max(0, parseInt(minStock, 10) || 0);
-    // Historial de precios: se anota cada cambio de precio de venta / compra
-    const priceChanges: { field: string; old: number | null; nu: number | null }[] = [];
-    for (const f of ["precio", "precio_compra", "precio_mayorista"]) {
-      const before = product.data[f];
-      const after = clean[f];
-      const b = before === null || before === undefined || before === "" ? null : Number(before);
-      const a = after === null || after === undefined || after === "" ? null : Number(after);
-      if ((b ?? null) !== (a ?? null)) priceChanges.push({ field: f, old: b, nu: a });
-    }
+    // Stock: NO viaja con `data` (la base conserva el stock real, aunque se haya vendido mientras se editaba).
+    // Si la persona lo cambió a mano (sin variantes), se registra como ajuste con su movimiento (021).
+    const stockKey = Object.keys(clean).find((k) => STOCK_KEYS.includes(k.toLowerCase()));
+    const typed = stockKey && clean[stockKey] !== null && clean[stockKey] !== "" ? Number(clean[stockKey]) : null;
+    const stockChanged = !variants.length && typed !== null && Number.isFinite(typed) && typed !== (stockOf(product) ?? 0);
+    // El historial de precios lo escribe la base al detectar el cambio (021)
     const { error } = await supabase
       .from("products")
-      .update({ data: clean, category_id: categoryId, min_stock: min, expires_at: expiresAt || null, ...(status ? { status } : {}) })
+      .update({ data: withoutStock(clean), category_id: categoryId, min_stock: min, expires_at: expiresAt || null, ...(status ? { status } : {}) })
       .eq("id", product.id);
-    setSaving(false);
-    if (error) return setError(error.message);
-    if (priceChanges.length) {
-      await supabase.from("price_history").insert(priceChanges.map((c) => ({ user_id: product.user_id, product_id: product.id, field: c.field, old_value: c.old, new_value: c.nu, source: "ficha" })));
+    if (error) {
+      setSaving(false);
+      return setError(friendlyError(error));
     }
+    if (stockChanged) {
+      try {
+        await setStock(supabase, { id: newOpId(), productId: product.id, value: typed!, motivo: "corrección desde la ficha" });
+      } catch (e) {
+        setSaving(false);
+        return setError(friendlyError(e));
+      }
+    }
+    setSaving(false);
     toast("success", "Cambios guardados");
     // Tras editar, se vuelve a la lista de donde vino el producto
     if (status === "draft") router.push("/review");

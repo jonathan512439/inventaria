@@ -12,6 +12,7 @@ import CoachTip from "@/components/CoachTip";
 import OwnerOnly from "@/components/OwnerOnly";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
+import { newOpId, setStock, withoutStock } from "@/lib/data/ops";
 import { IconArrowLeft, IconCheck, IconTable, IconX, Spinner } from "@/components/ui/Icons";
 
 type Sheet = { name: string; headers: string[]; rows: Record<string, unknown>[] };
@@ -146,15 +147,15 @@ export default function ImportPage() {
           const canStock = !variantIds.has(p.id) && u.row.data.stock !== undefined;
           const before = stockOf(p) ?? 0;
           const after = canStock ? Number(u.row.data.stock) : before;
-          if (canStock) next.stock = after;
-          const patch: Partial<Product> = { data: next };
+          // El stock no viaja con `data`: si cambia, va como ajuste atómico sobre el stock real (021)
+          const patch: Partial<Product> = { data: withoutStock(next) };
           if (u.row.min_stock !== null) patch.min_stock = u.row.min_stock;
           if (u.row.expires_at) patch.expires_at = u.row.expires_at;
           const cat = categoryFor(cats, u.row);
           if (cat && !p.category_id) patch.category_id = cat.id;
           const { error } = await supabase.from("products").update(patch).eq("id", p.id);
           if (error) throw error;
-          if (canStock && after !== before) await supabase.from("stock_movements").insert({ user_id: user.id, product_id: p.id, product_name: productTitle(next) || null, tipo: "ajuste", cantidad: Math.abs(after - before), motivo: `${after > before ? "+" : "−"}${Math.abs(after - before)} · importado de Excel`, stock_resultante: after });
+          if (canStock && Number.isFinite(after) && after !== before) await setStock(supabase, { id: newOpId(), productId: p.id, value: after, motivo: "importado de Excel" });
           updated++;
           if (updated % 10 === 0) setBusy({ done: created + updated, total: toDo });
         }

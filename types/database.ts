@@ -188,6 +188,10 @@ export type StockMovement = {
   total: number | null;
   motivo: string | null;
   stock_resultante: number | null;
+  /** Unidades vendidas/entregadas por encima del stock registrado (021): el stock quedó en 0 */
+  faltante?: number;
+  /** Id generado en el celular para que repetir la operación no la duplique (021) */
+  client_id?: string | null;
   created_at: string;
 };
 
@@ -377,6 +381,13 @@ export type Product = {
   /** Texto de búsqueda en minúsculas. Lo calcula la base. */
   search?: string | null;
 };
+
+/** Entradas y resultados de las operaciones atómicas (021). */
+export type SaleLineInput = { product_id: string; variant_id: string | null; qty: number; unit_price: number };
+export type PurchaseLineInput = { product_id: string; variant_id: string | null; qty: number; unit_cost: number | null; expires_at: string | null };
+export type CountRowInput = { product_id: string; variant_id: string | null; expected: number; counted: number; reason: string | null };
+/** Resultado de mover stock: `stock` = del producto o de la variante tocada; `product_stock` = total del producto. */
+export type StockResult = { stock: number; product_stock: number | null; faltante?: number; movement_id?: number; repeated?: boolean; changed?: boolean };
 
 /** Tipado mínimo para supabase-js (Database generic) */
 export interface Database {
@@ -687,6 +698,41 @@ export interface Database {
       set_pin: { Args: { p_business: string; p_pin: string }; Returns: undefined };
       set_my_name: { Args: { p_business: string; p_name: string }; Returns: undefined };
       current_business_id: { Args: Record<string, never>; Returns: string | null };
+      // Operaciones atómicas (021 · Fase 6.9 C2). Se llaman solo desde lib/data/*.
+      adjust_stock: {
+        Args: { p_id: string; p_product: string; p_variant: string | null; p_delta: number; p_tipo: MovementType; p_motivo?: string | null; p_precio?: number | null; p_at?: string | null };
+        Returns: StockResult;
+      };
+      set_stock: { Args: { p_id: string; p_product: string; p_variant: string | null; p_value: number; p_motivo?: string | null }; Returns: StockResult };
+      register_sale: {
+        Args: {
+          p_id: string;
+          p_lines: SaleLineInput[];
+          p_method?: PayMethod;
+          p_status?: SaleStatus;
+          p_paid?: number;
+          p_discount?: number;
+          p_customer?: string | null;
+          p_customer_name?: string | null;
+          p_note?: string | null;
+          p_at?: string | null;
+        };
+        Returns: { sale: Sale; items: SaleItem[]; repeated: boolean };
+      };
+      register_purchase: {
+        Args: { p_id: string; p_supplier: string | null; p_doc: string | null; p_note: string | null; p_lines: PurchaseLineInput[] };
+        Returns: { purchase: Purchase; repeated: boolean };
+      };
+      consign_out: { Args: { p_id: string; p_customer: string; p_lines: SaleLineInput[]; p_note?: string | null }; Returns: { consignment: Consignment; repeated: boolean } };
+      consign_settle: {
+        Args: { p_id: string; p_consignment: string; p_rows: { item_id: string; sold: number; returned: number }[]; p_pay?: SaleStatus; p_method?: PayMethod };
+        Returns: { sale: Sale | null; sold: number; returned: number; remaining: number; repeated: boolean };
+      };
+      apply_count: {
+        Args: { p_id: string; p_category: string | null; p_category_name: string | null; p_rows: CountRowInput[]; p_note?: string | null };
+        Returns: { count: StockCount; adjusted: number; repeated: boolean };
+      };
+      set_prices: { Args: { p_rows: { product_id: string; field: "precio" | "precio_mayorista" | "precio_compra"; value: number | null }[]; p_source?: string }; Returns: number };
     };
     Enums: { field_type: FieldType; product_status: ProductStatus; movement_type: MovementType; sale_status: SaleStatus; pay_method: PayMethod };
     CompositeTypes: { [_ in never]: never };

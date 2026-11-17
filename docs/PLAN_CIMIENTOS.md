@@ -12,8 +12,8 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 |---|---|---|---|---|
 | C0 · Operación y alertas | ✅ 2026-11-17 | — | ejecución manual de `keepalive` y `backup` | 17.0 |
 | C1 · Campos del sistema como columnas | ✅ 2026-11-17 | `020_campos_sistema.sql` | `npm run test:fields` + `test:variants` | 17.1 |
-| C2 · Operaciones atómicas | ⏳ siguiente | `021_operaciones.sql` | `npm run test:ops` | 17.2 |
-| C3 · El dinero como pagos | pendiente | `022_pagos.sql` | `npm run test:ops` (ampliada) | 17.3 |
+| C2 · Operaciones atómicas | ✅ 2026-11-17 | `021_operaciones.sql` | `npm run test:ops` | 17.2 |
+| C3 · El dinero como pagos | ⏳ siguiente | `022_pagos.sql` | `npm run test:ops` (ampliada) | 17.3 |
 | C4 · Ajustes del negocio y zona horaria | pendiente | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
 | C5 · Permisos en la base | pendiente | `024_permisos.sql` (+ `025_fotos_privadas.sql`) | `npm run test:access` | 17.5 |
 | C6 · Calidad continua | pendiente | `schema_migrations` | CI | 17.6 |
@@ -81,9 +81,19 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 
 `stock_movements` gana `client_id uuid unique` y `faltante integer not null default 0`.
 
-**Código:** `lib/data/stock.ts`, `lib/data/sales.ts`, `lib/data/purchases.ts`, `lib/data/consign.ts`, `lib/data/counts.ts`, `lib/data/prices.ts` (una función por `rpc`, con tipos). Se eliminan los 12 sitios con «leer → escribir»: `lib/sales.ts`, `lib/offline.ts`, `consign`, `count` (2), `prices`, `purchases`, `review`, `scan` (2), `labels` (código interno: pasa a `set_product_code`). La cola sin conexión pasa a llamar `adjust_stock` con el mismo `id` (reintento seguro) y marca como `fallido` tras 5 rechazos del servidor (visible en la barra sin conexión, con «Descartar»).
+**Código:** `lib/data/ops.ts` (un solo módulo: una función tipada por `rpc`, `newOpId()` para la idempotencia y `withoutStock()` para guardar formularios sin pisar el stock). Se eliminan los 12 sitios con «leer → escribir»: `lib/sales.ts`, `lib/offline.ts`, `consign`, `count` (2), `prices`, `purchases`, `review`, `scan` (2), `labels` (código interno: pasa a `set_product_code`). La cola sin conexión pasa a llamar `adjust_stock` con el mismo `id` (reintento seguro) y marca como `fallido` tras 5 rechazos del servidor (visible en la barra sin conexión, con «Descartar»).
 
 **Prueba `scripts/test-ops.mjs`:** 10 ventas simultáneas de 1 unidad sobre stock 10 → stock 0 y números 1…10 sin repetir; la misma venta enviada dos veces → una sola; venta de un vendedor → `cost_total` correcto; vender 5 con stock 3 → stock 0 y `faltante = 2`; entrega 20 → liquidación 15 vendidas / 5 devueltas → stock y movimientos sin doble salida.
+
+**Resultado (2026-11-17):** `021_operaciones.sql` aplicada (huella del inventario idéntica antes y después). `npm run test:ops` 30/30 (10 ventas simultáneas → stock 0 y números 1…10; venta repetida no se duplica; faltante; variantes; costo correcto cuando vende el vendedor; otro negocio y sin sesión rechazados; ajustes y conteo idempotentes; compra con historial automático; formulario sin stock no lo pisa; consignación sin doble salida y sin rendir de más). `test:fields`, `test:variants`, `test:team`, `test:import` en verde.
+
+**Además de lo previsto:**
+- El **historial de precios** lo escribe un disparador (`products_price_history`) con el origen en `app.price_source` (`ficha` por defecto, `masivo`, `compra`): ya no depende de que la pantalla lo anote. Los cambios de precio de variantes no se registran (igual que antes, salvo el costo por compra, que queda a nivel de producto).
+- El disparador de C1 ahora **conserva la columna si la clave no viene en `data`**: la ficha, la tabla y la importación guardan `data` sin el stock (`withoutStock`) y, si la persona cambió el stock, se registra con `set_stock` (ajuste con movimiento). Antes, guardar la ficha podía pisar una venta hecha mientras se editaba.
+- Una **venta rápida sin conexión** se envía como venta real (`register_sale` con su hora original), no solo como movimiento. Los cambios sin conexión rechazados 5 veces quedan como fallidos y se pueden ver y descartar desde la barra.
+- Mensajes de las funciones SQL (código `P0001`) llegan tal cual a la persona por `friendlyError`.
+
+**Fuera de alcance de C2 (siguen escribiendo `data` directamente, sin carrera de stock):** creación de productos (alta, Revisar al confirmar un pendiente, importación de filas nuevas, `/api/barcode` POST), variantes de un pendiente en Revisar.
 
 ## C3 · El dinero como pagos (cierra N1, N2, N6, C6)
 

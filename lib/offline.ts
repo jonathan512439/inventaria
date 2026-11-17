@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, MovementType } from "@/types/database";
+import { adjustStock, registerSaleOp } from "./data/ops";
+import { friendlyError } from "./errors";
 
 /**
  * Modo sin conexión: caché de lectura (inventario) y cola de movimientos de stock.
@@ -69,13 +71,20 @@ export interface PendingMove {
   precio_unitario: number | null;
   total: number | null;
   motivo: string | null;
+  /** Rechazos del servidor (no de red). Tras MAX_TRIES queda como fallido y deja de reintentarse. */
+  tries?: number;
+  /** Motivo del rechazo, en palabras simples, cuando ya no se reintenta */
+  failed?: string | null;
 }
+
+const MAX_TRIES = 5;
 
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
-export async function queueMove(m: Omit<PendingMove, "id" | "at">): Promise<PendingMove> {
-  const row: PendingMove = { ...m, id: crypto.randomUUID(), at: Date.now() };
+/** Guarda un cambio sin conexión. `id` = id de la operación (si ya se intentó en línea, el mismo, para no duplicar). */
+export async function queueMove(m: Omit<PendingMove, "id" | "at"> & { id?: string }): Promise<PendingMove> {
+  const row: PendingMove = { ...m, id: m.id ?? crypto.randomUUID(), at: Date.now() };
   await tx("moves", "readwrite", (s) => s.put(row));
   notify();
   return row;
@@ -99,10 +108,18 @@ export function isNetworkError(e: unknown): boolean {
   return /fetch|network|Failed to|load failed|NetworkError|ECONN/i.test(msg);
 }
 
+/** Quita de la cola los cambios que el servidor rechazó definitivamente (la persona ya los vio). */
+export async function discardFailedMoves(): Promise<number> {
+  const failed = (await listMoves()).filter((m) => m.failed);
+  for (const m of failed) await removeMove(m.id);
+  return failed.length;
+}
+
 let syncing = false;
 /**
- * Envía los movimientos guardados sin conexión: aplica el delta sobre el stock ACTUAL del servidor
- * (así no se pisan cambios hechos desde otro celular) y registra el movimiento.
+ * Envía los cambios guardados sin conexión con las MISMAS operaciones atómicas que en línea (021), usando el id
+ * del cambio como id de la operación: si el envío se corta y se repite, el servidor no lo duplica.
+ * Una venta rápida hecha sin conexión se registra como venta real (ticket, caja) con su hora original.
  */
 export async function syncMoves(supabase: SupabaseClient<Database>): Promise<{ sent: number; failed: number }> {
   if (syncing) return { sent: 0, failed: 0 };
@@ -110,56 +127,32 @@ export async function syncMoves(supabase: SupabaseClient<Database>): Promise<{ s
   let sent = 0,
     failed = 0;
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { sent, failed };
     for (const m of await listMoves()) {
+      if (m.failed) continue;
       try {
-        let resultante = 0;
-        if (m.variant_id) {
-          const { data: v, error } = await supabase.from("product_variants").select("stock").eq("id", m.variant_id).maybeSingle();
-          if (error) throw error;
-          if (!v) {
-            await removeMove(m.id); // la variante ya no existe
-            continue;
-          }
-          resultante = Math.max(0, v.stock + m.delta);
-          const { error: e2 } = await supabase.from("product_variants").update({ stock: resultante }).eq("id", m.variant_id);
-          if (e2) throw e2;
+        const at = new Date(m.at).toISOString();
+        if (m.tipo === "venta") {
+          await registerSaleOp(supabase, {
+            id: m.id,
+            lines: [{ product_id: m.product_id, variant_id: m.variant_id, qty: Math.abs(m.delta), unit_price: m.precio_unitario ?? 0 }],
+            method: "efectivo",
+            status: "pagado",
+            paid: 0,
+            discount: 0,
+            note: "registrada sin conexión",
+            at,
+          });
         } else {
-          const { data: p, error } = await supabase.from("products").select("data").eq("id", m.product_id).maybeSingle();
-          if (error) throw error;
-          if (!p) {
-            await removeMove(m.id);
-            continue;
-          }
-          const keys = Object.keys(p.data);
-          const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "stock";
-          resultante = Math.max(0, (Number(p.data[key] ?? 0) || 0) + m.delta);
-          const { error: e2 } = await supabase.from("products").update({ data: { ...p.data, [key]: resultante } }).eq("id", m.product_id);
-          if (e2) throw e2;
+          await adjustStock(supabase, { id: m.id, productId: m.product_id, variantId: m.variant_id, delta: m.delta, tipo: m.tipo, motivo: m.motivo, precio: m.precio_unitario, at });
         }
-        const { error: e3 } = await supabase.from("stock_movements").insert({
-          user_id: user.id,
-          product_id: m.product_id,
-          product_name: m.product_name,
-          variant_id: m.variant_id,
-          variant_label: m.variant_label,
-          tipo: m.tipo,
-          cantidad: Math.abs(m.delta),
-          precio_unitario: m.precio_unitario,
-          total: m.total,
-          motivo: m.motivo,
-          stock_resultante: resultante,
-          created_at: new Date(m.at).toISOString(),
-        });
-        if (e3) throw e3;
         await removeMove(m.id);
         sent++;
       } catch (e) {
         failed++;
         if (isNetworkError(e)) break; // seguimos sin red: se reintenta después
+        const tries = (m.tries ?? 0) + 1;
+        await tx("moves", "readwrite", (s) => s.put({ ...m, tries, failed: tries >= MAX_TRIES ? friendlyError(e) : null } as PendingMove));
+        notify();
       }
     }
   } finally {
@@ -168,14 +161,19 @@ export async function syncMoves(supabase: SupabaseClient<Database>): Promise<{ s
   return { sent, failed };
 }
 
-/** Estado de conexión + número de movimientos pendientes de enviar. */
-export function useOffline(): { online: boolean; pending: number } {
+/** Estado de conexión, cambios pendientes de enviar y cambios que el servidor rechazó. */
+export function useOffline(): { online: boolean; pending: number; failed: PendingMove[] } {
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
+  const [failed, setFailed] = useState<PendingMove[]>([]);
   useEffect(() => {
     const upd = () => setOnline(navigator.onLine);
     upd();
-    const count = () => listMoves().then((l) => setPending(l.length));
+    const count = () =>
+      listMoves().then((l) => {
+        setPending(l.filter((m) => !m.failed).length);
+        setFailed(l.filter((m) => m.failed));
+      });
     count();
     listeners.add(count);
     window.addEventListener("online", upd);
@@ -186,5 +184,5 @@ export function useOffline(): { online: boolean; pending: number } {
       window.removeEventListener("offline", upd);
     };
   }, []);
-  return { online, pending };
+  return { online, pending, failed };
 }

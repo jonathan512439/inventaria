@@ -14,6 +14,8 @@ import CoachTip from "@/components/CoachTip";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import { useFlow } from "@/components/FlowProvider";
+import { newOpId } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import { IconArrowLeft, IconBox, IconCheck, IconPlus, IconSearch, IconTag, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 
 /** Vender: carrito con varios productos, medio de pago y ticket. Descuenta el stock y guarda la ganancia real. */
@@ -33,6 +35,8 @@ export default function SellPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerDebt, setCustomerDebt] = useState(0);
   const [saving, setSaving] = useState(false);
+  // Id de la venta en curso (idempotencia): si se corta la red y se vuelve a tocar «Cobrar», no se duplica
+  const [saleId, setSaleId] = useState(newOpId);
   const [done, setDone] = useState<{ sale: Sale; items: SaleItem[] } | null>(null);
   const [business, setBusiness] = useState<string | null>(null);
   const [recent, setRecent] = useState<Product[]>([]);
@@ -137,8 +141,9 @@ export default function SellPage() {
     if (!ok) return;
     setSaving(true);
     try {
-      const out = await registerSale(supabase, lines, { method, status, paid: paidNum, discount: disc, customerId: customer?.id ?? null, customerName: customer?.name ?? null });
+      const out = await registerSale(supabase, lines, { id: saleId, method, status, paid: paidNum, discount: disc, customerId: customer?.id ?? null, customerName: customer?.name ?? null });
       setDone(out);
+      setSaleId(newOpId()); // la próxima venta lleva otro id
       setLines([]);
       setDiscount("");
       setPaid("");
@@ -147,7 +152,7 @@ export default function SellPage() {
       flow.refresh();
       navigator.vibrate?.(30);
     } catch (e) {
-      toast("error", e instanceof Error ? e.message : "No se pudo registrar la venta");
+      toast("error", friendlyError(e, "No se pudo registrar la venta"));
     } finally {
       setSaving(false);
     }

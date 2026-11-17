@@ -11,6 +11,8 @@ import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
 import { categoryColor } from "@/lib/colors";
 import { IconChevronRight } from "./ui/Icons";
 import FieldInput from "./FieldInput";
+import { STOCK_KEYS, newOpId, setStock, withoutStock } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 
 interface Props {
   products: Product[];
@@ -63,12 +65,19 @@ export default function ProductTable({ products, categories, templates, mode, on
     const merged = getData(p);
     const data: ProductData = { ...merged };
     fields.forEach((f) => (data[f.name] = coerceValue(f, merged[f.name])));
+    // El stock no viaja con `data` (la base conserva el real); si se editó en la tabla, va como ajuste atómico (021)
+    const editedStockKey = Object.keys(edits[p.id] ?? {}).find((k) => STOCK_KEYS.includes(k.toLowerCase()));
+    const typed = editedStockKey && data[editedStockKey] !== null && data[editedStockKey] !== "" ? Number(data[editedStockKey]) : null;
     const { error } = await supabase
       .from("products")
-      .update({ data, ...(status ? { status } : {}) })
+      .update({ data: withoutStock(data), ...(status ? { status } : {}) })
       .eq("id", p.id);
+    let stockError: unknown = null;
+    if (!error && typed !== null && Number.isFinite(typed) && typed !== (stockOf(p) ?? 0)) {
+      await setStock(supabase, { id: newOpId(), productId: p.id, value: typed, motivo: "corrección en la tabla" }).catch((e) => (stockError = e));
+    }
     setBusy((b) => ({ ...b, [p.id]: false }));
-    if (error) return setError(error.message);
+    if (error || stockError) return setError(friendlyError(error ?? stockError));
     setEdits((prev) => {
       const next = { ...prev };
       delete next[p.id];

@@ -3,6 +3,23 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-17 · Fase 6.9 · C2 — Ventas, stock, compras, entregas y conteos que no se pierden
+
+Migración `021_operaciones.sql` aplicada (el inventario quedó idéntico). `npm run test:ops` 30/30; `test:fields`, `test:variants`, `test:team`, `test:import` en verde.
+
+### 17.2 Operaciones atómicas
+- **Qué**: vender, sumar o restar stock, anotar una compra, entregar a un revendedor, rendir cuentas, terminar un conteo y cambiar precios ahora se hacen en **una sola operación en el servidor que se guarda completa o no se guarda**. Antes cada pantalla hacía varios pasos sueltos: un corte de internet a mitad podía dejar un ticket sin productos o el stock sin descontar, y dos celulares vendiendo a la vez podían perder un descuento.
+  - **Sin duplicados**: cada venta u operación lleva un número propio; si se corta la red y se vuelve a tocar «Cobrar», no se registra dos veces.
+  - **Número de venta** sin repetidos aunque vendan dos personas a la vez.
+  - **Ganancia real también cuando vende un vendedor**: el costo se toma en el servidor (antes quedaba en 0 y la ganancia salía inflada).
+  - **Vender más de lo que dice la app** está permitido: el stock queda en 0 y el movimiento anota cuántas unidades faltaban («faltante»). Antes se recortaba en silencio.
+  - **Mercadería entregada**: al rendir cuentas, lo vendido ya no se descuenta dos veces de los movimientos; no se puede rendir más de lo que está afuera.
+  - **Conteo**: el stock queda en lo contado aunque se haya vendido mientras se contaba.
+  - **Guardar la ficha o la tabla ya no pisa una venta** hecha mientras se editaba; si se cambia el stock a mano, queda como «ajuste» en Movimientos.
+  - **Historial de precios automático**: todo cambio de precio (ficha, tabla, cambio masivo, compra) queda registrado.
+  - **Sin conexión**: una venta rápida hecha en modo avión se envía como venta de verdad (aparece en la caja y en los tickets) con su hora original. Si el servidor rechaza un cambio 5 veces, la barra lo muestra con «Ver y descartar».
+- **Validar**: vender 2 productos en Vender → stock baja y aparece el ticket; tocar «Cobrar», cortar el internet antes de que responda y volver a tocar → una sola venta; vender más unidades de las que hay → stock 0 y en Movimientos la venta muestra el faltante; anotar una compra con costo → stock y precio de compra cambian y el historial de precios de la ficha lo muestra; entregar 5 a un revendedor y rendir 3 vendidas + 1 devuelta → stock correcto y la entrega sigue abierta con 1.
+
 ## 2026-11-17 · Fase 6.9 · C1 — Nombre, precios, stock y código como columnas
 
 Migración `020_campos_sistema.sql` aplicada. **Verificación:** la vista del inventario devuelve exactamente lo mismo antes y después (huella `md5` de las 55 filas idéntica, stock total 348 = 348, fechas sin tocar). `npm run test:fields` 19/19, `test:variants` 10/10, `test:team` y `test:import` en verde.

@@ -37,7 +37,8 @@ export function friendlyError(e: unknown, fallback = "Algo salió mal. Intenta d
   if (/password should be at least|weak.?password/i.test(message) || code === "weak_password") return "La contraseña es muy corta: usa al menos 6 caracteres.";
   if (/rate limit|too many requests|over_request_rate_limit|over_email_send_rate_limit/i.test(message) || code === "over_request_rate_limit") return "Demasiados intentos seguidos. Espera un minuto y vuelve a probar.";
   if (/jwt expired|invalid jwt|refresh token/i.test(message)) return "Tu sesión venció. Vuelve a iniciar sesión.";
-  // Base de datos (Postgres / PostgREST)
+  // Base de datos (Postgres / PostgREST). P0001 = mensaje escrito por nuestras funciones SQL, ya pensado para la persona.
+  if (code === "P0001" && message) return message;
   if (code === "23505" || /duplicate key/i.test(message)) return "Eso ya existe (hay otro registro igual).";
   if (code === "42501" || /row-level security|permission denied/i.test(message)) return "No tienes permiso para hacer esto.";
   if (code === "23503") return "Está relacionado con otros datos y no se puede cambiar así.";

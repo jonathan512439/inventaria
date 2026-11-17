@@ -11,6 +11,8 @@ import OwnerOnly from "@/components/OwnerOnly";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
+import { setPrices } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import { IconArrowLeft, IconCheck, Spinner } from "@/components/ui/Icons";
 
 type Field = "precio" | "precio_mayorista";
@@ -84,19 +86,13 @@ export default function PricesPage() {
     });
     if (!ok) return;
     setSaving(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // Un solo cambio atómico (021); el historial de precios lo escribe la base
     let done = 0;
-    for (const r of preview) {
-      const { data: p } = await supabase.from("products").select("data").eq("id", r.p.id).single();
-      if (!p) continue;
-      const keys = Object.keys(p.data);
-      const key = field === "precio" ? ["precio", "precio_venta", "price"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "precio" : "precio_mayorista";
-      const { error } = await supabase.from("products").update({ data: { ...p.data, [key]: r.next } }).eq("id", r.p.id);
-      if (error) continue;
-      await supabase.from("price_history").insert({ user_id: user!.id, product_id: r.p.id, field, old_value: r.base, new_value: r.next, source: "masivo" });
-      done++;
+    try {
+      done = await setPrices(supabase, preview.map((r) => ({ product_id: r.p.id, field, value: r.next })), "masivo");
+    } catch (e) {
+      setSaving(false);
+      return toast("error", friendlyError(e));
     }
     setSaving(false);
     toast("success", `${done} precio${done === 1 ? "" : "s"} actualizado${done === 1 ? "" : "s"}`);

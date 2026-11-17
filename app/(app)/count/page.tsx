@@ -12,6 +12,8 @@ import CoachTip from "@/components/CoachTip";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
+import { applyCount, newOpId } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import { IconArrowLeft, IconCheck, IconChevronRight, IconTag, IconX, Spinner } from "@/components/ui/Icons";
 
 interface Row {
@@ -40,6 +42,8 @@ export default function CountPage() {
   const [reason, setReason] = useState<Record<string, string>>({});
   const [onlyPending, setOnlyPending] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Id del conteo en curso (idempotencia): se renueva al guardarlo
+  const [countId, setCountId] = useState(newOpId);
   const [lastHit, setLastHit] = useState<string | null>(null);
   // Código leído que no pertenece a ningún producto de esta categoría: se puede asignar aquí mismo
   const [unknown, setUnknown] = useState<{ code: string; note: string } | null>(null);
@@ -120,12 +124,9 @@ export default function CountPage() {
       const { error } = await supabase.from("product_variants").update({ codigo_barras: code }).eq("id", r.variantId);
       if (error) return toast("error", /product_variants_codigo/.test(error.message) ? "Ese código ya está en otra variante" : error.message);
     } else {
-      const { data: p } = await supabase.from("products").select("data").eq("id", r.productId).maybeSingle();
-      if (!p) return toast("error", "No se encontró el producto");
-      const keys = Object.keys(p.data);
-      const key = ["codigo_barras", "codigo", "sku", "barcode", "ean"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "codigo_barras";
-      const { error } = await supabase.from("products").update({ data: { ...p.data, [key]: code } }).eq("id", r.productId);
-      if (error) return toast("error", error.message);
+      // Columna del sistema (020): la base lo copia a `data` con la clave que ya use el producto
+      const { error } = await supabase.from("products").update({ codigo_barras: code }).eq("id", r.productId);
+      if (error) return toast("error", friendlyError(error));
     }
     setRows((rs) => (rs ? rs.map((x) => (x.key === r.key ? { ...x, code } : x)) : rs));
     setUnknown(null);
@@ -175,47 +176,21 @@ export default function CountPage() {
     });
     if (!ok) return;
     setSaving(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { data: count, error } = await supabase
-      .from("stock_counts")
-      .insert({ user_id: user!.id, category_id: top.id === "none" ? null : top.id, category_name: top.name, items: toApply.length, differences: stats.diffs, diff_units: stats.units, closed_at: new Date().toISOString() })
-      .select()
-      .single();
-    if (error || !count) {
-      setSaving(false);
-      return toast("error", error?.message ?? "No se pudo guardar el conteo");
-    }
-    await supabase.from("stock_count_items").insert(
-      toApply.map((r) => ({ count_id: count.id, user_id: user!.id, product_id: r.productId, variant_id: r.variantId, product_name: r.name, variant_label: r.variant, expected: r.expected, counted: parsed(r), reason: parsed(r) !== r.expected ? reason[r.key] ?? REASONS[0] : null }))
-    );
-    // Ajustes de stock con su movimiento
-    for (const r of toApply) {
-      const c = parsed(r)!;
-      if (c === r.expected) continue;
-      if (r.variantId) await supabase.from("product_variants").update({ stock: c }).eq("id", r.variantId);
-      else {
-        const { data: p } = await supabase.from("products").select("data").eq("id", r.productId).maybeSingle();
-        if (p) {
-          const keys = Object.keys(p.data);
-          const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "stock";
-          await supabase.from("products").update({ data: { ...p.data, [key]: c } }).eq("id", r.productId);
-        }
-      }
-      await supabase.from("stock_movements").insert({
-        user_id: user!.id,
-        product_id: r.productId,
-        product_name: r.name,
-        variant_id: r.variantId,
-        variant_label: r.variant,
-        tipo: "ajuste",
-        cantidad: Math.abs(c - r.expected),
-        motivo: `${c > r.expected ? "+" : "−"}${Math.abs(c - r.expected)} · ${reason[r.key] ?? REASONS[0]}`,
-        stock_resultante: c,
-        count_id: count.id,
+    // Todo el conteo en una operación atómica (021): acta, diferencias y ajustes sobre el stock REAL al cerrar
+    let count: StockCount;
+    try {
+      const out = await applyCount(supabase, {
+        id: countId,
+        categoryId: top.id === "none" ? null : top.id,
+        categoryName: top.name,
+        rows: toApply.map((r) => ({ product_id: r.productId, variant_id: r.variantId, expected: r.expected, counted: parsed(r)!, reason: parsed(r) !== r.expected ? reason[r.key] ?? REASONS[0] : null })),
       });
+      count = out.count;
+    } catch (e) {
+      setSaving(false);
+      return toast("error", friendlyError(e));
     }
+    setCountId(newOpId());
     setSaving(false);
     navigator.vibrate?.(30);
     toast("success", `Listo: contaste ${toApply.length} producto${toApply.length === 1 ? "" : "s"} y se corrigieron ${stats.diffs}`);

@@ -20,6 +20,8 @@ import Photo from "@/components/ui/Photo";
 import { categoryColor } from "@/lib/colors";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
+import { adjustStock } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -88,18 +90,13 @@ function Review() {
     const { count: nVariants } = await supabase.from("product_variants").select("id", { count: "exact", head: true }).eq("product_id", existingId);
     const qty = Math.max(1, parseInt(String(draft.data.stock ?? draft.data.cantidad ?? 1), 10) || 1);
     if (!nVariants) {
-      const keys = Object.keys(existing.data);
-      const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "stock";
-      const cur = Number(existing.data[key] ?? 0) || 0;
-      const { error } = await supabase.from("products").update({ data: { ...existing.data, [key]: cur + qty } }).eq("id", existingId);
-      if (error) {
+      // Suma atómica en el servidor (021); el id del pendiente hace que repetir el toque no sume dos veces
+      try {
+        await adjustStock(supabase, { id: current.id, productId: existingId, delta: qty, tipo: "entrada", motivo: "foto repetida" });
+      } catch (e) {
         setMerging(false);
-        return toast("error", error.message);
+        return toast("error", friendlyError(e));
       }
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      await supabase.from("stock_movements").insert({ user_id: user!.id, product_id: existingId, product_name: productTitle(existing.data) || null, tipo: "entrada", cantidad: qty, motivo: "foto repetida", stock_resultante: cur + qty });
     }
     // Borrar el pendiente y su foto
     if (current.image_url) {

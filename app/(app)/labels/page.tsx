@@ -119,11 +119,8 @@ export default function LabelsPage() {
         const { error } = await supabase.from("product_variants").update({ codigo_barras: code }).eq("id", r.variantId);
         if (error) continue;
       } else {
-        const { data: p } = await supabase.from("products").select("data").eq("id", r.productId).maybeSingle();
-        if (!p) continue;
-        const keys = Object.keys(p.data);
-        const key = ["codigo_barras", "codigo", "sku", "barcode", "ean"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "codigo_barras";
-        const { error } = await supabase.from("products").update({ data: { ...p.data, [key]: code } }).eq("id", r.productId);
+        // Columna del sistema (020): la base lo copia a `data` con la clave que ya use el producto
+        const { error } = await supabase.from("products").update({ codigo_barras: code }).eq("id", r.productId);
         if (error) continue;
       }
       done++;

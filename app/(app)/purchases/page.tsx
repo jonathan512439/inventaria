@@ -12,6 +12,8 @@ import { useFlow } from "@/components/FlowProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
+import { newOpId, registerPurchase } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import { IconArrowLeft, IconCheck, IconPlus, IconSearch, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 
 interface Line {
@@ -38,6 +40,8 @@ export default function PurchasesPage() {
   const [supplierId, setSupplierId] = useState<string>("");
   const [newSupplier, setNewSupplier] = useState<{ name: string; phone: string } | null>(null);
   const [doc, setDoc] = useState("");
+  // Id de la compra en curso (idempotencia): se renueva solo cuando la compra se guardó
+  const [opId, setOpId] = useState(newOpId);
   const [lines, setLines] = useState<Line[]>([]);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Product[]>([]);
@@ -120,70 +124,35 @@ export default function PurchasesPage() {
       data: { user },
     } = await supabase.auth.getUser();
     let supId = supplierId || null;
-    let supName = suppliers.find((s) => s.id === supplierId)?.name ?? null;
     if (newSupplier?.name.trim()) {
       const { data: s, error } = await supabase.from("suppliers").insert({ user_id: user!.id, name: newSupplier.name.trim(), phone: newSupplier.phone.trim() || null }).select().single();
       if (error) {
         setSaving(false);
-        return toast("error", error.message);
+        return toast("error", friendlyError(error));
       }
       supId = s.id;
-      supName = s.name;
+      // Si la compra falla y se reintenta, no se vuelve a crear el proveedor
+      setSuppliers((list) => [...list, s as Supplier]);
+      setSupplierId(s.id);
+      setNewSupplier(null);
     }
     const items = lines.filter((l) => (parseInt(l.qty, 10) || 0) > 0);
-    const { data: purchase, error } = await supabase
-      .from("purchases")
-      .insert({ user_id: user!.id, supplier_id: supId, supplier_name: supName, doc: doc.trim() || null, total: Math.round(total * 100) / 100, items: items.length })
-      .select()
-      .single();
-    if (error || !purchase) {
-      setSaving(false);
-      return toast("error", error?.message ?? "No se pudo guardar la compra");
-    }
-    for (const l of items) {
-      const qty = parseInt(l.qty, 10) || 0;
-      const cost = l.cost.trim() === "" ? null : Number(l.cost.replace(",", "."));
-      const expires = l.expires || null;
-      await supabase.from("purchase_items").insert({ purchase_id: purchase.id, user_id: user!.id, product_id: l.product.id, variant_id: l.variant?.id ?? null, product_name: String(l.product.data.nombre || ""), variant_label: l.variant?.label ?? null, qty, unit_cost: Number.isFinite(cost as number) ? cost : null, expires_at: expires });
-      let resultante = 0;
-      if (l.variant) {
-        const { data: v } = await supabase.from("product_variants").select("stock,costo").eq("id", l.variant.id).single();
-        resultante = (v?.stock ?? 0) + qty;
-        await supabase.from("product_variants").update({ stock: resultante, ...(cost !== null && Number.isFinite(cost) ? { costo: cost } : {}), ...(expires ? { expires_at: expires } : {}) }).eq("id", l.variant.id);
-      }
-      // Producto: stock (si no tiene variantes), precio de compra y vencimiento
-      const { data: p } = await supabase.from("products").select("data,expires_at").eq("id", l.product.id).single();
-      if (p) {
-        const keys = Object.keys(p.data);
-        const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "stock";
-        const data = { ...p.data };
-        if (!l.variant) {
-          resultante = (Number(p.data[key] ?? 0) || 0) + qty;
-          data[key] = resultante;
-        }
-        if (cost !== null && Number.isFinite(cost)) {
-          const old = p.data.precio_compra === null || p.data.precio_compra === undefined || p.data.precio_compra === "" ? null : Number(p.data.precio_compra);
-          if (old !== cost) {
-            data.precio_compra = cost;
-            await supabase.from("price_history").insert({ user_id: user!.id, product_id: l.product.id, variant_id: l.variant?.id ?? null, field: "precio_compra", old_value: old, new_value: cost, source: "compra" });
-          }
-        }
-        await supabase.from("products").update({ data, ...(expires && !l.variant ? { expires_at: expires } : {}) }).eq("id", l.product.id);
-      }
-      await supabase.from("stock_movements").insert({
-        user_id: user!.id,
-        product_id: l.product.id,
-        product_name: String(l.product.data.nombre || ""),
-        variant_id: l.variant?.id ?? null,
-        variant_label: l.variant?.label ?? null,
-        tipo: "entrada",
-        cantidad: qty,
-        precio_unitario: Number.isFinite(cost as number) ? cost : null,
-        motivo: supName ? `compra · ${supName}` : "compra",
-        stock_resultante: resultante,
-        purchase_id: purchase.id,
+    // Toda la compra en una operación atómica (021): stock, costo, vencimiento, historial y movimientos
+    try {
+      await registerPurchase(supabase, {
+        id: opId,
+        supplierId: supId,
+        doc: doc.trim() || null,
+        lines: items.map((l) => {
+          const cost = l.cost.trim() === "" ? null : Number(l.cost.replace(",", "."));
+          return { product_id: l.product.id, variant_id: l.variant?.id ?? null, qty: parseInt(l.qty, 10) || 0, unit_cost: cost !== null && Number.isFinite(cost) ? cost : null, expires_at: l.expires || null };
+        }),
       });
+    } catch (e) {
+      setSaving(false);
+      return toast("error", friendlyError(e));
     }
+    setOpId(newOpId());
     setSaving(false);
     navigator.vibrate?.(30);
     toast("success", `Compra registrada: ${items.length} producto${items.length === 1 ? "" : "s"} · Bs ${fmtMoney(total)}`);

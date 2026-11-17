@@ -9,6 +9,8 @@ import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
 import { useToast } from "./ui/Toast";
 import { isNetworkError, queueMove } from "@/lib/offline";
 import { registerSale } from "@/lib/sales";
+import { adjustStock, newOpId } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import { IconCheck, IconPlus, IconX, Spinner } from "./ui/Icons";
 
 interface Props {
@@ -42,6 +44,8 @@ export default function StockAdjust({ product, variants = [], variant = null, on
   const [salePrice, setSalePrice] = useState<string>(price !== null ? String(price) : "");
   const [motivo, setMotivo] = useState(MOTIVOS_SALIDA[0]);
   const [saving, setSaving] = useState(false);
+  // Id de esta operación (idempotencia): se reutiliza si se reintenta o si termina en la cola sin conexión
+  const [opId] = useState(newOpId);
 
   useEffect(() => {
     setAsSale(null);
@@ -59,8 +63,9 @@ export default function StockAdjust({ product, variants = [], variant = null, on
   /** Sin conexión: se guarda en el celular y se envía al reconectar (el delta se aplica sobre el stock real de ese momento). */
   async function saveOffline(key: string) {
     const tipo: MovementType = mode === "add" ? "entrada" : asSale ? "venta" : "salida";
-    const delta = mode === "add" ? qty : -Math.min(qty, current);
+    const delta = mode === "add" ? qty : -qty;
     await queueMove({
+      id: opId,
       product_id: product.id,
       product_name: productTitle(product.data) || null,
       variant_id: sel?.id ?? null,
@@ -84,76 +89,50 @@ export default function StockAdjust({ product, variants = [], variant = null, on
     const keys = Object.keys(product.data);
     const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => normalizeFieldName(x) === k)).find(Boolean) ?? "stock";
     if (typeof navigator !== "undefined" && !navigator.onLine) return saveOffline(key);
-    let data = { ...product.data, [key]: newStock };
     let updatedVariant: ProductVariant | undefined;
+    /** Total del producto que devolvió el servidor (con variantes, la suma) → para refrescar la pantalla. */
+    const totalFrom = (productStock: number | null | undefined, after: number) =>
+      productStock !== null && productStock !== undefined ? Number(productStock) : sel ? variants.reduce((t, v) => t + (v.id === sel.id ? after : v.stock), 0) : after;
     if (mode === "remove" && asSale) {
-      // Venta rápida: pasa por el mismo camino que el carrito (ticket de 1 línea, stock y movimiento)
+      // Venta rápida: la misma operación que el carrito (ticket de 1 línea, stock y movimiento), con el id de este intento
       try {
-        const sold = Math.min(qty, current);
-        if (sold <= 0) throw new Error("No hay stock para vender");
-        const { sale } = await registerSale(supabase, [{ key: sel?.id ?? product.id, product, variant: sel, qty: sold, unitPrice: Number(salePrice) || 0 }], { method: "efectivo", status: "pagado", paid: 0, discount: 0 });
+        const { sale, items } = await registerSale(supabase, [{ key: sel?.id ?? product.id, product, variant: sel, qty, unitPrice: Number(salePrice) || 0 }], { id: opId, method: "efectivo", status: "pagado", paid: 0, discount: 0 });
         setSaving(false);
         navigator.vibrate?.(20);
-        toast("success", `Venta N.º ${sale.number} · ${sold} × Bs ${fmtMoney(Number(salePrice) || 0)} = Bs ${fmtMoney(Number(sale.total))} · stock ${current} → ${newStock}`);
+        toast("success", `Venta N.º ${sale.number} · ${qty} × Bs ${fmtMoney(Number(salePrice) || 0)} = Bs ${fmtMoney(Number(sale.total))} · stock ${current} → ${newStock}`);
         if (sel) updatedVariant = { ...sel, stock: newStock };
-        onSaved({ ...product, data: sel ? { ...product.data, [key]: variants.reduce((t, v) => t + (v.id === sel.id ? newStock : v.stock), 0) } : data }, updatedVariant);
+        void items;
+        onSaved({ ...product, data: { ...product.data, [key]: totalFrom(null, newStock) } }, updatedVariant);
         onClose();
       } catch (e) {
         if (isNetworkError(e)) return saveOffline(key);
         setSaving(false);
-        toast("error", e instanceof Error ? e.message : "No se pudo registrar la venta");
+        toast("error", friendlyError(e));
       }
       return;
     }
-    if (sel) {
-      // Stock por variante: el total del producto lo recalcula la base de datos (suma de variantes)
-      const { error: ev } = await supabase.from("product_variants").update({ stock: newStock }).eq("id", sel.id);
-      if (ev) {
-        if (isNetworkError(ev)) return saveOffline(key);
-        setSaving(false);
-        return toast("error", ev.message);
-      }
-      updatedVariant = { ...sel, stock: newStock };
-      const total = variants.reduce((t, v) => t + (v.id === sel.id ? newStock : v.stock), 0);
-      data = { ...product.data, [key]: total };
-    } else {
-      const { error: e1 } = await supabase.from("products").update({ data }).eq("id", product.id);
-      if (e1) {
-        if (isNetworkError(e1)) return saveOffline(key);
-        setSaving(false);
-        return toast("error", e1.message);
-      }
+    // Entrada o retiro: una sola operación atómica en el servidor (021), con el id de este intento
+    try {
+      const res = await adjustStock(supabase, {
+        id: opId,
+        productId: product.id,
+        variantId: sel?.id ?? null,
+        delta: mode === "add" ? qty : -qty,
+        tipo: mode === "add" ? "entrada" : "salida",
+        motivo: mode === "remove" ? motivo : null,
+      });
+      setSaving(false);
+      navigator.vibrate?.(20);
+      const after = Number(res.stock);
+      toast("success", mode === "add" ? `+${qty} al stock (${current} → ${after})` : `−${qty} del stock (${current} → ${after}) · no cuenta como venta`);
+      if (sel) updatedVariant = { ...sel, stock: after };
+      onSaved({ ...product, data: { ...product.data, [key]: totalFrom(res.product_stock, after) } }, updatedVariant);
+      onClose();
+    } catch (e) {
+      if (isNetworkError(e)) return saveOffline(key);
+      setSaving(false);
+      toast("error", friendlyError(e));
     }
-    const tipo: MovementType = mode === "add" ? "entrada" : asSale ? "venta" : "salida";
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { error: e2 } = await supabase.from("stock_movements").insert({
-      user_id: user!.id,
-      product_id: product.id,
-      product_name: productTitle(product.data) || null,
-      variant_id: sel?.id ?? null,
-      variant_label: sel?.label ?? null,
-      tipo,
-      cantidad: qty,
-      precio_unitario: asSale ? Number(salePrice) || 0 : null,
-      total: asSale ? total : null,
-      motivo: mode === "remove" && !asSale ? motivo : null,
-      stock_resultante: newStock,
-    });
-    setSaving(false);
-    if (e2) return toast("error", e2.message);
-    navigator.vibrate?.(20);
-    toast(
-      "success",
-      mode === "add"
-        ? `+${qty} al stock (${current} → ${newStock})`
-        : asSale
-          ? `Venta registrada: ${qty} × Bs ${fmtMoney(Number(salePrice) || 0)} = Bs ${fmtMoney(total)} · stock ${current} → ${newStock}`
-          : `−${qty} del stock (${current} → ${newStock}) · no cuenta como venta`
-    );
-    onSaved({ ...product, data }, updatedVariant);
-    onClose();
   }
 
   if (typeof document === "undefined") return null;

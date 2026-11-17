@@ -6,13 +6,15 @@ import { createClient } from "@/lib/supabase/client";
 import type { Consignment, ConsignmentItem, Customer, PayMethod, Product, ProductVariant } from "@/types/database";
 import { SUMMARY_COLS, fmtMoney, fromSummary, stockOf } from "@/lib/inventory";
 import { productTitle } from "@/lib/fields";
-import { METHOD_LABEL, registerSale, suggestedPrice, type CartLine } from "@/lib/sales";
+import { METHOD_LABEL, suggestedPrice } from "@/lib/sales";
 import CustomerPicker from "@/components/CustomerPicker";
 import BarcodeCamera from "@/components/BarcodeCamera";
 import CoachTip from "@/components/CoachTip";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
+import { consignOut, consignSettle, newOpId } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import { IconArrowLeft, IconCheck, IconChevronRight, IconPlus, IconSearch, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 
 interface Line {
@@ -44,6 +46,9 @@ export default function ConsignPage() {
   const [results, setResults] = useState<Product[]>([]);
   const [picking, setPicking] = useState<{ product: Product; variants: ProductVariant[] } | null>(null);
   const [saving, setSaving] = useState(false);
+  // Ids de la entrega y de la rendición en curso (idempotencia): se renuevan al guardarlas
+  const [deliverId, setDeliverId] = useState(newOpId);
+  const [settleId, setSettleId] = useState(newOpId);
   // Liquidación
   const [settle, setSettle] = useState<{ cons: Consignment; rows: Record<string, { sold: string; returned: string }>; method: PayMethod; pay: "pagado" | "fiado" } | null>(null);
 
@@ -115,34 +120,18 @@ export default function ConsignPage() {
     });
     if (!ok) return;
     setSaving(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { data: cons, error } = await supabase.from("consignments").insert({ user_id: user!.id, customer_id: customer.id, customer_name: customer.name }).select().single();
-    if (error || !cons) {
+    // Toda la entrega en una operación atómica (021): ficha, productos, stock y movimientos
+    try {
+      await consignOut(supabase, {
+        id: deliverId,
+        customerId: customer.id,
+        lines: valid.map((l) => ({ product_id: l.product.id, variant_id: l.variant?.id ?? null, qty: parseInt(l.qty, 10) || 0, unit_price: Number(l.price.replace(",", ".")) || 0 })),
+      });
+    } catch (e) {
       setSaving(false);
-      return toast("error", error?.message ?? "No se pudo registrar la entrega");
+      return toast("error", friendlyError(e));
     }
-    for (const l of valid) {
-      const qty = parseInt(l.qty, 10) || 0;
-      const price = Number(l.price.replace(",", ".")) || 0;
-      await supabase.from("consignment_items").insert({ consignment_id: cons.id, user_id: user!.id, product_id: l.product.id, variant_id: l.variant?.id ?? null, product_name: productTitle(l.product.data) || null, variant_label: l.variant?.label ?? null, qty_out: qty, unit_price: price });
-      let resultante = 0;
-      if (l.variant) {
-        const { data: v } = await supabase.from("product_variants").select("stock").eq("id", l.variant.id).maybeSingle();
-        resultante = Math.max(0, (v?.stock ?? 0) - qty);
-        await supabase.from("product_variants").update({ stock: resultante }).eq("id", l.variant.id);
-      } else {
-        const { data: p } = await supabase.from("products").select("data").eq("id", l.product.id).maybeSingle();
-        if (p) {
-          const keys = Object.keys(p.data);
-          const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "stock";
-          resultante = Math.max(0, (Number(p.data[key] ?? 0) || 0) - qty);
-          await supabase.from("products").update({ data: { ...p.data, [key]: resultante } }).eq("id", l.product.id);
-        }
-      }
-      await supabase.from("stock_movements").insert({ user_id: user!.id, product_id: l.product.id, product_name: productTitle(l.product.data) || null, variant_id: l.variant?.id ?? null, variant_label: l.variant?.label ?? null, tipo: "salida", cantidad: qty, motivo: `entregado a ${customer.name}`, stock_resultante: resultante, consignment_id: cons.id });
-    }
+    setDeliverId(newOpId());
     setSaving(false);
     navigator.vibrate?.(30);
     toast("success", `Entrega a ${customer.name} registrada: ${units} unidades afuera`);
@@ -180,67 +169,23 @@ export default function ConsignPage() {
     });
     if (!ok) return;
     setSaving(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
     try {
-      // Vendido → venta a nombre del cliente (el stock ya había salido: la venta no vuelve a descontarlo)
-      if (soldUnits) {
-        const cart: CartLine[] = [];
-        for (const p of parsed.filter((x) => x.sold > 0)) {
-          const { data: prod } = await supabase.from("products").select("*").eq("id", p.i.product_id!).maybeSingle();
-          if (!prod) continue;
-          let variant: ProductVariant | null = null;
-          if (p.i.variant_id) {
-            const { data: v } = await supabase.from("product_variants").select("*").eq("id", p.i.variant_id).maybeSingle();
-            variant = (v as ProductVariant | null) ?? null;
-          }
-          cart.push({ key: p.i.id, product: prod as Product, variant, qty: p.sold, unitPrice: Number(p.i.unit_price) });
-        }
-        // Compensación: registerSale descuenta stock; aquí ya salió al entregar → se repone antes
-        for (const l of cart) {
-          if (l.variant) {
-            const { data: v } = await supabase.from("product_variants").select("stock").eq("id", l.variant.id).maybeSingle();
-            await supabase.from("product_variants").update({ stock: (v?.stock ?? 0) + l.qty }).eq("id", l.variant.id);
-          } else {
-            const { data: pr } = await supabase.from("products").select("data").eq("id", l.product.id).maybeSingle();
-            if (pr) {
-              const keys = Object.keys(pr.data);
-              const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "stock";
-              await supabase.from("products").update({ data: { ...pr.data, [key]: (Number(pr.data[key] ?? 0) || 0) + l.qty } }).eq("id", l.product.id);
-            }
-          }
-        }
-        await registerSale(supabase, cart, { method: settle.method, status: settle.pay, paid: 0, discount: 0, customerId: settle.cons.customer_id, customerName: settle.cons.customer_name, note: "consignación" });
-      }
-      // Devuelto → vuelve al estante
-      for (const p of parsed.filter((x) => x.returned > 0)) {
-        let resultante = 0;
-        if (p.i.variant_id) {
-          const { data: v } = await supabase.from("product_variants").select("stock").eq("id", p.i.variant_id).maybeSingle();
-          resultante = (v?.stock ?? 0) + p.returned;
-          await supabase.from("product_variants").update({ stock: resultante }).eq("id", p.i.variant_id);
-        } else if (p.i.product_id) {
-          const { data: pr } = await supabase.from("products").select("data").eq("id", p.i.product_id).maybeSingle();
-          if (pr) {
-            const keys = Object.keys(pr.data);
-            const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => x.toLowerCase() === k)).find(Boolean) ?? "stock";
-            resultante = (Number(pr.data[key] ?? 0) || 0) + p.returned;
-            await supabase.from("products").update({ data: { ...pr.data, [key]: resultante } }).eq("id", p.i.product_id);
-          }
-        }
-        await supabase.from("stock_movements").insert({ user_id: user!.id, product_id: p.i.product_id, product_name: p.i.product_name, variant_id: p.i.variant_id, variant_label: p.i.variant_label, tipo: "entrada", cantidad: p.returned, motivo: `devuelto por ${settle.cons.customer_name}`, stock_resultante: resultante, consignment_id: settle.cons.id });
-      }
-      for (const p of parsed) {
-        if (p.sold || p.returned) await supabase.from("consignment_items").update({ qty_sold: p.i.qty_sold + p.sold, qty_returned: p.i.qty_returned + p.returned }).eq("id", p.i.id);
-      }
-      if (!remaining) await supabase.from("consignments").update({ status: "liquidada", closed_at: new Date().toISOString() }).eq("id", settle.cons.id);
+      // Una operación atómica (021): lo vendido pasa a ser una venta SIN volver a mover stock (ya salió al entregar),
+      // lo devuelto vuelve al estante y la entrega se cierra si no queda nada afuera
+      await consignSettle(supabase, {
+        id: settleId,
+        consignmentId: settle.cons.id,
+        rows: parsed.filter((p) => p.sold || p.returned).map((p) => ({ item_id: p.i.id, sold: p.sold, returned: p.returned })),
+        pay: settle.pay,
+        method: settle.method,
+      });
+      setSettleId(newOpId());
       navigator.vibrate?.(30);
       toast("success", remaining ? "Cuentas registradas; la entrega sigue abierta" : "Entrega liquidada");
       setSettle(null);
       load();
     } catch (e) {
-      toast("error", e instanceof Error ? e.message : "No se pudo liquidar");
+      toast("error", friendlyError(e, "No se pudo liquidar"));
     } finally {
       setSaving(false);
     }

@@ -12,6 +12,8 @@ import { categoryPath } from "@/lib/categories";
 import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import { useToast } from "@/components/ui/Toast";
+import { adjustStock, newOpId } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import { IconArrowLeft, IconBox, IconCamera, IconCheck, IconChevronRight, IconPlus, IconSearch, IconSparkles, IconTag, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 
 interface PublicInfo { nombre: string; marca: string; contenido: string; categorias: string[]; imagen: string | null; fuente: string }
@@ -242,18 +244,22 @@ export default function ScanPage() {
 
   /** Suma stock a una variante concreta; si el código no estaba en esa variante, se le asigna para la próxima vez. */
   async function addVariantStock(v: ProductVariant, n: number, scanned: string): Promise<ProductVariant | null> {
-    const patch: Partial<ProductVariant> = { stock: v.stock + n };
-    if (!v.codigo_barras && scanned) patch.codigo_barras = scanned;
-    const { error } = await supabase.from("product_variants").update(patch).eq("id", v.id);
-    if (error) {
-      toast("error", /product_variants_codigo/.test(error.message) ? "Ese código ya está en otra variante" : error.message);
+    // El código leído se guarda en la variante si aún no tenía (no es stock: se escribe directo)
+    if (!v.codigo_barras && scanned) {
+      const { error } = await supabase.from("product_variants").update({ codigo_barras: scanned }).eq("id", v.id);
+      if (error) {
+        toast("error", /product_variants_codigo/.test(error.message) ? "Ese código ya está en otra variante" : friendlyError(error));
+        return null;
+      }
+    }
+    // Stock: operación atómica en el servidor (021)
+    try {
+      const res = await adjustStock(supabase, { id: newOpId(), productId: v.product_id, variantId: v.id, delta: n, tipo: "entrada", motivo: "escáner" });
+      return { ...v, stock: Number(res.stock), codigo_barras: v.codigo_barras || scanned || v.codigo_barras } as ProductVariant;
+    } catch (e) {
+      toast("error", friendlyError(e));
       return null;
     }
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    await supabase.from("stock_movements").insert({ user_id: user!.id, product_id: v.product_id, variant_id: v.id, variant_label: v.label, tipo: "entrada", cantidad: n, motivo: "escáner", stock_resultante: v.stock + n });
-    return { ...v, ...patch } as ProductVariant;
   }
 
   async function addStock(p: Product, n: number) {
@@ -268,13 +274,15 @@ export default function ScanPage() {
       return;
     }
     const keys = Object.keys(p.data);
-    const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => normalizeFieldName(x) === k)).find(Boolean);
-    if (!key) return toast("error", "Este producto no tiene un campo de stock");
+    const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => normalizeFieldName(x) === k)).find(Boolean) ?? "stock";
     const current = Number(p.data[key] ?? 0) || 0;
-    const { error } = await supabase.from("products").update({ data: { ...p.data, [key]: current + n } }).eq("id", p.id);
-    if (error) return toast("error", error.message);
-    toast("success", `Stock actualizado: ${current} → ${current + n}`);
-    setResult({ found: "own", product: { ...p, data: { ...p.data, [key]: current + n } } });
+    try {
+      const res = await adjustStock(supabase, { id: newOpId(), productId: p.id, delta: n, tipo: "entrada", motivo: "escáner" });
+      toast("success", `Stock actualizado: ${current} → ${Number(res.stock)}`);
+      setResult({ found: "own", product: { ...p, data: { ...p.data, [key]: Number(res.stock) } } });
+    } catch (e) {
+      toast("error", friendlyError(e));
+    }
   }
 
   // ---- lote ----
@@ -294,12 +302,13 @@ export default function ScanPage() {
         continue;
       }
       if (r.status === "own" && r.product) {
-        const keys = Object.keys(r.product.data);
-        const key = ["stock", "cantidad", "existencias"].map((k) => keys.find((x) => normalizeFieldName(x) === k)).find(Boolean) ?? "stock";
-        const current = Number(r.product.data[key] ?? 0) || 0;
-        const { error } = await supabase.from("products").update({ data: { ...r.product.data, [key]: current + r.count } }).eq("id", r.product.id);
-        setRows((rs) => rs.map((x) => (x.code === r.code ? { ...x, done: error ? "error" : "stock" } : x)));
-        if (!error) ok++;
+        const productId = r.product.id;
+        const done = await adjustStock(supabase, { id: newOpId(), productId, delta: r.count, tipo: "entrada", motivo: "escáner (lote)" }).then(
+          () => true,
+          () => false
+        );
+        setRows((rs) => rs.map((x) => (x.code === r.code ? { ...x, done: done ? "stock" : "error" } : x)));
+        if (done) ok++;
         continue;
       }
       const cat = r.categoryId || batchCategory;
