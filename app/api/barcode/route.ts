@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CODE_FIELDS, applyDefaults, coerceValue, getEffectiveFields, getValue, normalizeFieldName } from "@/lib/fields";
+import { applyDefaults, coerceValue, getEffectiveFields } from "@/lib/fields";
 import { categoryPath } from "@/lib/categories";
 import { lookupPublicCatalogs, suggestCategory } from "@/lib/publicCatalog";
 import type { ProductData } from "@/types/database";
@@ -25,27 +25,22 @@ export async function GET(request: Request) {
   const code = (new URL(request.url).searchParams.get("code") ?? "").trim();
   if (!code) return NextResponse.json({ error: "Falta el código" }, { status: 400 });
 
-  const [{ data: products }, { data: categories }, { data: byVariant }] = await Promise.all([
-    supabase.from("products").select("id,data,category_id,image_url,status").is("deleted_at", null),
-    supabase.from("categories").select("*"),
+  // Búsqueda directa por la columna indexada `codigo_norm` (020): una fila, no todo el inventario.
+  const COLS = "id,data,category_id,image_url,status";
+  const [{ data: hits }, { data: byVariant }] = await Promise.all([
+    supabase.from("products").select(COLS).is("deleted_at", null).eq("codigo_norm", code.toUpperCase()).limit(1),
     supabase.from("product_variants").select("*").eq("codigo_barras", code).limit(1),
   ]);
   // 1a) El código pertenece a una variante concreta (talla/color) → sumar a esa variante
   const variantHit = byVariant?.[0];
   if (variantHit) {
-    const product = (products ?? []).find((p) => p.id === variantHit.product_id);
+    const { data: product } = await supabase.from("products").select(COLS).eq("id", variantHit.product_id).is("deleted_at", null).maybeSingle();
     if (product) {
       const { data: variants } = await supabase.from("product_variants").select("*").eq("product_id", product.id).order("created_at");
       return NextResponse.json({ found: "own", product, variant: variantHit, variants: variants ?? [] });
     }
   }
-  const codeKeys = CODE_FIELDS.map(normalizeFieldName);
-  const existing = (products ?? []).find((p) =>
-    codeKeys.some((k) => {
-      const v = getValue(p.data, k);
-      return v !== undefined && v !== null && String(v).trim().toUpperCase() === code.toUpperCase();
-    })
-  );
+  const existing = hits?.[0];
   if (existing) {
     // 1b) Producto conocido: si tiene variantes, el cliente pregunta a cuál pertenece este código
     const { data: variants } = await supabase.from("product_variants").select("*").eq("product_id", existing.id).order("created_at");
@@ -54,6 +49,7 @@ export async function GET(request: Request) {
 
   const info = await lookupPublicCatalogs(code);
   if (!info) return NextResponse.json({ found: "none", info: null, suggestion: null });
+  const { data: categories } = await supabase.from("categories").select("*");
   const cat = suggestCategory(categories ?? [], info);
   return NextResponse.json({
     found: "public",

@@ -13,17 +13,20 @@ const check = (ok, msg) => { console.log(`${ok ? "OK " : "FAIL"} ${msg}`); if (!
 const { data: u, error: ue } = await admin.auth.admin.createUser({ email: `var-${Date.now()}@example.com`, password: "Test123456!", email_confirm: true });
 if (ue) { console.error(ue.message); process.exit(1); }
 const uid = u.user.id;
+// Cada fila con el negocio del usuario temporal (con service role el disparador no lo puede deducir)
+const { data: mem } = await admin.from("business_members").select("business_id").eq("user_id", uid).single();
+const bid = mem.business_id;
 try {
-  const { data: cat } = await admin.from("categories").insert({ user_id: uid, name: "Ropa", parent_id: null }).select().single();
+  const { data: cat } = await admin.from("categories").insert({ user_id: uid, business_id: bid, name: "Ropa", parent_id: null }).select().single();
   const { data: axes, error: ae } = await admin.from("variant_axes").insert([
-    { user_id: uid, category_id: cat.id, key: "talla", label: "Talla", options: ["S", "M", "L"], sort_order: 0 },
-    { user_id: uid, category_id: cat.id, key: "color", label: "Color", options: ["Rojo", "Azul"], sort_order: 1 },
+    { user_id: uid, business_id: bid, category_id: cat.id, key: "talla", label: "Talla", options: ["S", "M", "L"], sort_order: 0 },
+    { user_id: uid, business_id: bid, category_id: cat.id, key: "color", label: "Color", options: ["Rojo", "Azul"], sort_order: 1 },
   ]).select();
   check(!ae && axes.length === 2, "ejes creados");
-  const { data: p } = await admin.from("products").insert({ user_id: uid, category_id: cat.id, status: "confirmed", data: { nombre: "Polera", precio: 35, stock: 1 } }).select().single();
+  const { data: p } = await admin.from("products").insert({ user_id: uid, business_id: bid, category_id: cat.id, status: "confirmed", data: { nombre: "Polera", precio: 35, stock: 1 } }).select().single();
   const { error: ve } = await admin.from("product_variants").insert([
-    { user_id: uid, product_id: p.id, values: { talla: "S", color: "Rojo" }, label: "S · Rojo", stock: 3 },
-    { user_id: uid, product_id: p.id, values: { talla: "M", color: "Rojo" }, label: "M · Rojo", stock: 5, codigo_barras: "7791234567890" },
+    { user_id: uid, business_id: bid, product_id: p.id, values: { talla: "S", color: "Rojo" }, label: "S · Rojo", stock: 3 },
+    { user_id: uid, business_id: bid, product_id: p.id, values: { talla: "M", color: "Rojo" }, label: "M · Rojo", stock: 5, codigo_barras: "7791234567890" },
   ]);
   check(!ve, `variantes creadas ${ve?.message ?? ""}`);
   let { data: p2 } = await admin.from("products").select("data").eq("id", p.id).single();
@@ -35,14 +38,14 @@ try {
   await admin.from("product_variants").update({ stock: 0 }).eq("id", v.id);
   ({ data: p2 } = await admin.from("products").select("data").eq("id", p.id).single());
   check(p2.data.stock === 3, `venta de la M roja → stock 3 → ${p2.data.stock}`);
-  const { error: dupe } = await admin.from("product_variants").insert({ user_id: uid, product_id: p.id, values: { talla: "L", color: "Rojo" }, label: "L · Rojo", stock: 1, codigo_barras: "7791234567890" });
+  const { error: dupe } = await admin.from("product_variants").insert({ user_id: uid, business_id: bid, product_id: p.id, values: { talla: "L", color: "Rojo" }, label: "L · Rojo", stock: 1, codigo_barras: "7791234567890" });
   check(!!dupe, "código de barras repetido entre variantes se rechaza");
-  const { error: dupv } = await admin.from("product_variants").insert({ user_id: uid, product_id: p.id, values: { color: "Rojo", talla: "S" }, label: "S · Rojo", stock: 1 });
+  const { error: dupv } = await admin.from("product_variants").insert({ user_id: uid, business_id: bid, product_id: p.id, values: { color: "Rojo", talla: "S" }, label: "S · Rojo", stock: 1 });
   check(!!dupv, "misma combinación (otro orden de claves) se rechaza");
   await admin.from("product_variants").delete().eq("id", v.id);
   ({ data: p2 } = await admin.from("products").select("data").eq("id", p.id).single());
   check(p2.data.stock === 3, `borrar variante recalcula → ${p2.data.stock}`);
-  const { error: me } = await admin.from("stock_movements").insert({ user_id: uid, product_id: p.id, variant_id: null, variant_label: "S · Rojo", tipo: "venta", cantidad: 1, total: 35, stock_resultante: 2 });
+  const { error: me } = await admin.from("stock_movements").insert({ user_id: uid, business_id: bid, product_id: p.id, variant_id: null, variant_label: "S · Rojo", tipo: "venta", cantidad: 1, total: 35, stock_resultante: 2 });
   check(!me, `movimiento con variante ${me?.message ?? ""}`);
   await admin.from("categories").delete().eq("id", cat.id);
   const { data: axesLeft } = await admin.from("variant_axes").select("id").eq("user_id", uid);

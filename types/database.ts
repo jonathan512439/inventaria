@@ -360,6 +360,22 @@ export type Product = {
   business_id?: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Campos del sistema como columnas (020 · Fase 6.9 C1). Se sincronizan con `data` en los dos sentidos por
+   * el disparador `products_sync_fields`; desde C2 las funciones SQL escriben aquí y no en `data`.
+   */
+  nombre?: string | null;
+  marca?: string | null;
+  precio?: number | null;
+  precio_compra?: number | null;
+  precio_mayorista?: number | null;
+  stock?: number | null;
+  codigo_barras?: string | null;
+  unidades_por_paquete?: number | null;
+  /** upper(btrim(codigo_barras)): búsqueda exacta por código. Lo calcula la base. */
+  codigo_norm?: string | null;
+  /** Texto de búsqueda en minúsculas. Lo calcula la base. */
+  search?: string | null;
 };
 
 /** Tipado mínimo para supabase-js (Database generic) */

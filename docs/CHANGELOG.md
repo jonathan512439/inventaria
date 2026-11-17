@@ -3,6 +3,17 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-17 · Fase 6.9 · C1 — Nombre, precios, stock y código como columnas
+
+Migración `020_campos_sistema.sql` aplicada. **Verificación:** la vista del inventario devuelve exactamente lo mismo antes y después (huella `md5` de las 55 filas idéntica, stock total 348 = 348, fechas sin tocar). `npm run test:fields` 19/19, `test:variants` 10/10, `test:team` y `test:import` en verde.
+
+### 17.1 Campos del sistema como columnas
+- **Qué**: los datos que usa todo el sistema (nombre, marca, precio, precio de compra, precio mayorista, stock, código de barras, unidades por paquete) pasan a ser **columnas reales** del producto, además de seguir en sus datos. Un disparador los mantiene iguales en los dos sentidos: lo que hoy escribe la app en los datos se copia a la columna, y lo que se escriba en la columna (desde C2) se copia a los datos con la misma clave que ya usaba el producto (`stock`, `cantidad`…). Con variantes, el stock sigue siendo la suma de las variantes.
+  - **Búsqueda más rápida**: la búsqueda del inventario, Vender, Compras y Entregas usa un índice de texto (no recorre todos los productos).
+  - **Escanear un código** (Escanear y Vender) busca solo ese código en lugar de descargar todo el inventario.
+  - El **código de barras de una variante** es único dentro del negocio (antes, por persona: dos miembros podían repetirlo).
+- **Validar**: buscar un producto por parte del nombre en Inventario y en Vender → aparece igual que antes; escanear un producto con código → se reconoce al instante; cambiar el stock desde la ficha → Inventario muestra el valor nuevo; en un producto con tallas, el stock total sigue siendo la suma.
+
 ## 2026-11-17 · Fase 6.9 · C0 — La base no se vuelve a dormir sin aviso
 
 Plan detallado y estado de la Fase 6.9: [PLAN_CIMIENTOS.md](PLAN_CIMIENTOS.md). Incidente: [AUDITORIA.md §2.0](AUDITORIA.md).

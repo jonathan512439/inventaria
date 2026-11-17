@@ -11,8 +11,8 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 | Paso | Estado | Migración | Prueba | CHANGELOG |
 |---|---|---|---|---|
 | C0 · Operación y alertas | ✅ 2026-11-17 | — | ejecución manual de `keepalive` y `backup` | 17.0 |
-| C1 · Campos del sistema como columnas | ⏳ en curso | `020_campos_sistema.sql` | `npm run test:fields` + `test:variants` | 17.1 |
-| C2 · Operaciones atómicas | pendiente | `021_operaciones.sql` | `npm run test:ops` | 17.2 |
+| C1 · Campos del sistema como columnas | ✅ 2026-11-17 | `020_campos_sistema.sql` | `npm run test:fields` + `test:variants` | 17.1 |
+| C2 · Operaciones atómicas | ⏳ siguiente | `021_operaciones.sql` | `npm run test:ops` | 17.2 |
 | C3 · El dinero como pagos | pendiente | `022_pagos.sql` | `npm run test:ops` (ampliada) | 17.3 |
 | C4 · Ajustes del negocio y zona horaria | pendiente | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
 | C5 · Permisos en la base | pendiente | `024_permisos.sql` (+ `025_fotos_privadas.sql`) | `npm run test:access` | 17.5 |
@@ -42,11 +42,13 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 
 **Acepta cuando:** el login funciona; `backup.yml` lanzado a mano termina en verde; `keepalive.yml` lanzado a mano termina en verde; sin red, el login dice «No pudimos conectar con el servidor…».
 
+**Resultado (2026-11-17):** proyecto `ACTIVE_HEALTHY`; despliegue con Node 22 en verde; `keepalive` y `backup` lanzados a mano en verde (primer respaldo correcto desde el 2026-10-04).
+
 ## C1 · Campos del sistema como columnas (cierra C2-base, M2, E1, E2, S11)
 
 **Migración `020_campos_sistema.sql`:**
 1. `pg_trgm` en el esquema `extensions`.
-2. Columnas en `products`: `nombre text`, `marca text`, `precio numeric(12,2)`, `precio_compra numeric(12,2)`, `precio_mayorista numeric(12,2)`, `stock numeric(14,3)`, `codigo_barras text`, `unidades_por_paquete numeric(12,3)`, `codigo_norm text` (= `upper(btrim(codigo_barras))`, para buscar por código), `search text` (nombre, marca, descripción, etiqueta leída y código en minúsculas).
+2. Columnas en `products`: `nombre text`, `marca text`, `precio`, `precio_compra`, `precio_mayorista`, `stock`, `unidades_por_paquete` (`numeric` sin precisión fija: `data` es texto libre y un valor raro no debe romper un guardado; al escribir a `data` se usa `trim_scale`), `codigo_barras text`, `codigo_norm text` (= `upper(btrim(codigo_barras))`, para buscar por código), `search text` (nombre, marca, descripción, etiqueta leída y código en minúsculas).
 3. Relleno desde `data` con los alias de siempre (`jkey`/`safe_num`) con los disparadores apagados (no toca `updated_at`).
 4. Disparador `products_sync_fields` (BEFORE INSERT OR UPDATE) descrito arriba; se elimina `products_stock_guard_trg`.
 5. Índices: `(business_id, status) where deleted_at is null`, `(business_id, codigo_norm) where codigo_norm is not null`, GIN trigram sobre `search`.
@@ -58,6 +60,10 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 **Verificación de la migración:** para cada producto, columna = valor leído de `data` (0 diferencias); suma de stock igual antes y después; `product_summaries` devuelve las mismas filas.
 
 **Acepta cuando:** `test:fields` y `test:variants` en verde; escanear un código encuentra el producto con una sola consulta; la búsqueda sigue funcionando.
+
+**Resultado (2026-11-17):** aplicada en producción (55 productos, 2 negocios). Huella de `product_summaries` idéntica antes y después (`md5` de todas las filas, también la búsqueda), stock total 348 = 348, `updated_at` sin tocar. `test:fields` 19/19, `test:variants` 10/10, `test:team` y `test:import` en verde.
+
+**Pendiente heredado a C2:** los 12 sitios que escriben stock por `data` siguen funcionando gracias al disparador, pero conservan la carrera «leer → escribir»; C2 los reemplaza por funciones atómicas que escriben la columna. `/api/barcode` busca por el primer código con valor (`codigo_barras` › `codigo` › `sku` › `barcode` › `ean`), igual que etiquetas y conteo; un producto con dos códigos distintos en dos claves solo se encuentra por el primero.
 
 ## C2 · Operaciones atómicas (cierra C1, C3, C4, C5, N4, N7, M1)
 
