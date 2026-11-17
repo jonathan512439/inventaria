@@ -17,7 +17,7 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 | C4 · Ajustes del negocio y zona horaria | pendiente | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
 | C5 · Permisos en la base | pendiente | `024_permisos.sql` (+ `025_fotos_privadas.sql`) | `npm run test:access` | 17.5 |
 | C6 · Calidad continua | pendiente | `schema_migrations` | CI | 17.6 |
-| C7 · Interfaz | pendiente | — | manual + `test:e2e` | 17.7 |
+| C7 · Reconstrucción visual completa (C7.1–C7.9) | pendiente (tras C5) | — | manual + `test:e2e` + prueba con 3 personas | 17.7–17.15 |
 
 ## Contexto para retomar (decisiones tomadas)
 
@@ -136,12 +136,8 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 - `vitest` para reglas puras (`lib/inventory`, `lib/import`, `parseExpiry`, `lib/customers`, `lib/errors`).
 - `deploy.yml`: job `test` (unitarias + `test:variants`, `test:fields`, `test:ops`, `test:access` contra el proyecto de pruebas) del que depende el despliegue; `test:e2e` (con IA) una vez al día.
 
-## C7 · Interfaz (cierra V1–V5, V7, V8, M4, M5)
+## C7 · Reconstrucción visual y funcional completa (cierra V1–V8, M4, M5 y el pedido del 2026-11-17)
 
-- Barra inferior según rol y etapa (con inventario: Inicio · **Vender** · Escanear · Inventario · Más); vendedor sin «Revisar» si no hay pendientes.
-- Menú «Más» por tareas (Vender y cobrar · Mercadería · Números · Configurar), un icono propio por destino (nuevos en `components/ui/Icons.tsx`), buscador.
-- Escala tipográfica en `tailwind.config.ts`; mínimo 12 px informativo y 14 px en acciones (reemplazar `text-[9-11px]`).
-- `aria-label` en botones de icono; `eslint-plugin-jsx-a11y`.
-- `friendlyError` en todos los `toast("error", …)`.
-- Hoja de cobro con teclado grande y vuelto.
-- Partir `review` (872 líneas), `scan`, `consign`, `ProductDetailClient` en hooks de datos + componentes; `lib/ai/productAnalysis.ts` compartido por `analyze` y `reanalyze`.
+Plan completo, diagnóstico, trazabilidad de las 42 funciones actuales, mapa de pantallas (38 → 16), navegación por rol, redirecciones, sistema visual y pasos C7.1–C7.9: **[RECONSTRUCCION_VISUAL.md](RECONSTRUCCION_VISUAL.md)**.
+
+Regla para C2–C5: las pantallas actuales solo cambian por dentro (pasan a usar `lib/data/*` y las funciones SQL); no se rediseñan, para no hacer el trabajo dos veces. Partir `review`, `scan`, `consign` y `ProductDetailClient` y crear `lib/ai/productAnalysis.ts` (compartido por `analyze` y `reanalyze`) se hace dentro de C7.

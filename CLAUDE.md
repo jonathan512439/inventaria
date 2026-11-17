@@ -24,4 +24,5 @@
 ## Plan vigente
 - `docs/PLAN_V3.md` (Fases 0–8). Cada fase se despliega y documenta por separado.
 - **En curso: Fase 6.9 · Cimientos** (`docs/PLAN_CIMIENTOS.md`, pasos C0–C7, con tabla de estado y decisiones). Leerlo antes de tocar stock, ventas, pagos o permisos: toda escritura de dinero/stock va por funciones SQL atómicas (`rpc`), nunca «leer → escribir» desde el navegador.
+- **Reconstrucción visual (C7, tras C5):** `docs/RECONSTRUCCION_VISUAL.md` (5 áreas, 38 → 16 pantallas, trazabilidad de funciones, sistema visual). Hasta entonces no se rediseñan pantallas: solo se cambian por dentro.
 - Errores al usuario siempre con `friendlyError()` (`lib/errors.ts`), nunca `error.message` crudo.
