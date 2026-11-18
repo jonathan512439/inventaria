@@ -54,8 +54,10 @@ function Products() {
   const confirm = useConfirm();
   const { alerts, isOwner } = useFlow();
 
-  const view: View = (VIEWS as readonly string[]).includes(params.get("filter") ?? "") ? (params.get("filter") as View) : "all";
-  const categoryId = params.get("category"); // "none" = sin categoría
+  // Las redirecciones de Cloudflare pegan la consulta antigua con «?» (p. ej. filter=expiring?tab=vencer): se corta ahí
+  const param = (k: string) => params.get(k)?.split("?")[0] || null;
+  const view: View = (VIEWS as readonly string[]).includes(param("filter") ?? "") ? (param("filter") as View) : "all";
+  const categoryId = param("category"); // "none" = sin categoría
   const table = params.get("view") === "table";
 
   const [categories, setCategories] = useState<Category[]>([]);
