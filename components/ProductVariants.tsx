@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { axesFor, sameValues, variantLabel, variantTotals } from "@/lib/variants";
-import { fmtMoney } from "@/lib/inventory";
+import { money } from "@/lib/inventory";
 import VariantGrid from "./VariantGrid";
 import StockAdjust from "./StockAdjust";
 import { useToast } from "./ui/Toast";
@@ -147,7 +147,7 @@ export default function ProductVariants({ product, categories, axes, variants, o
                   <div key={v.id} className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-xl bg-white p-2 ring-1 ring-violet-100 sm:grid-cols-[1fr_96px_1fr_auto]">
                     <span className="min-w-0 truncate text-sm font-semibold text-ink">{v.label} <span className="text-xs font-normal text-slate-500">· {v.stock} en stock</span></span>
                     <button type="button" onClick={() => removeVariant(v)} className="rounded-full p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600 sm:order-last" title="Quitar variante"><IconTrash size={14} /></button>
-                    <input type="number" inputMode="decimal" step="any" className="input py-1.5 text-sm tabular-nums" placeholder={`Bs ${fmtMoney(Number(product.data.precio ?? 0) || 0)}`} value={e.precio} onChange={(ev) => setEdits({ ...edits, [v.id]: { ...e, precio: ev.target.value } })} title="Precio propio (vacío = el del producto)" />
+                    <input type="number" inputMode="decimal" step="any" className="input py-1.5 text-sm tabular-nums" placeholder={`${money(Number(product.data.precio ?? 0) || 0)}`} value={e.precio} onChange={(ev) => setEdits({ ...edits, [v.id]: { ...e, precio: ev.target.value } })} title="Precio propio (vacío = el del producto)" />
                     <input className="input py-1.5 text-sm" placeholder="Código de barras" value={e.codigo} onChange={(ev) => setEdits({ ...edits, [v.id]: { ...e, codigo: ev.target.value } })} />
                   </div>
                 );

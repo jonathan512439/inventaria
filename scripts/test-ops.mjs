@@ -201,6 +201,26 @@ try {
   check(Number(closes?.[0]?.collected_abonos) === 25 && Number(closes?.[1]?.collected_abonos) === 28, `el primer cierre no cambia con el abono posterior → ${closes?.[0]?.collected_abonos} / ${closes?.[1]?.collected_abonos}`);
   const sv = await sum(v);
   check(sv?.profit === null && k2?.profit !== null, "el vendedor no recibe la ganancia en la caja");
+  // ===================== C4 · ajustes del negocio y zona horaria (023) =====================
+  const { error: rn } = await a.from("businesses").update({ name: "Tienda Prueba", currency: "S/" }).eq("id", A.bid);
+  const { data: ctxV } = await v.rpc("session_context");
+  check(!rn && ctxV?.business?.name === "Tienda Prueba" && ctxV?.business?.currency === "S/" && ctxV?.role === "vendedor", `el vendedor recibe el nombre y la moneda del negocio → ${ctxV?.business?.name} ${ctxV?.business?.currency} (${ctxV?.role}) ${rn?.message ?? ""}`);
+  check(Array.isArray(ctxV?.members) && ctxV.members.length === 2 && typeof ctxV?.counts?.confirmed === "number", `session_context trae equipo y conteos → ${ctxV?.members?.length} miembros, ${ctxV?.counts?.confirmed} en inventario`);
+  await v.from("businesses").update({ name: "Hackeado" }).eq("id", A.bid);
+  const { data: bz } = await admin.from("businesses").select("name").eq("id", A.bid).single();
+  check(bz?.name === "Tienda Prueba", `el vendedor no puede cambiar el nombre del negocio → ${bz?.name}`);
+  const { error: badTz } = await a.from("businesses").update({ timezone: "Marte/Olympus" }).eq("id", A.bid);
+  check(!!badTz, "zona horaria inválida se rechaza");
+  // Una venta a las 21:30 de Bolivia (01:30 UTC del día siguiente) cuenta en su día, no en el siguiente
+  const late = await a.rpc("register_sale", { p_id: uuid(), p_lines: [line(P1.id, 1, 10)], p_at: "2026-11-18T01:30:00Z" });
+  const d17 = (await a.rpc("cash_summary", { p_day: "2026-11-17" })).data;
+  const d18 = (await a.rpc("cash_summary", { p_day: "2026-11-18" })).data;
+  check(!late.error && d17?.tz === "America/La_Paz" && Number(d17?.sales_count) === 1 && Number(d18?.sales_count ?? 0) >= 0 && d17?.from === "2026-11-17T04:00:00+00:00", `venta 21:30 Bolivia cae el 17 (zona del negocio) → ventas del 17: ${d17?.sales_count}, desde ${d17?.from} ${late.error?.message ?? ""}`);
+  await a.from("businesses").update({ timezone: "Europe/Madrid" }).eq("id", A.bid);
+  const m18 = (await a.rpc("cash_summary", { p_day: "2026-11-18" })).data;
+  const m17 = (await a.rpc("cash_summary", { p_day: "2026-11-17" })).data;
+  check(m18?.tz === "Europe/Madrid" && Number(m17?.sales_count) === 0 && Number(m18?.sales_count) >= 1, `con zona España la misma venta cae el 18 → 17: ${m17?.sales_count}, 18: ${m18?.sales_count}`);
+  await a.from("businesses").update({ timezone: "America/La_Paz" }).eq("id", A.bid);
 } catch (e) {
   failed++;
   console.error("ERROR", e);

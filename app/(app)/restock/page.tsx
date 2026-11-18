@@ -6,12 +6,13 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, Product, ProductVariant } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
-import { SUMMARY_COLS, daysToExpiry, expiringSoon, fmtMoney, fromSummary, minStockOf, needsRestock, stockOf } from "@/lib/inventory";
+import { daysToExpiry, expiringSoon, fromSummary, minStockOf, money, needsRestock, stockOf, SUMMARY_COLS } from "@/lib/inventory";
 import { useFlow } from "@/components/FlowProvider";
 import SwipeRow from "@/components/SwipeRow";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { IconArrowLeft, IconDownload, IconTag } from "@/components/ui/Icons";
+import { businessDayKey } from "@/lib/dates";
 
 export default function RestockPage() {
   return (
@@ -144,7 +145,7 @@ function Restock() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Reposición");
-    XLSX.writeFile(wb, `reposicion-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `reposicion-${businessDayKey()}.xlsx`);
     toast("success", "Excel descargado");
   }
 
@@ -225,7 +226,7 @@ function Restock() {
                 <Link href={`/products/${p.id}`} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 hover:ring-brand-400">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-ink">{String(p.data.nombre || "Sin nombre")}</span>
-                    <span className="block truncate text-xs text-slate-500">{p.category_id ? categoryPath(categories, p.category_id) : "Sin categoría"} · {stockOf(p) ?? 0} en stock · Bs {fmtMoney((Number(p.data.precio) || 0) * (stockOf(p) ?? 0))} en juego</span>
+                    <span className="block truncate text-xs text-slate-500">{p.category_id ? categoryPath(categories, p.category_id) : "Sin categoría"} · {stockOf(p) ?? 0} en stock · {money((Number(p.data.precio) || 0) * (stockOf(p) ?? 0))} en juego</span>
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${days < 0 ? "bg-rose-600 text-white" : days <= 7 ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"}`}>
                     {days < 0 ? `vencido ${-days} d` : days === 0 ? "hoy" : `${days} d`}

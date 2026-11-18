@@ -27,19 +27,21 @@ export async function POST(request: Request) {
   if (q.length < 3) return NextResponse.json({ error: "Escribe una pregunta" }, { status: 400 });
 
   const since = new Date(Date.now() - DAYS * 86400000).toISOString();
-  const [{ data: cats }, { data: prods }, { data: sales }, { data: items }, { data: customers }, { data: prof }] = await Promise.all([
+  const [{ data: cats }, { data: prods }, { data: sales }, { data: items }, { data: customers }, { data: ctx }] = await Promise.all([
     supabase.from("categories").select("*"),
     supabase.from("product_summaries").select("id,category_id,nombre,marca,precio,precio_compra,stock,min_stock,expires_at").eq("status", "confirmed").limit(MAX_PRODUCTS),
     supabase.from("sales").select("id,number,customer_name,status,method,total,paid,cost_total,items,created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(1500),
     supabase.from("sale_items").select("sale_id,product_id,product_name,variant_label,qty,unit_price,unit_cost,line_total,created_at").gte("created_at", since).limit(4000),
     supabase.from("customers").select("id,name,phone").is("deleted_at", null).limit(300),
-    supabase.from("profiles").select("business_name").maybeSingle(),
+    // Nombre, moneda y «hoy» del NEGOCIO (023)
+    supabase.rpc("session_context"),
   ]);
+  const biz = ctx?.business ?? null;
+  const moneda = biz?.currency || "Bs";
   const categories = cats ?? [];
   // El vendedor no ve costos ni ganancia
-  const { data: bid } = await supabase.rpc("current_business_id");
-  const { data: me } = bid ? await supabase.from("business_members").select("role").eq("business_id", bid).eq("user_id", user.id).maybeSingle() : { data: null };
-  const owner = (me?.role ?? "dueno") === "dueno";
+  // Rol de quien pregunta (session_context): si no se sabe, no se muestran costos ni ganancia
+  const owner = ctx?.role === "dueno";
 
   // Ventas agregadas por producto (compacto) y por día
   const byProduct = new Map<string, { nombre: string; unidades: number; vendido: number; ganancia: number; ultima: string }>();
@@ -65,9 +67,9 @@ export async function POST(request: Request) {
   for (const s of sales ?? []) if (s.status !== "pagado" && s.customer_name) debts.set(s.customer_name, (debts.get(s.customer_name) ?? 0) + Number(s.total) - Number(s.paid));
 
   const snapshot = {
-    negocio: prof?.business_name ?? null,
-    hoy: new Date().toISOString().slice(0, 10),
-    moneda: "Bs",
+    negocio: biz?.name ?? null,
+    hoy: ctx?.today ?? new Date().toISOString().slice(0, 10),
+    moneda,
     productos: (prods ?? []).map((p) => ({
       id: p.id,
       nombre: p.nombre,
@@ -96,7 +98,7 @@ export async function POST(request: Request) {
   const key = await resolveAiKey(admin, user.id);
   const prompt = [
     "Eres el asistente de una pequeña tienda. Responde SOLO con los datos del negocio que te doy (JSON). No inventes cifras; si algo no está en los datos, dilo.",
-    "Responde en español sencillo, sin tecnicismos, en 2-6 frases o una lista corta. Usa Bs para el dinero y redondea a 2 decimales. Si la pregunta pide un ranking, da máximo 5 elementos.",
+    `Responde en español sencillo, sin tecnicismos, en 2-6 frases o una lista corta. Usa ${moneda} para el dinero y redondea a 2 decimales. Si la pregunta pide un ranking, da máximo 5 elementos.`,
     "Si detectas algo útil relacionado (por ejemplo un producto por reponer o una deuda vieja), menciónalo en una frase al final.",
     `Pregunta: ${q}`,
     `Datos del negocio: ${json}`,

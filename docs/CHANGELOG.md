@@ -3,6 +3,20 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-18 · Fase 6.9 · C4 — El nombre, la moneda y «hoy» son del negocio
+
+Migración `023_ajustes_negocio.sql` aplicada. `npm run test:ops` 50/50; `test:fields`, `test:variants`, `test:team`, `test:import`, `test:backup` en verde.
+
+### 17.4 Ajustes del negocio y zona horaria
+- **Qué**:
+  - **Nombre del negocio** en tickets, recordatorios por WhatsApp, resumen del día e Inicio: ahora es el del negocio para todo el equipo (antes un vendedor veía «Mi negocio»).
+  - **Ajustes → Tu negocio**: el dueño cambia nombre, **moneda** (Bs, S/, $…) y **zona horaria**. Todos los importes de la app usan esa moneda.
+  - **«Hoy» es el día del negocio**, no el del celular: la caja, el inicio, el resumen, movimientos y reportes cortan el día en la zona horaria del negocio (una venta a las 21:00 en Bolivia ya no cae en el día siguiente en algunas pantallas).
+  - **Avisos** (desde cuántas unidades avisar y días antes del vencimiento) son del negocio: los mismos para todo el equipo.
+  - **Más rápida al navegar**: la app pide negocio, equipo, ajustes y conteos en una sola consulta en vez de unas 7 en cada pantalla.
+  - «Pregúntale» responde con el nombre, la moneda y la fecha del negocio.
+- **Validar**: Ajustes → Tu negocio → cambiar el nombre y la moneda → Guardar → un ticket nuevo en Vender muestra el nombre y los importes con esa moneda; entrar con la cuenta de un vendedor → ve el mismo nombre y no puede cambiarlo; Ajustes → Cuándo avisarme → cambiar el mínimo → con la cuenta del vendedor, «Qué falta» usa el mismo mínimo.
+
 ## 2026-11-18 · Fase 6.9 · C3 — El dinero como pagos: caja que cuadra, pago con varios medios y saldo a favor
 
 Migración `022_pagos.sql` aplicada (las ventas existentes conservan exactamente su estado y lo cobrado). `npm run test:ops` 44/44; `test:fields`, `test:variants`, `test:team`, `test:import` en verde.

@@ -3,10 +3,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient, getActor, setActor } from "@/lib/supabase/client";
-import type { Business, BusinessMember, MemberRole } from "@/types/database";
+import type { Business, BusinessMember, MemberRole, SessionContext } from "@/types/database";
 import { hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
 import { syncMoves } from "@/lib/offline";
-import { DEFAULT_ALERTS, type AlertSettings } from "@/lib/inventory";
+import { DEFAULT_ALERTS, setCurrency, type AlertSettings } from "@/lib/inventory";
+import { setBusinessTz } from "@/lib/dates";
 import { useToast } from "./ui/Toast";
 
 /** Estado del flujo ① Agregar → ② Revisar → ③ Inventario, compartido por la barra de pasos, el menú y el Inicio. */
@@ -51,27 +52,26 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
   const [team, setTeam] = useState<{ business: Business | null; role: MemberRole; members: BusinessMember[]; meId: string | null }>({ business: null, role: "dueno", members: [], meId: null });
   const [actorId, setActorId] = useState<string | null>(null);
 
+  /**
+   * Negocio, rol, equipo, ajustes y conteos en UNA llamada (`session_context`, 023); antes eran ~7 consultas
+   * en cada cambio de pantalla. Fija además la moneda y la zona horaria del negocio para toda la app.
+   */
   const refresh = useCallback(() => {
     const supabase = createClient();
-    Promise.all([
-      supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft").is("deleted_at", null),
-      supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed").is("deleted_at", null),
-    ]).then(([d, c]) => setCounts({ pending: d.count ?? 0, confirmed: c.count ?? 0, loaded: true }));
-    // Negocio, rol y equipo
     (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: bid } = await supabase.rpc("current_business_id");
-      if (!bid) return;
-      const [{ data: biz }, { data: mem }] = await Promise.all([
-        supabase.from("businesses").select("*").eq("id", bid).maybeSingle(),
-        supabase.from("business_members").select("*").eq("business_id", bid).order("created_at"),
-      ]);
-      const members = (mem ?? []) as BusinessMember[];
-      const me = members.find((m) => m.user_id === user.id);
-      setTeam({ business: (biz as Business | null) ?? null, role: me?.role ?? "dueno", members, meId: user.id });
+      const { data, error } = await supabase.rpc("session_context");
+      const ctx = data as SessionContext | null;
+      if (error || !ctx) return;
+      setCounts({ pending: ctx.counts?.pending ?? 0, confirmed: ctx.counts?.confirmed ?? 0, loaded: true });
+      const biz = ctx.business;
+      setCurrency(biz?.currency);
+      setBusinessTz(biz?.timezone);
+      setAlerts({
+        minStock: typeof biz?.min_stock_default === "number" ? biz.min_stock_default : DEFAULT_ALERTS.minStock,
+        expiryDays: typeof biz?.expiry_days === "number" ? biz.expiry_days : DEFAULT_ALERTS.expiryDays,
+      });
+      const members = ctx.members ?? [];
+      setTeam({ business: biz, role: ctx.role ?? "dueno", members, meId: ctx.me });
       // Actor guardado en este celular: solo vale si sigue siendo miembro activo
       const saved = getActor();
       if (saved && members.some((m) => m.user_id === saved && m.active)) setActorId(saved);
@@ -80,16 +80,6 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
         setActorId(null);
       }
     })();
-    supabase
-      .from("profiles")
-      .select("min_stock_default,expiry_days")
-      .maybeSingle()
-      .then(({ data }) =>
-        setAlerts({
-          minStock: typeof data?.min_stock_default === "number" ? data.min_stock_default : DEFAULT_ALERTS.minStock,
-          expiryDays: typeof data?.expiry_days === "number" ? data.expiry_days : DEFAULT_ALERTS.expiryDays,
-        })
-      );
   }, []);
 
   // Recupera fotos guardadas en el teléfono si la app se cerró a mitad de un lote

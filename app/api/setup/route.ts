@@ -167,9 +167,17 @@ export async function POST(request: Request) {
     }
   }
 
-  // Perfil
+  // Nombre del NEGOCIO (023): se guarda en el negocio activo (lo cambia solo el dueño, por RLS)
+  if (body.business_name !== undefined && body.business_name.trim()) {
+    const { data: bid } = await supabase.rpc("current_business_id");
+    if (bid) {
+      const { error } = await supabase.from("businesses").update({ name: body.business_name.trim() }).eq("id", bid);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+
+  // Perfil: cuándo terminó el asistente inicial
   const profilePatch: Record<string, unknown> = { id: user.id };
-  if (body.business_name !== undefined) profilePatch.business_name = body.business_name.trim() || null;
   if (body.onboarded) profilePatch.onboarded_at = new Date().toISOString();
   if (Object.keys(profilePatch).length > 1) {
     const { error } = await supabase.from("profiles").upsert(profilePatch as { id: string });

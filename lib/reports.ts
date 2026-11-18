@@ -1,19 +1,19 @@
 import type { Category, Product, Sale, SaleItem } from "@/types/database";
 import { costOf, priceOf, stockOf } from "./inventory";
+import { addDaysKey, businessDayKey, businessDayStart, businessDayStartOf, businessMonthStart, businessTz } from "./dates";
 
 export type Period = "7d" | "mes" | "90d";
 
+/** Inicio del periodo en la zona horaria del negocio (023), no la del celular. */
 export function periodStart(p: Period): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  if (p === "7d") return new Date(d.getTime() - 6 * 86400000);
-  if (p === "mes") return new Date(d.getFullYear(), d.getMonth(), 1);
-  return new Date(d.getTime() - 89 * 86400000);
+  if (p === "7d") return businessDayStart(6);
+  if (p === "mes") return businessMonthStart();
+  return businessDayStart(89);
 }
 /** Periodo anterior del mismo largo (para comparar). */
 export function previousRange(p: Period): { start: Date; end: Date } {
   const start = periodStart(p);
-  if (p === "mes") return { start: new Date(start.getFullYear(), start.getMonth() - 1, 1), end: start };
+  if (p === "mes") return { start: businessMonthStart(1), end: start };
   const len = Date.now() - start.getTime();
   return { start: new Date(start.getTime() - len), end: start };
 }
@@ -89,18 +89,16 @@ export function deadStock(products: Product[], items: SaleItem[], days = 60): { 
 /** Ventas por día (para la gráfica de barras). */
 export function salesPerDay(sales: Sale[], days: number): { day: string; label: string; total: number; count: number }[] {
   const out: { day: string; label: string; total: number; count: number }[] = [];
+  // Días del negocio (023): una venta a las 21:00 en Bolivia cuenta en su día, no en el siguiente (UTC)
+  const today = businessDayKey();
   for (let k = days - 1; k >= 0; k--) {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() - k);
-    const key = d.toISOString().slice(0, 10);
-    out.push({ day: key, label: d.toLocaleDateString("es", { weekday: "short" }).slice(0, 2), total: 0, count: 0 });
+    const key = addDaysKey(today, -k);
+    const label = businessDayStartOf(key).toLocaleDateString("es", { weekday: "short", timeZone: businessTz() }).slice(0, 2);
+    out.push({ day: key, label, total: 0, count: 0 });
   }
   const idx = new Map(out.map((o, i) => [o.day, i]));
   for (const s of sales) {
-    const local = new Date(s.created_at);
-    local.setHours(0, 0, 0, 0);
-    const i = idx.get(local.toISOString().slice(0, 10));
+    const i = idx.get(businessDayKey(s.created_at));
     if (i !== undefined) {
       out[i].total += Number(s.total);
       out[i].count++;

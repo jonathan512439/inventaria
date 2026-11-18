@@ -4,36 +4,35 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, Product, Sale } from "@/types/database";
-import { SUMMARY_COLS, daysToExpiry, expiringSoon, fmtMoney, fromSummary, needsRestock, stockOf } from "@/lib/inventory";
+import { daysToExpiry, expiringSoon, fromSummary, money, needsRestock, stockOf, SUMMARY_COLS } from "@/lib/inventory";
 import { useFlow } from "@/components/FlowProvider";
 import CoachTip from "@/components/CoachTip";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { IconArrowLeft, IconTag } from "@/components/ui/Icons";
+import { businessDayStart } from "@/lib/dates";
 
 /** Resumen del día: lo que un dueño quiere saber al cerrar, en un mensaje que se puede mandar por WhatsApp. */
 export default function DigestPage() {
   const supabase = createClient();
-  const { alerts, isOwner } = useFlow();
+  const { alerts, isOwner, business: biz } = useFlow();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [salesToday, setSalesToday] = useState<Sale[]>([]);
   const [salesYesterday, setSalesYesterday] = useState<Sale[]>([]);
   const [debts, setDebts] = useState<{ name: string; amount: number; days: number }[]>([]);
-  const [business, setBusiness] = useState<string | null>(null);
+  const business = biz?.name ?? null;
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const yesterday = new Date(today.getTime() - 86400000);
-      const [p, c, st, sy, open, prof] = await Promise.all([
+      const today = businessDayStart();
+      const yesterday = businessDayStart(1);
+      const [p, c, st, sy, open] = await Promise.all([
         supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed"),
         supabase.from("categories").select("*"),
         supabase.from("sales").select("*").gte("created_at", today.toISOString()),
         supabase.from("sales").select("*").gte("created_at", yesterday.toISOString()).lt("created_at", today.toISOString()),
         supabase.from("sales").select("customer_name,total,paid,created_at").neq("status", "pagado"),
-        supabase.from("profiles").select("business_name").maybeSingle(),
       ]);
       setProducts((p.data ?? []).map(fromSummary));
       setCategories(c.data ?? []);
@@ -48,7 +47,6 @@ export default function DigestPage() {
         m.set(k, cur);
       });
       setDebts(Array.from(m.entries()).map(([name, v]) => ({ name, amount: v.amount, days: Math.floor((Date.now() - new Date(v.oldest).getTime()) / 86400000) })).sort((a, b) => b.days - a.days));
-      setBusiness(prof.data?.business_name ?? null);
       setLoading(false);
     })();
   }, [supabase]);
@@ -64,12 +62,12 @@ export default function DigestPage() {
   const text = [
     `*${business || "Mi negocio"} · resumen de hoy* (${new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" })})`,
     "",
-    `💰 Vendido: Bs ${fmtMoney(t.total)} en ${salesToday.length} venta${salesToday.length === 1 ? "" : "s"} (ayer Bs ${fmtMoney(y.total)})`,
-    isOwner ? `📈 Ganancia: Bs ${fmtMoney(t.profit)}` : "",
+    `💰 Vendido: ${money(t.total)} en ${salesToday.length} venta${salesToday.length === 1 ? "" : "s"} (ayer ${money(y.total)})`,
+    isOwner ? `📈 Ganancia: ${money(t.profit)}` : "",
     out.length ? `🔴 Agotados: ${out.slice(0, 5).map((p) => String(p.data.nombre)).join(", ")}${out.length > 5 ? ` y ${out.length - 5} más` : ""}` : "✅ Sin agotados",
     restock.length ? `🟠 Por reponer: ${restock.length} producto${restock.length === 1 ? "" : "s"}` : "",
     expiring.length ? `⏳ Por vencer: ${expiring.slice(0, 3).map((p) => `${String(p.data.nombre)} (${daysToExpiry(p.expires_at)} d)`).join(", ")}${expiring.length > 3 ? ` y ${expiring.length - 3} más` : ""}` : "",
-    debts.length ? `💳 Te deben: Bs ${fmtMoney(debts.reduce((a, d) => a + d.amount, 0))} (${debts.length} cliente${debts.length === 1 ? "" : "s"}${oldDebts.length ? `, ${oldDebts.length} desde hace +30 días` : ""})` : "",
+    debts.length ? `💳 Te deben: ${money(debts.reduce((a, d) => a + d.amount, 0))} (${debts.length} cliente${debts.length === 1 ? "" : "s"}${oldDebts.length ? `, ${oldDebts.length} desde hace +30 días` : ""})` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -90,10 +88,10 @@ export default function DigestPage() {
       ) : (
         <>
           <div className="animate-in grid grid-cols-2 gap-2">
-            <Tile label="Vendido hoy" value={`Bs ${fmtMoney(t.total)}`} hint={`ayer Bs ${fmtMoney(y.total)}`} tone="emerald" />
-            {isOwner ? <Tile label="Ganancia de hoy" value={`Bs ${fmtMoney(t.profit)}`} hint={`ayer Bs ${fmtMoney(y.profit)}`} /> : <Tile label="Ventas de hoy" value={String(salesToday.length)} hint={`ayer ${salesYesterday.length}`} />}
+            <Tile label="Vendido hoy" value={`${money(t.total)}`} hint={`ayer ${money(y.total)}`} tone="emerald" />
+            {isOwner ? <Tile label="Ganancia de hoy" value={`${money(t.profit)}`} hint={`ayer ${money(y.profit)}`} /> : <Tile label="Ventas de hoy" value={String(salesToday.length)} hint={`ayer ${salesYesterday.length}`} />}
             <Tile label="Agotados" value={String(out.length)} hint={restock.length ? `+${restock.length} por reponer` : "nada por reponer"} tone={out.length ? "rose" : undefined} href="/restock" />
-            <Tile label="Te deben" value={`Bs ${fmtMoney(debts.reduce((a, d) => a + d.amount, 0))}`} hint={oldDebts.length ? `${oldDebts.length} con más de 30 días` : `${debts.length} cliente${debts.length === 1 ? "" : "s"}`} tone={oldDebts.length ? "amber" : undefined} href="/customers?tab=deben" />
+            <Tile label="Te deben" value={`${money(debts.reduce((a, d) => a + d.amount, 0))}`} hint={oldDebts.length ? `${oldDebts.length} con más de 30 días` : `${debts.length} cliente${debts.length === 1 ? "" : "s"}`} tone={oldDebts.length ? "amber" : undefined} href="/customers?tab=deben" />
           </div>
 
           {expiring.length > 0 && (
@@ -111,7 +109,7 @@ export default function DigestPage() {
               <h2 className="mb-1 text-sm font-bold text-ink">Deudas viejas (+30 días)</h2>
               <ul className="divide-y divide-slate-100 text-sm">
                 {oldDebts.slice(0, 6).map((d) => (
-                  <li key={d.name} className="flex items-center gap-2 py-1.5"><span className="min-w-0 flex-1 truncate font-medium text-ink">{d.name}</span><span className="text-xs text-slate-500">{d.days} d</span><span className="font-bold tabular-nums text-amber-700">Bs {fmtMoney(d.amount)}</span></li>
+                  <li key={d.name} className="flex items-center gap-2 py-1.5"><span className="min-w-0 flex-1 truncate font-medium text-ink">{d.name}</span><span className="text-xs text-slate-500">{d.days} d</span><span className="font-bold tabular-nums text-amber-700">{money(d.amount)}</span></li>
                 ))}
               </ul>
               <Link href="/customers?tab=deben" className="mt-2 inline-block text-xs font-semibold text-brand-700 underline">Ir a cobrar →</Link>

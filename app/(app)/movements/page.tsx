@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import type { MovementType, Sale, SaleItem, StockMovement } from "@/types/database";
 import { METHOD_LABEL, STATUS_LABEL } from "@/lib/sales";
 import { useFlow } from "@/components/FlowProvider";
-import { fmtMoney } from "@/lib/inventory";
+import { money } from "@/lib/inventory";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { IconArrowLeft, IconChevronRight } from "@/components/ui/Icons";
+import { businessDayStart, businessMonthStart } from "@/lib/dates";
 
 type Tab = "venta" | "entrada" | "salida" | "todos";
 type Range = "hoy" | "7d" | "mes" | "todo";
@@ -21,11 +22,10 @@ const LABEL: Record<MovementType, { t: string; c: string; sign: string }> = {
 };
 
 function rangeStart(r: Range): Date | null {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  if (r === "hoy") return d;
-  if (r === "7d") return new Date(d.getTime() - 6 * 86400000);
-  if (r === "mes") return new Date(d.getFullYear(), d.getMonth(), 1);
+  // En la zona horaria del negocio (023), no la del celular
+  if (r === "hoy") return businessDayStart();
+  if (r === "7d") return businessDayStart(6);
+  if (r === "mes") return businessMonthStart();
   return null;
 }
 
@@ -116,11 +116,11 @@ export default function MovementsPage() {
       <div className="animate-in grid grid-cols-2 gap-2 md:grid-cols-4 xl:max-w-4xl">
         <div className="rounded-3xl bg-emerald-600 p-4 text-white shadow-float">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Vendido</p>
-          <p className="text-2xl font-bold tabular-nums">Bs {fmtMoney(ingresos)}</p>
+          <p className="text-2xl font-bold tabular-nums">{money(ingresos)}</p>
           <p className="text-xs text-white/80">{ticketsInRange.length + looseSales.length} venta{ticketsInRange.length + looseSales.length === 1 ? "" : "s"} · {unidadesVendidas} unid.</p>
         </div>
-        {isOwner ? <Stat label="Ganancia real" value={`Bs ${fmtMoney(ganancia)}`} hint={ganancia > 0 || ingresos === 0 ? "vendido − lo que te costó" : "faltan costos de compra"} /> : <Stat label="Unidades vendidas" value={String(unidadesVendidas)} hint="en el periodo" />}
-        {pendienteCobro > 0 ? <Stat label="Por cobrar" value={`Bs ${fmtMoney(pendienteCobro)}`} hint="ventas fiadas o a medias" /> : <Stat label="Entradas" value={`+${entradas}`} hint="unidades recibidas" />}
+        {isOwner ? <Stat label="Ganancia real" value={`${money(ganancia)}`} hint={ganancia > 0 || ingresos === 0 ? "vendido − lo que te costó" : "faltan costos de compra"} /> : <Stat label="Unidades vendidas" value={String(unidadesVendidas)} hint="en el periodo" />}
+        {pendienteCobro > 0 ? <Stat label="Por cobrar" value={`${money(pendienteCobro)}`} hint="ventas fiadas o a medias" /> : <Stat label="Entradas" value={`+${entradas}`} hint="unidades recibidas" />}
         <Stat label="Retiros sin venta" value={`−${retiros}`} hint="no suman ingresos" />
       </div>
 
@@ -133,7 +133,7 @@ export default function MovementsPage() {
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800">{i + 1}</span>
                 <span className="min-w-0 flex-1 truncate font-medium text-ink">{v.name}</span>
                 <span className="text-xs text-slate-500">{v.qty} unid.</span>
-                <span className="font-bold tabular-nums text-emerald-700">Bs {fmtMoney(v.total)}</span>
+                <span className="font-bold tabular-nums text-emerald-700">{money(v.total)}</span>
               </li>
             ))}
           </ol>
@@ -159,12 +159,12 @@ export default function MovementsPage() {
                   <span className="block truncate font-semibold text-ink">N.º {t.number} · {t.items} producto{t.items === 1 ? "" : "s"}{t.customer_name ? ` · ${t.customer_name}` : ""}</span>
                   <span className="block text-xs text-slate-500">
                     {new Date(t.created_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {METHOD_LABEL[t.method]}
-                    {t.status !== "pagado" ? ` · debe Bs ${fmtMoney(Number(t.total) - Number(t.paid))}` : ""}
+                    {t.status !== "pagado" ? ` · debe ${money(Number(t.total) - Number(t.paid))}` : ""}
                   </span>
                 </span>
                 <span className="text-right">
-                  <span className="block font-bold tabular-nums text-emerald-700">Bs {fmtMoney(Number(t.total))}</span>
-                  {isOwner && <span className="block text-[11px] text-slate-500">gana Bs {fmtMoney(Number(t.total) - Number(t.cost_total))}</span>}
+                  <span className="block font-bold tabular-nums text-emerald-700">{money(Number(t.total))}</span>
+                  {isOwner && <span className="block text-[11px] text-slate-500">gana {money(Number(t.total) - Number(t.cost_total))}</span>}
                 </span>
                 <IconChevronRight size={16} className={`text-slate-300 transition ${open === t.id ? "rotate-90" : ""}`} />
               </button>
@@ -174,12 +174,12 @@ export default function MovementsPage() {
                     <li key={i.id} className="flex items-center gap-2 py-1.5">
                       <span className="w-8 shrink-0 text-right font-bold tabular-nums">{i.qty}×</span>
                       <span className="min-w-0 flex-1 truncate">{i.product_name ?? "Producto"}{i.variant_label ? <span className="text-violet-800"> · {i.variant_label}</span> : null}</span>
-                      <span className="tabular-nums text-slate-500">Bs {fmtMoney(Number(i.unit_price))}</span>
-                      <span className="font-semibold tabular-nums">Bs {fmtMoney(Number(i.line_total))}</span>
+                      <span className="tabular-nums text-slate-500">{money(Number(i.unit_price))}</span>
+                      <span className="font-semibold tabular-nums">{money(Number(i.line_total))}</span>
                     </li>
                   ))}
                   {!items[t.id] && <li className="py-2 text-xs text-slate-500">Cargando…</li>}
-                  {Number(t.discount) > 0 && <li className="flex justify-between py-1.5 text-xs text-slate-500"><span>Descuento</span><span>−Bs {fmtMoney(Number(t.discount))}</span></li>}
+                  {Number(t.discount) > 0 && <li className="flex justify-between py-1.5 text-xs text-slate-500"><span>Descuento</span><span>−{money(Number(t.discount))}</span></li>}
                 </ul>
               )}
             </li>
@@ -191,7 +191,7 @@ export default function MovementsPage() {
                 <span className="block truncate font-semibold text-ink">{r.product_name || "Producto"}{r.variant_label ? <span className="text-violet-800"> · {r.variant_label}</span> : null}</span>
                 <span className="block text-xs text-slate-500">{new Date(r.created_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · registrada sin conexión</span>
               </span>
-              <span className="font-bold tabular-nums text-emerald-700">Bs {fmtMoney(r.total ?? 0)}</span>
+              <span className="font-bold tabular-nums text-emerald-700">{money(r.total ?? 0)}</span>
             </li>
           ))}
         </ul>
@@ -219,7 +219,7 @@ export default function MovementsPage() {
                 </span>
                 <span className="text-right">
                   <span className={`block font-bold tabular-nums ${r.tipo === "entrada" ? "text-brand-700" : "text-ink"}`}>{l.sign}{r.cantidad}</span>
-                  {r.tipo === "venta" && <span className="block text-xs font-semibold text-emerald-700">Bs {fmtMoney(r.total ?? 0)}</span>}
+                  {r.tipo === "venta" && <span className="block text-xs font-semibold text-emerald-700">{money(r.total ?? 0)}</span>}
                 </span>
                 {r.product_id && <IconChevronRight size={16} className="text-slate-300" />}
               </li>

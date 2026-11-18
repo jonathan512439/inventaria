@@ -18,7 +18,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import StockAdjust from "@/components/StockAdjust";
 import ProductVariants from "@/components/ProductVariants";
-import { fmtMoney, stockOf } from "@/lib/inventory";
+import { money, stockOf } from "@/lib/inventory";
 import { STOCK_KEYS, newOpId, setStock, withoutStock } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
 import type { PriceHistory, StockMovement } from "@/types/database";
@@ -239,7 +239,7 @@ export default function ProductDetailClient() {
                     <span className={`w-14 shrink-0 rounded-full px-1.5 py-0.5 text-center font-bold ${m.tipo === "venta" ? "bg-emerald-100 text-emerald-800" : m.tipo === "entrada" ? "bg-brand-100 text-brand-800" : "bg-slate-200 text-slate-700"}`}>{m.tipo === "venta" ? "venta" : m.tipo === "entrada" ? "entrada" : "retiro"}</span>
                     <span className="flex-1 text-slate-600">{new Date(m.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}{m.variant_label ? ` · ${m.variant_label}` : ""}{m.motivo ? ` · ${m.motivo}` : ""}</span>
                     <span className="font-bold tabular-nums text-ink">{m.tipo === "entrada" ? "+" : "−"}{m.cantidad}</span>
-                    {m.tipo === "venta" && <span className="font-semibold text-emerald-700">Bs {fmtMoney(m.total ?? 0)}</span>}
+                    {m.tipo === "venta" && <span className="font-semibold text-emerald-700">{money(m.total ?? 0)}</span>}
                   </li>
                 ))}
               </ul>
@@ -254,8 +254,8 @@ export default function ProductDetailClient() {
                 {priceHist.map((h) => (
                   <li key={h.id} className="flex items-center gap-2">
                     <span className="w-24 shrink-0 text-slate-500">{new Date(h.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })} · {h.field === "precio" ? "venta" : h.field === "precio_compra" ? "compra" : "mayorista"}</span>
-                    <span className="tabular-nums text-slate-400 line-through">{h.old_value === null ? "—" : `Bs ${fmtMoney(Number(h.old_value))}`}</span>
-                    <span className="font-bold tabular-nums text-ink">{h.new_value === null ? "—" : `Bs ${fmtMoney(Number(h.new_value))}`}</span>
+                    <span className="tabular-nums text-slate-400 line-through">{h.old_value === null ? "—" : `${money(Number(h.old_value))}`}</span>
+                    <span className="font-bold tabular-nums text-ink">{h.new_value === null ? "—" : `${money(Number(h.new_value))}`}</span>
                     <span className="ml-auto text-slate-400">{h.source}</span>
                   </li>
                 ))}

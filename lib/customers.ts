@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Customer, Database, PayMethod, Sale, SaleItem } from "@/types/database";
-import { fmtMoney } from "./inventory";
+import { money } from "./inventory";
 import { newOpId, registerPaymentOp } from "./data/ops";
 
 /** Lo que debe un cliente = suma de (total − cobrado) de sus ventas fiadas o a medias. */
@@ -38,10 +38,10 @@ export async function registerPayment(
 /** Mensaje de WhatsApp con el saldo y el detalle de lo que se llevó. */
 export function reminderText(customer: Customer, sales: Sale[], items: SaleItem[], business: string | null): string {
   const open = sales.filter((s) => s.status !== "pagado").sort((a, b) => a.created_at.localeCompare(b.created_at));
-  const lines = [`Hola ${customer.name.split(" ")[0]}, te escribo de *${business || "la tienda"}*.`, `Tienes un saldo pendiente de *Bs ${fmtMoney(debtOf(sales))}*:`, ""];
+  const lines = [`Hola ${customer.name.split(" ")[0]}, te escribo de *${business || "la tienda"}*.`, `Tienes un saldo pendiente de *${money(debtOf(sales))}*:`, ""];
   open.forEach((s) => {
     const its = items.filter((i) => i.sale_id === s.id);
-    lines.push(`• ${new Date(s.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })} · Bs ${fmtMoney(Number(s.total) - Number(s.paid))}${its.length ? ` (${its.map((i) => `${i.qty} ${i.product_name ?? "producto"}${i.variant_label ? ` ${i.variant_label}` : ""}`).join(", ")})` : ""}`);
+    lines.push(`• ${new Date(s.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })} · ${money(Number(s.total) - Number(s.paid))}${its.length ? ` (${its.map((i) => `${i.qty} ${i.product_name ?? "producto"}${i.variant_label ? ` ${i.variant_label}` : ""}`).join(", ")})` : ""}`);
   });
   lines.push("", "¿Pasas esta semana? ¡Gracias!");
   return lines.join("\n");

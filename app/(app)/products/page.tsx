@@ -10,11 +10,12 @@ import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
 import { categoryColor } from "@/lib/colors";
 import { useFlow } from "@/components/FlowProvider";
-import { SUMMARY_COLS, computeShelves, fmtMoney, fromSummary, priceOf, stockOf, timeAgo, type CategoryStats } from "@/lib/inventory";
+import { type CategoryStats, computeShelves, fmtMoney, fromSummary, money, priceOf, stockOf, SUMMARY_COLS, timeAgo } from "@/lib/inventory";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import Photo from "@/components/ui/Photo";
 import { IllustrationCapture } from "@/components/guide/Illustrations";
 import { IconAlert, IconBox, IconCamera, IconChevronRight, IconDownload, IconPlus, IconSearch, IconTable, IconTag } from "@/components/ui/Icons";
+import { businessMonthStart } from "@/lib/dates";
 
 /** Nivel 1 del inventario: estantes por categoría con totales y alertas. */
 export default function ProductsPage() {
@@ -53,9 +54,7 @@ export default function ProductsPage() {
       setProducts(list);
       setLoading(false);
       cacheSet("inventory", { categories: cats, products: list });
-      const start = new Date();
-      start.setDate(1);
-      start.setHours(0, 0, 0, 0);
+      const start = businessMonthStart();
       const [{ data: sales }, { data: vs }] = await Promise.all([
         supabase.from("sales").select("total").gte("created_at", start.toISOString()),
         supabase.from("product_variants").select("product_id,stock"),
@@ -123,11 +122,11 @@ export default function ProductsPage() {
             <p className={`text-xl font-bold tabular-nums ${total.alerts.porReponer ? "text-orange-700" : "text-ink"}`}>{total.alerts.porReponer}</p>
             <p className="truncate text-[11px] text-slate-400">{total.alerts.porReponer ? "ver lista de reposición" : `${fmtMoney(total.units)} unidades en total`}</p>
           </Link>
-          <Stat label="Valor de venta" value={`Bs ${fmtMoney(total.saleValue)}`} tone="ok" hint="precio × stock" />
+          <Stat label="Valor de venta" value={`${money(total.saleValue)}`} tone="ok" hint="precio × stock" />
           {!isOwner ? (
             <Stat label="Categorías" value={String(shelves.length)} hint="estantes" />
           ) : total.costValue > 0 ? (
-            <Stat label="Ganancia estimada" value={`Bs ${fmtMoney(total.saleValue - total.costValue)}`} tone="ok" hint={`costo Bs ${fmtMoney(total.costValue)}`} />
+            <Stat label="Ganancia estimada" value={`${money(total.saleValue - total.costValue)}`} tone="ok" hint={`costo ${money(total.costValue)}`} />
           ) : (
             <Stat label="Ganancia estimada" value="—" hint="agrega precio de compra" />
           )}
@@ -145,7 +144,7 @@ export default function ProductsPage() {
           />
           <Link href="/movements" className="rounded-2xl bg-emerald-600 p-3 text-white shadow-card transition hover:brightness-110">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Ventas este mes</p>
-            <p className="text-xl font-bold tabular-nums">Bs {fmtMoney(salesMonth?.total ?? 0)}</p>
+            <p className="text-xl font-bold tabular-nums">{money(salesMonth?.total ?? 0)}</p>
             <p className="text-[11px] text-white/80">{salesMonth ? `${salesMonth.count} venta${salesMonth.count === 1 ? "" : "s"} · ver detalle` : "…"}</p>
           </Link>
         </div>
@@ -204,9 +203,9 @@ export default function ProductsPage() {
                     {/* Cifras */}
                     <dl className="mt-3 grid grid-cols-3 gap-2">
                       <Mini label="Unidades" value={fmtMoney(s.units)} />
-                      <Mini label="Valor venta" value={s.saleValue > 0 ? `Bs ${fmtMoney(s.saleValue)}` : "—"} tone="ok" />
+                      <Mini label="Valor venta" value={s.saleValue > 0 ? `${money(s.saleValue)}` : "—"} tone="ok" />
                       {isOwner && s.costValue > 0 ? (
-                        <Mini label="Ganancia" value={`Bs ${fmtMoney(s.saleValue - s.costValue)}`} tone="ok" />
+                        <Mini label="Ganancia" value={`${money(s.saleValue - s.costValue)}`} tone="ok" />
                       ) : (
                         <Mini label="Poco stock" value={String(s.lowStock)} tone={s.lowStock ? "warn" : undefined} />
                       )}
@@ -232,7 +231,7 @@ export default function ProductsPage() {
                         {s.lastAdded && <span className="block truncate">Último agregado <b className="text-slate-700">{timeAgo(s.lastAdded)}</b></span>}
                         {s.topProduct && (
                           <span className="block truncate">
-                            Más valor en stock: <b className="text-slate-700">{productTitle(s.topProduct.product.data) || "Sin nombre"}</b> · Bs {fmtMoney(s.topProduct.value)}
+                            Más valor en stock: <b className="text-slate-700">{productTitle(s.topProduct.product.data) || "Sin nombre"}</b> · {money(s.topProduct.value)}
                           </span>
                         )}
                       </p>
@@ -319,7 +318,7 @@ function SearchResults({ results, categories }: { results: Product[]; categories
                 <span className="block truncate text-xs text-slate-500">{categoryPath(categories, p.category_id)}</span>
               </span>
               <span className="text-right text-xs">
-                {price !== null && <span className="block font-bold text-emerald-700">Bs {fmtMoney(price)}</span>}
+                {price !== null && <span className="block font-bold text-emerald-700">{money(price)}</span>}
                 <span className={`block ${(stock ?? 0) <= 0 ? "text-rose-600" : "text-slate-500"}`}>stock {stock ?? "—"}</span>
               </span>
             </Link>

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase/client";
 import type { MovementType, Product, ProductVariant } from "@/types/database";
 import { normalizeFieldName, productTitle } from "@/lib/fields";
-import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
+import { currencyLabel, money, priceOf, stockOf } from "@/lib/inventory";
 import { useToast } from "./ui/Toast";
 import { isNetworkError, queueMove } from "@/lib/offline";
 import { registerSale } from "@/lib/sales";
@@ -99,7 +99,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
         const { sale, items } = await registerSale(supabase, [{ key: sel?.id ?? product.id, product, variant: sel, qty, unitPrice: Number(salePrice) || 0 }], { id: opId, method: "efectivo", status: "pagado", paid: 0, discount: 0 });
         setSaving(false);
         navigator.vibrate?.(20);
-        toast("success", `Venta N.º ${sale.number} · ${qty} × Bs ${fmtMoney(Number(salePrice) || 0)} = Bs ${fmtMoney(Number(sale.total))} · stock ${current} → ${newStock}`);
+        toast("success", `Venta N.º ${sale.number} · ${qty} × ${money(Number(salePrice) || 0)} = ${money(Number(sale.total))} · stock ${current} → ${newStock}`);
         if (sel) updatedVariant = { ...sel, stock: newStock };
         void items;
         onSaved({ ...product, data: { ...product.data, [key]: totalFrom(null, newStock) } }, updatedVariant);
@@ -145,7 +145,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
           <div className="min-w-0 flex-1">
             <p className="truncate font-bold text-ink">{productTitle(product.data) || "Producto"}</p>
             {sel && <p className="truncate text-xs font-semibold text-violet-700">Variante: {sel.label}</p>}
-            <p className="text-xs text-slate-500">Stock actual{sel ? " de esta variante" : ""}: <b className="text-ink">{current}</b>{price !== null ? ` · precio Bs ${fmtMoney(price)}` : ""}</p>
+            <p className="text-xs text-slate-500">Stock actual{sel ? " de esta variante" : ""}: <b className="text-ink">{current}</b>{price !== null ? ` · precio ${money(price)}` : ""}</p>
           </div>
           <button onClick={onClose} className="btn-ghost btn-sm -mr-2"><IconX size={18} /></button>
         </div>
@@ -216,9 +216,9 @@ export default function StockAdjust({ product, variants = [], variant = null, on
 
             {asSale === true && (
               <div className="mt-3 rounded-2xl bg-emerald-50 p-3">
-                <label className="label" htmlFor="sale-price">Precio de venta por unidad (Bs)</label>
+                <label className="label" htmlFor="sale-price">Precio de venta por unidad ({currencyLabel()})</label>
                 <input id="sale-price" type="number" inputMode="decimal" step="any" className="input-lg tabular-nums" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
-                <p className="mt-2 text-sm text-emerald-900">Total de la venta: <b>Bs {fmtMoney(total)}</b></p>
+                <p className="mt-2 text-sm text-emerald-900">Total de la venta: <b>{money(total)}</b></p>
               </div>
             )}
             {asSale === false && (
@@ -242,7 +242,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
             : asSale === null
               ? "Elige si es venta o solo retiro"
               : asSale
-                ? `Registrar venta de Bs ${fmtMoney(total)} · stock queda en ${newStock}`
+                ? `Registrar venta de ${money(total)} · stock queda en ${newStock}`
                 : `Restar ${qty} sin venta · stock queda en ${newStock}`}
         </button>
       </div>

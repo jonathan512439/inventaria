@@ -27,4 +27,5 @@
 - **En curso: Fase 6.9 · Cimientos** (`docs/PLAN_CIMIENTOS.md`, pasos C0–C7, con tabla de estado y decisiones). Leerlo antes de tocar stock, ventas, pagos o permisos: toda escritura de dinero/stock va por funciones SQL atómicas (`rpc`), nunca «leer → escribir» desde el navegador.
 - **Reconstrucción visual (C7, tras C5):** `docs/RECONSTRUCCION_VISUAL.md` (5 áreas, 38 → 16 pantallas, trazabilidad de funciones, sistema visual). Hasta entonces no se rediseñan pantallas: solo se cambian por dentro.
 - Stock y dinero solo por `lib/data/ops.ts` (funciones SQL de `021`, idempotentes con `newOpId()`); al guardar `data` de un producto, usar `withoutStock()` y `setStock()` si cambió el stock.
+- Importes siempre con `money(n)` (y `currencyLabel()` en etiquetas), nunca «Bs» escrito a mano; «hoy» / «este mes» con `lib/dates.ts` (zona del negocio), nunca `setHours(0,0,0,0)` ni `toISOString().slice(0,10)`. Nombre y ajustes del negocio desde `useFlow().business` (no del perfil).
 - Errores al usuario siempre con `friendlyError()` (`lib/errors.ts`), nunca `error.message` crudo.

@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, PayMethod, PaymentInput, Product, ProductVariant, Sale, SaleItem, SaleStatus } from "@/types/database";
-import { fmtMoney, priceOf } from "./inventory";
+import { money, priceOf } from "./inventory";
 import { newOpId, registerSaleOp } from "./data/ops";
 
 /** Una línea del carrito. */
@@ -69,11 +69,11 @@ export function ticketText(sale: Sale, items: SaleItem[], business: string | nul
     `*${business || "Mi negocio"}*`,
     `Venta N.º ${sale.number ?? "—"} · ${new Date(sale.created_at).toLocaleString("es", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`,
     "",
-    ...items.map((i) => `${i.qty} × ${i.product_name ?? "Producto"}${i.variant_label ? ` (${i.variant_label})` : ""} · Bs ${fmtMoney(Number(i.line_total))}`),
+    ...items.map((i) => `${i.qty} × ${i.product_name ?? "Producto"}${i.variant_label ? ` (${i.variant_label})` : ""} · ${money(Number(i.line_total))}`),
     "",
   ];
-  if (Number(sale.discount) > 0) lines.push(`Subtotal: Bs ${fmtMoney(Number(sale.subtotal))}`, `Descuento: −Bs ${fmtMoney(Number(sale.discount))}`);
-  lines.push(`*Total: Bs ${fmtMoney(Number(sale.total))}*`, `Pago: ${METHOD_LABEL[sale.method]}${sale.status !== "pagado" ? ` · ${STATUS_LABEL[sale.status]} (cobrado Bs ${fmtMoney(Number(sale.paid))}, debe Bs ${fmtMoney(Number(sale.total) - Number(sale.paid))})` : ""}`);
+  if (Number(sale.discount) > 0) lines.push(`Subtotal: ${money(Number(sale.subtotal))}`, `Descuento: −${money(Number(sale.discount))}`);
+  lines.push(`*Total: ${money(Number(sale.total))}*`, `Pago: ${METHOD_LABEL[sale.method]}${sale.status !== "pagado" ? ` · ${STATUS_LABEL[sale.status]} (cobrado ${money(Number(sale.paid))}, debe ${money(Number(sale.total) - Number(sale.paid))})` : ""}`);
   if (sale.customer_name) lines.push(`Cliente: ${sale.customer_name}`);
   lines.push("", "¡Gracias por su compra!");
   return lines.join("\n");

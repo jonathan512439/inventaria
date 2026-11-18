@@ -1,6 +1,7 @@
 import type { Category, Product, ProductSummary } from "@/types/database";
 import { getDescendantIds } from "./categories";
 import { normalizeFieldName } from "./fields";
+import { businessDayStart } from "./dates";
 
 /** Lee un número de `data` por cualquiera de los nombres dados (sin importar mayúsculas). */
 function num(p: Product, names: string[]): number | null {
@@ -204,12 +205,20 @@ export function fmtMoney(n: number): string {
   return n.toLocaleString("es", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+/** Moneda del negocio (023 · C4). La fija FlowProvider desde `session_context()`; por defecto «Bs». */
+let CURRENCY = "Bs";
+export function setCurrency(symbol: string | null | undefined) {
+  if (symbol && symbol.trim()) CURRENCY = symbol.trim();
+}
+export const currencyLabel = () => CURRENCY;
+/** Importe con la moneda del negocio: «Bs 12,5». Usar siempre en vez de escribir la moneda a mano. */
+export const money = (n: number) => `${CURRENCY} ${fmtMoney(n)}`;
+
 export type Filter = "agotados" | "sinPrecio" | "sinFoto" | "hoy" | "pendientes" | "porReponer" | "porVencer";
 
 export function applyFilters(list: Product[], filters: Set<Filter>, variantsOf?: Map<string, { stock: number }[]>, categories?: Category[], settings: AlertSettings = DEFAULT_ALERTS): Product[] {
   if (!filters.size) return list;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = businessDayStart();
   return list.filter((p) => {
     if (filters.has("porReponer") && !needsRestock(p, categories, settings)) return false;
     if (filters.has("porVencer") && !expiringSoon(p, settings, categories)) return false;

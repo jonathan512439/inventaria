@@ -9,15 +9,33 @@ import { resetCoach, resetTour } from "@/lib/coach";
 import WhatsNew from "@/components/WhatsNew";
 import AiKeyCard from "@/components/AiKeyCard";
 import { useFlow } from "@/components/FlowProvider";
+import { DEFAULT_TZ } from "@/lib/dates";
+import { friendlyError } from "@/lib/errors";
 import { IconAlert, IconCheckCircle, IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconRefresh, IconSparkles, IconTable, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
+
+/** Zonas horarias frecuentes (la del negocio decide qué es «hoy» en caja, ventas y reportes). */
+const TIMEZONES: [string, string][] = [
+  ["America/La_Paz", "Bolivia"],
+  ["America/Lima", "Perú"],
+  ["America/Bogota", "Colombia"],
+  ["America/Guayaquil", "Ecuador"],
+  ["America/Santiago", "Chile"],
+  ["America/Argentina/Buenos_Aires", "Argentina"],
+  ["America/Asuncion", "Paraguay"],
+  ["America/Montevideo", "Uruguay"],
+  ["America/Caracas", "Venezuela"],
+  ["America/Sao_Paulo", "Brasil (São Paulo)"],
+  ["America/Mexico_City", "México (Ciudad de México)"],
+  ["Europe/Madrid", "España"],
+];
 
 export default function SettingsPage() {
   const supabase = createClient();
   const toast = useToast();
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [business, setBusiness] = useState("");
-  const [savedBusiness, setSavedBusiness] = useState("");
+  // Ajustes del NEGOCIO (023): nombre, moneda y zona horaria (antes el nombre era del perfil de cada usuario)
+  const [biz, setBiz] = useState({ name: "", currency: "Bs", timezone: DEFAULT_TZ });
   const [counts, setCounts] = useState<{ types: number; sections: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [tour, setTour] = useState(false);
@@ -25,30 +43,31 @@ export default function SettingsPage() {
 
   useEffect(() => {
     (async () => {
-      const [{ data: u }, p, c, f] = await Promise.all([
+      const [{ data: u }, c, f] = await Promise.all([
         supabase.auth.getUser(),
-        supabase.from("profiles").select("business_name").maybeSingle(),
         supabase.from("categories").select("id", { count: "exact", head: true }).is("parent_id", null),
         supabase.from("categories").select("id", { count: "exact", head: true }).not("parent_id", "is", null),
       ]);
       setEmail(u.user?.email ?? "");
-      setBusiness(p.data?.business_name ?? "");
-      setSavedBusiness(p.data?.business_name ?? "");
       setCounts({ types: c.count ?? 0, sections: f.count ?? 0 });
     })();
   }, [supabase]);
 
+  const saved = flow.business;
+  useEffect(() => {
+    if (saved) setBiz({ name: saved.name ?? "", currency: saved.currency ?? "Bs", timezone: saved.timezone ?? DEFAULT_TZ });
+  }, [saved]);
+  const dirty = !!saved && (biz.name.trim() !== (saved.name ?? "") || biz.currency.trim() !== (saved.currency ?? "Bs") || biz.timezone !== (saved.timezone ?? DEFAULT_TZ));
+
   async function saveBusiness() {
+    if (!saved) return;
+    if (!biz.currency.trim()) return toast("info", "Escribe la moneda (por ejemplo Bs)");
     setSaving(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const { error } = await supabase.from("profiles").upsert({ id: user!.id, business_name: business.trim() || null });
-    if (!error && flow.business && flow.isOwner) await supabase.from("businesses").update({ name: business.trim() || "Mi negocio" }).eq("id", flow.business.id);
+    const { error } = await supabase.from("businesses").update({ name: biz.name.trim() || "Mi negocio", currency: biz.currency.trim(), timezone: biz.timezone }).eq("id", saved.id);
     setSaving(false);
-    if (error) return toast("error", error.message);
-    setSavedBusiness(business.trim());
-    toast("success", "Nombre guardado");
+    if (error) return toast("error", friendlyError(error));
+    toast("success", "Datos del negocio guardados");
+    flow.refresh();
   }
 
   async function signOut() {
@@ -65,13 +84,29 @@ export default function SettingsPage() {
       </header>
 
       <section className="animate-in card space-y-3">
-        <label className="label" htmlFor="business">Nombre de tu negocio</label>
-        <div className="flex gap-2">
-          <input id="business" className="input" placeholder="Ej. Tienda Doña Rosa" value={business} onChange={(e) => setBusiness(e.target.value)} />
-          <button onClick={saveBusiness} className="btn-primary shrink-0" disabled={saving || business.trim() === savedBusiness}>
+        <p className="text-sm font-bold text-ink">Tu negocio</p>
+        <label className="label" htmlFor="business">Nombre (sale en los tickets y mensajes)</label>
+        <input id="business" className="input" placeholder="Ej. Tienda Doña Rosa" value={biz.name} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, name: e.target.value })} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="label">Moneda</span>
+            <input className="input" list="monedas" maxLength={5} value={biz.currency} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, currency: e.target.value })} />
+            <datalist id="monedas">{["Bs", "S/", "$", "₲", "€", "R$"].map((c) => <option key={c} value={c} />)}</datalist>
+          </label>
+          <label className="block">
+            <span className="label">Zona horaria (para cortar «hoy»)</span>
+            <select className="input" value={biz.timezone} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, timezone: e.target.value })}>
+              {(TIMEZONES.some(([z]) => z === biz.timezone) ? TIMEZONES : [[biz.timezone, biz.timezone] as [string, string], ...TIMEZONES]).map(([z, t]) => <option key={z} value={z}>{t}</option>)}
+            </select>
+          </label>
+        </div>
+        {flow.isOwner ? (
+          <button onClick={saveBusiness} className="btn-primary w-full" disabled={saving || !dirty}>
             {saving ? <Spinner /> : "Guardar"}
           </button>
-        </div>
+        ) : (
+          <p className="text-xs text-slate-500">Estos datos los cambia el dueño.</p>
+        )}
       </section>
 
       <section className="animate-in card divide-y divide-slate-100 p-0">

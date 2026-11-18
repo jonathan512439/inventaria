@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Consignment, ConsignmentItem, Customer, Sale } from "@/types/database";
-import { fmtMoney } from "@/lib/inventory";
+import { money } from "@/lib/inventory";
 import { debtOf, oldestDebtDays } from "@/lib/customers";
 import CoachTip from "@/components/CoachTip";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { IconArrowLeft, IconChevronRight, IconPlus, IconSearch, IconX, Spinner } from "@/components/ui/Icons";
+import { businessMonthStart } from "@/lib/dates";
 
 type Tab = "todos" | "deben" | "inactivos" | "resumen";
 
@@ -72,9 +73,7 @@ export default function CustomersPage() {
     .sort((a, b) => (tab === "deben" ? b.debt - a.debt : tab === "inactivos" ? (b.inactiveDays ?? 0) - (a.inactiveDays ?? 0) : a.c.name.localeCompare(b.c.name, "es")));
 
   // Resumen
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
+  const monthStart = businessMonthStart();
   const topMonth = rows
     .map((r) => ({ ...r, month: r.sales.filter((s) => new Date(s.created_at) >= monthStart).reduce((a, s) => a + Number(s.total), 0) }))
     .filter((r) => r.month > 0)
@@ -138,8 +137,8 @@ export default function CustomersPage() {
       ) : tab === "resumen" ? (
         <div className="space-y-3">
           <div className="animate-in grid grid-cols-2 gap-2">
-            <Tile label="Deuda en la calle" value={`Bs ${fmtMoney(debtTotal)}`} hint={`${rows.filter((r) => r.debt > 0).length} cliente${rows.filter((r) => r.debt > 0).length === 1 ? "" : "s"} deben`} tone={debtTotal ? "warn" : undefined} />
-            <Tile label="Deuda de más de 30 días" value={`Bs ${fmtMoney(debtOld)}`} hint="conviene recordar" tone={debtOld ? "danger" : undefined} />
+            <Tile label="Deuda en la calle" value={`${money(debtTotal)}`} hint={`${rows.filter((r) => r.debt > 0).length} cliente${rows.filter((r) => r.debt > 0).length === 1 ? "" : "s"} deben`} tone={debtTotal ? "warn" : undefined} />
+            <Tile label="Deuda de más de 30 días" value={`${money(debtOld)}`} hint="conviene recordar" tone={debtOld ? "danger" : undefined} />
             <Tile label="Mercadería entregada" value={`${outUnits} unid.`} hint="en consignación, sin liquidar" />
             <Tile label="Sin venir 30 días" value={String(inactive)} hint="clientes que dejaron de comprar" />
           </div>
@@ -153,7 +152,7 @@ export default function CustomersPage() {
                   <li key={r.c.id} className="flex items-center gap-3 text-sm">
                     <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800">{i + 1}</span>
                     <Link href={`/customers/detail?id=${r.c.id}`} className="min-w-0 flex-1 truncate font-medium text-ink hover:text-brand-700">{r.c.name}</Link>
-                    <span className="font-bold tabular-nums text-emerald-700">Bs {fmtMoney(r.month)}</span>
+                    <span className="font-bold tabular-nums text-emerald-700">{money(r.month)}</span>
                   </li>
                 ))}
               </ol>
@@ -181,13 +180,13 @@ export default function CustomersPage() {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold text-ink">{r.c.name}</span>
                       <span className="block truncate text-xs text-slate-500">
-                        {r.last ? `última compra ${r.inactiveDays === 0 ? "hoy" : `hace ${r.inactiveDays} d`}` : "sin compras"} · {r.sales.length} venta{r.sales.length === 1 ? "" : "s"} · Bs {fmtMoney(r.total)}
+                        {r.last ? `última compra ${r.inactiveDays === 0 ? "hoy" : `hace ${r.inactiveDays} d`}` : "sin compras"} · {r.sales.length} venta{r.sales.length === 1 ? "" : "s"} · {money(r.total)}
                         {r.out ? ` · ${r.out} unid. entregadas` : ""}
                       </span>
                     </span>
                     {r.debt > 0 ? (
                       <span className="text-right">
-                        <span className="block font-bold tabular-nums text-amber-700">debe Bs {fmtMoney(r.debt)}</span>
+                        <span className="block font-bold tabular-nums text-amber-700">debe {money(r.debt)}</span>
                         <span className={`block text-[11px] ${(r.days ?? 0) >= 30 ? "text-rose-600" : "text-slate-500"}`}>{r.days} d</span>
                       </span>
                     ) : null}

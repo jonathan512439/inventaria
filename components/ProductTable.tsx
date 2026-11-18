@@ -7,7 +7,7 @@ import { useConfirm } from "./ui/Confirm";
 import type { Category, FieldTemplate, Product, ProductData, ProductStatus } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { coerceValue, fieldLabel, getEffectiveFields } from "@/lib/fields";
-import { fmtMoney, priceOf, stockOf } from "@/lib/inventory";
+import { fmtMoney, money, priceOf, stockOf } from "@/lib/inventory";
 import { categoryColor } from "@/lib/colors";
 import { IconChevronRight } from "./ui/Icons";
 import FieldInput from "./FieldInput";
@@ -157,7 +157,7 @@ export default function ProductTable({ products, categories, templates, mode, on
                     )}
                   </span>
                   <span className="block text-xs text-slate-500">
-                    {list.length} producto{list.length === 1 ? "" : "s"} · {fmtMoney(units)} unid.{value ? ` · Bs ${fmtMoney(value)}` : ""}
+                    {list.length} producto{list.length === 1 ? "" : "s"} · {fmtMoney(units)} unid.{value ? ` · ${money(value)}` : ""}
                   </span>
                 </span>
               </button>

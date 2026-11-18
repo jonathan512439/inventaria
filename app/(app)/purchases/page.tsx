@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Product, ProductVariant, Purchase, Supplier } from "@/types/database";
-import { SUMMARY_COLS, fmtMoney, fromSummary, stockOf } from "@/lib/inventory";
+import { currencyLabel, fromSummary, money, stockOf, SUMMARY_COLS } from "@/lib/inventory";
 import BarcodeCamera from "@/components/BarcodeCamera";
 import CoachTip from "@/components/CoachTip";
 import OwnerOnly from "@/components/OwnerOnly";
@@ -112,7 +112,7 @@ export default function PurchasesPage() {
         { label: "Proveedor", value: proveedor },
         { label: "Productos", value: String(lines.length) },
         { label: "Unidades que entran", value: `+${unidades}`, tone: "ok" },
-        { label: "Total de la compra", value: `Bs ${fmtMoney(total)}` },
+        { label: "Total de la compra", value: `${money(total)}` },
       ],
       confirmLabel: "Sí, registrar",
       cancelLabel: "Revisar otra vez",
@@ -155,7 +155,7 @@ export default function PurchasesPage() {
     setOpId(newOpId());
     setSaving(false);
     navigator.vibrate?.(30);
-    toast("success", `Compra registrada: ${items.length} producto${items.length === 1 ? "" : "s"} · Bs ${fmtMoney(total)}`);
+    toast("success", `Compra registrada: ${items.length} producto${items.length === 1 ? "" : "s"} · ${money(total)}`);
     setLines([]);
     setDoc("");
     setNewSupplier(null);
@@ -276,7 +276,7 @@ export default function PurchasesPage() {
                       <input type="number" min={1} inputMode="numeric" className="input mt-0.5 py-1.5 text-center font-bold tabular-nums" value={l.qty} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, qty: e.target.value } : x)))} />
                     </label>
                     <label className="text-[11px] font-semibold uppercase text-slate-500">
-                      Costo unit. (Bs)
+                      Costo unit. ({currencyLabel()})
                       <input type="number" min={0} step="any" inputMode="decimal" className="input mt-0.5 py-1.5 text-center tabular-nums" value={l.cost} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, cost: e.target.value } : x)))} />
                     </label>
                     <label className="text-[11px] font-semibold uppercase text-slate-500">
@@ -292,7 +292,7 @@ export default function PurchasesPage() {
 
         <div className="sticky-action">
           <button onClick={save} disabled={saving || !lines.length} className="btn-success btn-lg w-full">
-            {saving ? <Spinner /> : <IconCheck size={20} />} Registrar compra · {lines.reduce((s, l) => s + (parseInt(l.qty, 10) || 0), 0)} unid. · Bs {fmtMoney(total)}
+            {saving ? <Spinner /> : <IconCheck size={20} />} Registrar compra · {lines.reduce((s, l) => s + (parseInt(l.qty, 10) || 0), 0)} unid. · {money(total)}
           </button>
         </div>
       </div>
@@ -337,7 +337,7 @@ export default function PurchasesPage() {
                 <span className="block truncate font-semibold text-ink">{p.supplier_name || "Sin proveedor"}{p.doc ? <span className="text-xs font-normal text-slate-500"> · {p.doc}</span> : null}</span>
                 <span className="block text-xs text-slate-500">{new Date(p.created_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {p.items} producto{p.items === 1 ? "" : "s"}</span>
               </span>
-              <span className="font-bold tabular-nums text-ink">Bs {fmtMoney(Number(p.total))}</span>
+              <span className="font-bold tabular-nums text-ink">{money(Number(p.total))}</span>
             </li>
           ))}
         </ul>

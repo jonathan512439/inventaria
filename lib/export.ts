@@ -2,6 +2,7 @@
 
 import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { fieldLabel, getEffectiveFields, getValue, normalizeFieldName } from "./fields";
+import { businessDayKey } from "./dates";
 
 interface ExportArgs {
   products: Product[];
@@ -98,7 +99,7 @@ export async function exportToExcel(args: ExportArgs) {
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
   addInventorySheets(XLSX, wb, args);
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = businessDayKey();
   XLSX.writeFile(wb, `${args.fileName ?? "inventario"}-${stamp}.xlsx`);
 }
 

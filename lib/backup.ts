@@ -1,5 +1,6 @@
 import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { addInventorySheets, type XlsxLib } from "./export";
+import { businessDayKey } from "./dates";
 
 /**
  * Respaldo completo: un solo .xlsx con todas las tablas del negocio (inventario con sus columnas,
@@ -122,5 +123,5 @@ export async function buildBackupWorkbook(XLSX: XlsxLib, fetch: Fetcher, busines
 
 /** Nombre del archivo de respaldo: fecha + origen (auto = semanal, manual = botón). */
 export function backupFileName(kind: "auto" | "manual", when = new Date()) {
-  return `${when.toISOString().slice(0, 10)}-${kind}.xlsx`;
+  return `${businessDayKey(when)}-${kind}.xlsx`;
 }

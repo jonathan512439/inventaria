@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, Product } from "@/types/database";
 import { getDescendantIds } from "@/lib/categories";
-import { SUMMARY_COLS, fmtMoney, fromSummary, priceOf } from "@/lib/inventory";
+import { currencyLabel, fromSummary, money, priceOf, SUMMARY_COLS } from "@/lib/inventory";
 import CoachTip from "@/components/CoachTip";
 import OwnerOnly from "@/components/OwnerOnly";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -133,18 +133,18 @@ export default function PricesPage() {
           Cómo cambiar
           <select className="input mt-1 normal-case" value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
             <option value="pct">Porcentaje (+10 % / −5 %)</option>
-            <option value="amount">Monto fijo (+2 Bs / −1 Bs)</option>
+            <option value="amount">{`Monto fijo (+2 ${currencyLabel()} / −1 ${currencyLabel()})`}</option>
             <option value="margin">Margen sobre el costo (costo + 30 %)</option>
           </select>
         </label>
         <label className="text-xs font-semibold uppercase text-slate-500">
-          {mode === "amount" ? "Monto (Bs)" : "Porcentaje (%)"}
+          {mode === "amount" ? `Monto (${currencyLabel()})` : "Porcentaje (%)"}
           <input type="number" step="any" inputMode="decimal" className="input mt-1 text-lg font-bold tabular-nums" value={value} onChange={(e) => setValue(e.target.value)} />
         </label>
         <label className="text-xs font-semibold uppercase text-slate-500 sm:col-span-2">
           Redondear
           <div className="mt-1 flex gap-2">
-            {([["0.5", "a 0,50"], ["1", "a 1 Bs"], ["none", "sin redondear"]] as [Round, string][]).map(([k, t]) => (
+            {([["0.5", "a 0,50"], ["1", `a 1 ${currencyLabel()}`], ["none", "sin redondear"]] as [Round, string][]).map(([k, t]) => (
               <button key={k} type="button" onClick={() => setRound(k)} className={`chip ${round === k ? "chip-active" : ""}`}>{t}</button>
             ))}
           </div>
@@ -165,8 +165,8 @@ export default function PricesPage() {
               {preview.map(({ p, base, next }) => (
                 <li key={p.id} className="flex items-center gap-3 py-2 text-sm">
                   <span className="min-w-0 flex-1 truncate font-medium text-ink">{String(p.data.nombre || "Sin nombre")}</span>
-                  <span className="tabular-nums text-slate-400 line-through">{base === null ? "—" : `Bs ${fmtMoney(base)}`}</span>
-                  <span className="font-bold tabular-nums text-emerald-700">Bs {fmtMoney(next!)}</span>
+                  <span className="tabular-nums text-slate-400 line-through">{base === null ? "—" : `${money(base)}`}</span>
+                  <span className="font-bold tabular-nums text-emerald-700">{money(next!)}</span>
                 </li>
               ))}
             </ul>

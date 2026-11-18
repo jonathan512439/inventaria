@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { CashClosing, CashMovement, CashSummary } from "@/types/database";
 import { cashSummary, closeCash, newOpId } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
-import { fmtMoney } from "@/lib/inventory";
+import { currencyLabel, fmtMoney, money } from "@/lib/inventory";
 import { METHOD_LABEL } from "@/lib/sales";
 import CoachTip from "@/components/CoachTip";
 import { useFlow } from "@/components/FlowProvider";
@@ -14,6 +14,7 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import { IconArrowLeft, IconCheck, IconPlus, Spinner } from "@/components/ui/Icons";
+import { businessDayStart } from "@/lib/dates";
 
 /**
  * Caja del día (022): lo calcula el servidor desde los COBROS del día por medio (ventas + abonos de fiados),
@@ -37,8 +38,7 @@ export default function CashPage() {
   const [closeId, setCloseId] = useState(newOpId);
 
   const load = useCallback(async () => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
+    const start = businessDayStart();
     try {
       const [summary, m, c] = await Promise.all([
         cashSummary(supabase),
@@ -79,20 +79,20 @@ export default function CashPage() {
     const { error } = await supabase.from("cash_movements").insert({ user_id: user!.id, tipo: moveForm.tipo, amount, note: moveForm.note.trim() || null });
     if (error) return toast("error", friendlyError(error));
     setMoveForm(null);
-    toast("success", moveForm.tipo === "retiro" ? `Retiro de Bs ${fmtMoney(amount)} anotado` : `Ingreso de Bs ${fmtMoney(amount)} anotado`);
+    toast("success", moveForm.tipo === "retiro" ? `Retiro de ${money(amount)} anotado` : `Ingreso de ${money(amount)} anotado`);
     load();
   }
 
   async function close() {
     const ok = await confirm({
       title: todayClosing ? "¿Cerramos la caja otra vez?" : "¿Cerramos la caja de hoy?",
-      body: countedNum === null ? "No escribiste cuánto efectivo contaste; se guardará el cierre sin comparar." : diff === 0 ? "El efectivo contado coincide con lo que debería haber." : `Hay una diferencia de Bs ${fmtMoney(Math.abs(diff!))} ${diff! > 0 ? "de más" : "de menos"}. Quedará anotada.`,
+      body: countedNum === null ? "No escribiste cuánto efectivo contaste; se guardará el cierre sin comparar." : diff === 0 ? "El efectivo contado coincide con lo que debería haber." : `Hay una diferencia de ${money(Math.abs(diff!))} ${diff! > 0 ? "de más" : "de menos"}. Quedará anotada.`,
       details: [
-        { label: "Ventas de hoy", value: `${salesCount} · Bs ${fmtMoney(totalSales)}` },
-        ...(Number(sm?.collected_abonos ?? 0) > 0 ? [{ label: "Abonos de fiados", value: `Bs ${fmtMoney(Number(sm?.collected_abonos))}` }] : []),
-        { label: "Efectivo que debería haber", value: `Bs ${fmtMoney(expectedCash)}` },
-        ...(countedNum !== null ? [{ label: "Efectivo contado", value: `Bs ${fmtMoney(countedNum)}`, tone: (diff === 0 ? "ok" : "warn") as "ok" | "warn" }] : []),
-        ...(isOwner ? [{ label: "Ganancia del día", value: `Bs ${fmtMoney(profit)}`, tone: "ok" as const }] : []),
+        { label: "Ventas de hoy", value: `${salesCount} · ${money(totalSales)}` },
+        ...(Number(sm?.collected_abonos ?? 0) > 0 ? [{ label: "Abonos de fiados", value: `${money(Number(sm?.collected_abonos))}` }] : []),
+        { label: "Efectivo que debería haber", value: `${money(expectedCash)}` },
+        ...(countedNum !== null ? [{ label: "Efectivo contado", value: `${money(countedNum)}`, tone: (diff === 0 ? "ok" : "warn") as "ok" | "warn" }] : []),
+        ...(isOwner ? [{ label: "Ganancia del día", value: `${money(profit)}`, tone: "ok" as const }] : []),
       ],
       confirmLabel: "Cerrar caja",
       tone: "success",
@@ -139,15 +139,15 @@ export default function CashPage() {
           <section className="animate-in grid grid-cols-2 gap-2">
             <div className="rounded-3xl bg-emerald-600 p-4 text-white shadow-float">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Vendido hoy</p>
-              <p className="text-2xl font-bold tabular-nums">Bs {fmtMoney(totalSales)}</p>
-              <p className="text-xs text-white/80">{salesCount} venta{salesCount === 1 ? "" : "s"}{isOwner ? ` · ganancia Bs ${fmtMoney(profit)}` : ""}</p>
+              <p className="text-2xl font-bold tabular-nums">{money(totalSales)}</p>
+              <p className="text-xs text-white/80">{salesCount} venta{salesCount === 1 ? "" : "s"}{isOwner ? ` · ganancia ${money(profit)}` : ""}</p>
             </div>
             <div className="rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-900/10">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cobrado</p>
-              <p className="text-2xl font-bold tabular-nums text-ink">Bs {fmtMoney(collected)}</p>
+              <p className="text-2xl font-bold tabular-nums text-ink">{money(collected)}</p>
               <p className="text-xs text-slate-500">
-                {pending > 0 ? `Bs ${fmtMoney(pending)} quedaron fiados` : "todo cobrado"}
-                {Number(sm?.collected_abonos ?? 0) > 0 ? ` · incluye Bs ${fmtMoney(Number(sm?.collected_abonos))} de abonos` : ""}
+                {pending > 0 ? `${money(pending)} quedaron fiados` : "todo cobrado"}
+                {Number(sm?.collected_abonos ?? 0) > 0 ? ` · incluye ${money(Number(sm?.collected_abonos))} de abonos` : ""}
               </p>
             </div>
           </section>
@@ -159,9 +159,9 @@ export default function CashPage() {
                 <li key={m} className="flex items-center justify-between py-2">
                   <span className="text-slate-600">
                     {METHOD_LABEL[m]}
-                    {Number(abonos[m]) > 0 && <span className="block text-xs text-slate-500">incluye Bs {fmtMoney(Number(abonos[m]))} de abonos de fiados</span>}
+                    {Number(abonos[m]) > 0 && <span className="block text-xs text-slate-500">incluye {money(Number(abonos[m]))} de abonos de fiados</span>}
                   </span>
-                  <span className="font-semibold tabular-nums">Bs {fmtMoney(Number(byMethod[m]))}</span>
+                  <span className="font-semibold tabular-nums">{money(Number(byMethod[m]))}</span>
                 </li>
               ))}
             </ul>
@@ -179,7 +179,7 @@ export default function CashPage() {
             </div>
             {moveForm && (
               <div className="grid gap-2 rounded-2xl bg-slate-50 p-3 sm:grid-cols-[110px_1fr_auto]">
-                <input type="number" min={0} step="any" inputMode="decimal" className="input py-1.5 tabular-nums" placeholder="Bs" value={moveForm.amount} onChange={(e) => setMoveForm({ ...moveForm, amount: e.target.value })} autoFocus />
+                <input type="number" min={0} step="any" inputMode="decimal" className="input py-1.5 tabular-nums" placeholder={currencyLabel()} value={moveForm.amount} onChange={(e) => setMoveForm({ ...moveForm, amount: e.target.value })} autoFocus />
                 <input className="input py-1.5" placeholder={moveForm.tipo === "retiro" ? "¿Para qué? (p. ej. pagar al proveedor)" : "¿De dónde? (p. ej. cambio inicial)"} value={moveForm.note} onChange={(e) => setMoveForm({ ...moveForm, note: e.target.value })} />
                 <div className="flex gap-1">
                   <button onClick={addMove} className="btn-primary btn-sm">Anotar {moveForm.tipo}</button>
@@ -195,7 +195,7 @@ export default function CashPage() {
                   <li key={m.id} className="flex items-center gap-2 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${m.tipo === "retiro" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-800"}`}>{m.tipo === "retiro" ? "salió" : "entró"}</span>
                     <span className="min-w-0 flex-1 truncate text-slate-600">{m.note || (m.tipo === "retiro" ? "Retiro" : "Ingreso")}</span>
-                    <span className="font-semibold tabular-nums">{m.tipo === "retiro" ? "−" : "+"}Bs {fmtMoney(Number(m.amount))}</span>
+                    <span className="font-semibold tabular-nums">{m.tipo === "retiro" ? "−" : "+"}{money(Number(m.amount))}</span>
                   </li>
                 ))}
               </ul>
@@ -206,7 +206,7 @@ export default function CashPage() {
             <p className="text-sm font-bold text-ink">Cuenta el efectivo</p>
             <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2 text-sm">
               <span className="text-slate-600">Debería haber en efectivo</span>
-              <span className="font-bold tabular-nums text-ink">Bs {fmtMoney(expectedCash)}</span>
+              <span className="font-bold tabular-nums text-ink">{money(expectedCash)}</span>
             </div>
             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
               ¿Cuánto hay en la caja?
@@ -214,7 +214,7 @@ export default function CashPage() {
             </label>
             {diff !== null && (
               <p className={`rounded-2xl px-3 py-2 text-sm font-semibold ${diff === 0 ? "bg-emerald-50 text-emerald-800" : diff > 0 ? "bg-amber-50 text-amber-800" : "bg-rose-50 text-rose-800"}`}>
-                {diff === 0 ? "✓ Cuadra perfecto" : diff > 0 ? `Hay Bs ${fmtMoney(diff)} de más` : `Faltan Bs ${fmtMoney(-diff)}`}
+                {diff === 0 ? "✓ Cuadra perfecto" : diff > 0 ? `Hay ${money(diff)} de más` : `Faltan ${money(-diff)}`}
               </p>
             )}
             <input className="input" placeholder="Nota (opcional)" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -228,9 +228,9 @@ export default function CashPage() {
                   <li key={c.id} className="flex items-center gap-3 py-2">
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold text-ink">{new Date(c.day + "T00:00:00").toLocaleDateString("es", { weekday: "short", day: "2-digit", month: "short" })} · {new Date(c.closed_at).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}</span>
-                      <span className="block text-xs text-slate-500">{c.sales_count} venta{c.sales_count === 1 ? "" : "s"}{isOwner ? ` · ganancia Bs ${fmtMoney(Number(c.profit))}` : ""}</span>
+                      <span className="block text-xs text-slate-500">{c.sales_count} venta{c.sales_count === 1 ? "" : "s"}{isOwner ? ` · ganancia ${money(Number(c.profit))}` : ""}</span>
                     </span>
-                    <span className="font-bold tabular-nums">Bs {fmtMoney(Number(c.total_sales))}</span>
+                    <span className="font-bold tabular-nums">{money(Number(c.total_sales))}</span>
                     {c.difference !== null && (
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${Number(c.difference) === 0 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{Number(c.difference) === 0 ? "cuadró" : `${Number(c.difference) > 0 ? "+" : ""}${fmtMoney(Number(c.difference))}`}</span>
                     )}

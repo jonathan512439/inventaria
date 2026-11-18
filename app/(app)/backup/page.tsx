@@ -11,6 +11,7 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import { IconArrowLeft, IconCheck, IconDownload, IconTrash, Spinner } from "@/components/ui/Icons";
+import { businessDayKey } from "@/lib/dates";
 
 type BackupFile = { name: string; size: number; when: string; kind: "auto" | "manual" };
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -77,7 +78,7 @@ export default function BackupPage() {
     setBusy("download");
     try {
       const { XLSX, wb } = await build();
-      XLSX.writeFile(wb, `${(flow.business?.name ?? "negocio").replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase()}-completo-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      XLSX.writeFile(wb, `${(flow.business?.name ?? "negocio").replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase()}-completo-${businessDayKey()}.xlsx`);
     } catch (e) {
       toast("error", e instanceof Error ? e.message : "No se pudo generar el archivo");
     } finally {

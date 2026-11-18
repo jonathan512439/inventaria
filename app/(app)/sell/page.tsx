@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Customer, PayMethod, Product, ProductVariant, Sale, SaleItem, SaleStatus } from "@/types/database";
 import CustomerPicker from "@/components/CustomerPicker";
 import { debtOf } from "@/lib/customers";
-import { SUMMARY_COLS, fmtMoney, fromSummary, stockOf } from "@/lib/inventory";
+import { currencyLabel, fromSummary, money, stockOf, SUMMARY_COLS } from "@/lib/inventory";
 import { productTitle } from "@/lib/fields";
 import { METHOD_LABEL, cartSubtotal, lineTotal, registerSale, suggestedPrice, ticketText, type CartLine } from "@/lib/sales";
 import BarcodeCamera from "@/components/BarcodeCamera";
@@ -43,11 +43,11 @@ export default function SellPage() {
   // Id de la venta en curso (idempotencia): si se corta la red y se vuelve a tocar «Cobrar», no se duplica
   const [saleId, setSaleId] = useState(newOpId);
   const [done, setDone] = useState<{ sale: Sale; items: SaleItem[] } | null>(null);
-  const [business, setBusiness] = useState<string | null>(null);
+  // Nombre del NEGOCIO para el ticket (023): antes salía el del perfil de quien vendía («Mi negocio» para el vendedor)
+  const business = flow.business?.name ?? null;
   const [recent, setRecent] = useState<Product[]>([]);
 
   useEffect(() => {
-    supabase.from("profiles").select("business_name").maybeSingle().then(({ data }) => setBusiness(data?.business_name ?? null));
     // Lo más vendido últimamente, para tenerlo a mano
     supabase
       .from("sale_items")
@@ -127,26 +127,26 @@ export default function SellPage() {
 
   async function finish() {
     if (!lines.length) return;
-    if (method === "mixto" && splitSum > total) return toast("info", `Los montos suman Bs ${fmtMoney(splitSum)} y el total es Bs ${fmtMoney(total)}: anota solo lo que se queda (el vuelto no)`);
+    if (method === "mixto" && splitSum > total) return toast("info", `Los montos suman ${money(splitSum)} y el total es ${money(total)}: anota solo lo que se queda (el vuelto no)`);
     if (method === "mixto" && splitSum === 0) return toast("info", "Escribe cuánto paga con cada medio");
     if (status !== "pagado" && !customer) return toast("info", "Elige o crea el cliente que va a deber");
     const overLimit = !!customer && customer.credit_limit !== null && status !== "pagado" && customerDebt + (total - paidNum) > Number(customer.credit_limit);
     const ok = await confirm({
       title: "¿Cerramos la venta?",
       body: overLimit
-        ? `Ojo: ${customer!.name} pasaría su límite de fiado (Bs ${fmtMoney(Number(customer!.credit_limit))}). Ya debe Bs ${fmtMoney(customerDebt)}.`
+        ? `Ojo: ${customer!.name} pasaría su límite de fiado (${money(Number(customer!.credit_limit))}). Ya debe ${money(customerDebt)}.`
         : stockWarn.length
           ? `Ojo: ${stockWarn.length} producto${stockWarn.length === 1 ? "" : "s"} se vende${stockWarn.length === 1 ? "" : "n"} por encima del stock que dice la app; el stock quedará en 0.`
           : "El stock baja al instante y queda el ticket.",
       details: [
         { label: "Productos", value: `${lines.length} · ${units} unid.` },
-        ...(disc ? [{ label: "Descuento", value: `−Bs ${fmtMoney(disc)}` }] : []),
-        { label: "Total", value: `Bs ${fmtMoney(total)}`, tone: "ok" as const },
-        { label: "Pago", value: `${METHOD_LABEL[method]}${status !== "pagado" ? ` · cobrado Bs ${fmtMoney(paidNum)}` : ""}` },
+        ...(disc ? [{ label: "Descuento", value: `−${money(disc)}` }] : []),
+        { label: "Total", value: `${money(total)}`, tone: "ok" as const },
+        { label: "Pago", value: `${METHOD_LABEL[method]}${status !== "pagado" ? ` · cobrado ${money(paidNum)}` : ""}` },
         ...(customer ? [{ label: "Cliente", value: customer.name }] : []),
-        ...(status !== "pagado" ? [{ label: "Queda debiendo", value: `Bs ${fmtMoney(total - paidNum)}`, tone: "warn" as const }] : []),
+        ...(status !== "pagado" ? [{ label: "Queda debiendo", value: `${money(total - paidNum)}`, tone: "warn" as const }] : []),
       ],
-      confirmLabel: status === "pagado" ? `Cobrar Bs ${fmtMoney(total)}` : "Registrar venta",
+      confirmLabel: status === "pagado" ? `Cobrar ${money(total)}` : "Registrar venta",
       tone: "success",
     });
     if (!ok) return;
@@ -184,8 +184,8 @@ export default function SellPage() {
         <div className="animate-in card text-center">
           <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-100 text-emerald-600"><IconCheck size={34} /></span>
           <h1 className="mt-3 text-2xl font-bold text-ink">Venta N.º {s.number} registrada</h1>
-          <p className="mt-1 text-3xl font-bold tabular-nums text-emerald-700">Bs {fmtMoney(Number(s.total))}</p>
-          <p className="text-sm text-slate-500">{METHOD_LABEL[s.method]}{s.status !== "pagado" ? ` · debe Bs ${fmtMoney(Number(s.total) - Number(s.paid))}` : ""} · el stock ya bajó</p>
+          <p className="mt-1 text-3xl font-bold tabular-nums text-emerald-700">{money(Number(s.total))}</p>
+          <p className="text-sm text-slate-500">{METHOD_LABEL[s.method]}{s.status !== "pagado" ? ` · debe ${money(Number(s.total) - Number(s.paid))}` : ""} · el stock ya bajó</p>
           <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-slate-50 p-3 text-left font-mono text-[12px] leading-snug text-slate-700">{ticketText(s, done.items, business)}</pre>
           <div className="mt-4 grid gap-2">
             <button onClick={shareTicket} className="btn-success btn-lg w-full"><IconTag size={18} /> Enviar ticket por WhatsApp</button>
@@ -220,7 +220,7 @@ export default function SellPage() {
                 <li key={p.id}>
                   <button onClick={() => add(p)} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-brand-50">
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{productTitle(p.data) || "Sin nombre"}</span>
-                    <span className="text-xs text-slate-500">Bs {fmtMoney(suggestedPrice(p, null))} · {stockOf(p) ?? 0} en stock</span>
+                    <span className="text-xs text-slate-500">{money(suggestedPrice(p, null))} · {stockOf(p) ?? 0} en stock</span>
                   </button>
                 </li>
               ))}
@@ -266,7 +266,7 @@ export default function SellPage() {
                       <span className="block truncate font-semibold text-ink">{productTitle(l.product.data) || "Producto"}{l.variant ? <span className="text-violet-800"> · {l.variant.label}</span> : null}</span>
                       <span className={`block text-xs ${l.qty > stock ? "text-rose-600" : "text-slate-500"}`}>{l.qty > stock ? `solo hay ${stock} en stock` : `${stock} en stock`}</span>
                     </span>
-                    <span className="font-bold tabular-nums text-ink">Bs {fmtMoney(lineTotal(l))}</span>
+                    <span className="font-bold tabular-nums text-ink">{money(lineTotal(l))}</span>
                     <button onClick={() => remove(l.key)} className="rounded-full p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600" aria-label="Quitar"><IconTrash size={16} /></button>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -276,12 +276,12 @@ export default function SellPage() {
                       <button onClick={() => setQty(l.key, l.qty + 1)} className="px-3 py-1.5 text-lg font-bold text-slate-600">+</button>
                     </div>
                     <label className="flex items-center gap-1 text-xs text-slate-500">
-                      a Bs
+                      a {currencyLabel()}
                       <input type="number" min={0} step="any" inputMode="decimal" className="input w-24 py-1.5 text-center tabular-nums" value={l.unitPrice} onChange={(e) => setPrice(l.key, e.target.value)} />
                       c/u
                     </label>
                     {Number(l.product.data.precio_mayorista) > 0 && l.unitPrice !== Number(l.product.data.precio_mayorista) && (
-                      <button onClick={() => setPrice(l.key, String(l.product.data.precio_mayorista))} className="chip py-1 text-xs">Mayorista Bs {fmtMoney(Number(l.product.data.precio_mayorista))}</button>
+                      <button onClick={() => setPrice(l.key, String(l.product.data.precio_mayorista))} className="chip py-1 text-xs">Mayorista {money(Number(l.product.data.precio_mayorista))}</button>
                     )}
                   </div>
                 </li>
@@ -297,19 +297,19 @@ export default function SellPage() {
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Cliente {status === "pagado" ? "(opcional)" : ""}</p>
             <CustomerPicker value={customer} onChange={setCustomer} required={status !== "pagado"} />
-            {customer && customerDebt > 0 && <p className="mt-1 text-xs text-amber-800">Ya debe Bs {fmtMoney(customerDebt)}{customer.credit_limit !== null ? ` · límite Bs ${fmtMoney(Number(customer.credit_limit))}` : ""}.</p>}
+            {customer && customerDebt > 0 && <p className="mt-1 text-xs text-amber-800">Ya debe {money(customerDebt)}{customer.credit_limit !== null ? ` · límite ${money(Number(customer.credit_limit))}` : ""}.</p>}
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-600">Subtotal</span>
-            <span className="font-semibold tabular-nums">Bs {fmtMoney(subtotal)}</span>
+            <span className="font-semibold tabular-nums">{money(subtotal)}</span>
           </div>
           <label className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-slate-600">Descuento (Bs)</span>
+            <span className="text-slate-600">Descuento ({currencyLabel()})</span>
             <input type="number" min={0} step="any" inputMode="decimal" className="input w-28 py-1.5 text-right tabular-nums" placeholder="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
           </label>
           <div className="flex items-center justify-between border-t border-slate-100 pt-2">
             <span className="font-bold text-ink">Total</span>
-            <span className="text-2xl font-bold tabular-nums text-emerald-700">Bs {fmtMoney(total)}</span>
+            <span className="text-2xl font-bold tabular-nums text-emerald-700">{money(total)}</span>
           </div>
 
           <div>
@@ -329,9 +329,9 @@ export default function SellPage() {
                 ))}
                 <p className={`text-xs font-semibold ${splitSum > total ? "text-rose-700" : splitSum < total ? "text-amber-800" : "text-emerald-700"}`}>
                   {splitSum > total
-                    ? `Suman Bs ${fmtMoney(splitSum)}: anota solo lo que se queda (el vuelto no)`
+                    ? `Suman ${money(splitSum)}: anota solo lo que se queda (el vuelto no)`
                     : splitSum < total
-                      ? `Faltan Bs ${fmtMoney(total - splitSum)}${splitSum > 0 ? ": quedarán fiados a nombre del cliente" : ""}`
+                      ? `Faltan ${money(total - splitSum)}${splitSum > 0 ? ": quedarán fiados a nombre del cliente" : ""}`
                       : "✓ La suma es exacta"}
                 </p>
               </div>
@@ -348,11 +348,11 @@ export default function SellPage() {
               <div className="mt-2 grid gap-2 rounded-2xl bg-amber-50 p-3 sm:grid-cols-2">
                 {status === "parcial" && (
                   <label className="text-xs font-semibold text-amber-900">
-                    ¿Cuánto paga ahora? (Bs)
+                    ¿Cuánto paga ahora? ({currencyLabel()})
                     <input type="number" min={0} step="any" inputMode="decimal" className="input mt-1 py-1.5 tabular-nums" value={paid} onChange={(e) => setPaid(e.target.value)} />
                   </label>
                 )}
-                <p className="text-[11px] text-amber-800 sm:col-span-2">Queda pendiente <b>Bs {fmtMoney(total - paidNum)}</b> a nombre de {customer ? <b>{customer.name}</b> : "el cliente que elijas arriba"}. Lo verás en su ficha, con sus productos, para cobrarlo o recordárselo por WhatsApp.</p>
+                <p className="text-[11px] text-amber-800 sm:col-span-2">Queda pendiente <b>{money(total - paidNum)}</b> a nombre de {customer ? <b>{customer.name}</b> : "el cliente que elijas arriba"}. Lo verás en su ficha, con sus productos, para cobrarlo o recordárselo por WhatsApp.</p>
               </div>
             )}
           </div>}
@@ -361,7 +361,7 @@ export default function SellPage() {
 
       <div className="sticky-action">
         <button onClick={finish} disabled={saving || !lines.length} className="btn-success btn-lg w-full">
-          {saving ? <Spinner /> : <IconCheck size={20} />} {lines.length ? (status === "pagado" ? `Cobrar Bs ${fmtMoney(total)}` : `Registrar venta · Bs ${fmtMoney(total)}`) : "Agrega productos para vender"}
+          {saving ? <Spinner /> : <IconCheck size={20} />} {lines.length ? (status === "pagado" ? `Cobrar ${money(total)}` : `Registrar venta · ${money(total)}`) : "Agrega productos para vender"}
         </button>
       </div>
     </div>

@@ -3,7 +3,31 @@ export type ProductStatus = "draft" | "confirmed";
 
 export type MemberRole = "dueno" | "vendedor";
 
-export type Business = { id: string; name: string; owner_id: string; plan: string; created_at: string };
+/** Negocio con sus ajustes (023): la zona horaria corta «hoy», la moneda se muestra en todos los importes. */
+export type Business = {
+  id: string;
+  name: string;
+  owner_id: string;
+  plan: string;
+  created_at: string;
+  timezone?: string;
+  currency?: string;
+  min_stock_default?: number | null;
+  expiry_days?: number | null;
+};
+
+/** Lo que la app necesita al abrir, en una llamada (`session_context`, 023). */
+export type SessionContext = {
+  me: string;
+  business: Business | null;
+  role: MemberRole | null;
+  members: BusinessMember[];
+  /** En cuántos negocios está la persona (para el selector de C5) */
+  businesses: number;
+  /** «AAAA-MM-DD» de hoy en la zona del negocio */
+  today?: string;
+  counts?: { pending: number; confirmed: number };
+};
 
 export type BusinessMember = {
   business_id: string;
@@ -737,6 +761,7 @@ export interface Database {
       set_pin: { Args: { p_business: string; p_pin: string }; Returns: undefined };
       set_my_name: { Args: { p_business: string; p_name: string }; Returns: undefined };
       current_business_id: { Args: Record<string, never>; Returns: string | null };
+      session_context: { Args: Record<string, never>; Returns: SessionContext | null };
       // Operaciones atómicas (021 · Fase 6.9 C2). Se llaman solo desde lib/data/*.
       adjust_stock: {
         Args: { p_id: string; p_product: string; p_variant: string | null; p_delta: number; p_tipo: MovementType; p_motivo?: string | null; p_precio?: number | null; p_at?: string | null };

@@ -12,6 +12,8 @@ import OwnerOnly from "@/components/OwnerOnly";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { IconAlert, IconArrowLeft, IconCheck, IconSearch, Spinner } from "@/components/ui/Icons";
+import { useFlow } from "@/components/FlowProvider";
+import { friendlyError } from "@/lib/errors";
 
 /**
  * Ajustes → Avisos de reposición: desde cuántas unidades avisar (negocio, categoría y producto),
@@ -20,6 +22,7 @@ import { IconAlert, IconArrowLeft, IconCheck, IconSearch, Spinner } from "@/comp
 export default function AlertsPage() {
   const supabase = createClient();
   const toast = useToast();
+  const flow = useFlow();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [minStock, setMinStock] = useState<string>("");
@@ -30,32 +33,37 @@ export default function AlertsPage() {
   const [tab, setTab] = useState<"general" | "productos" | "silenciados">("general");
 
   const load = useCallback(async () => {
-    const [c, p, prof] = await Promise.all([
+    const [c, p] = await Promise.all([
       supabase.from("categories").select("*").order("name"),
       supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed"),
-      supabase.from("profiles").select("min_stock_default,expiry_days").maybeSingle(),
     ]);
     setCategories(c.data ?? []);
     setProducts((p.data ?? []).map(toProduct));
-    setMinStock(prof.data?.min_stock_default === null || prof.data?.min_stock_default === undefined ? "" : String(prof.data.min_stock_default));
-    setExpiryDays(prof.data?.expiry_days === null || prof.data?.expiry_days === undefined ? "" : String(prof.data.expiry_days));
     setLoading(false);
   }, [supabase]);
   useEffect(() => {
     load();
   }, [load]);
+  // Los avisos generales son del NEGOCIO (023): los mismos para todo el equipo; llegan con session_context
+  const bizId = flow.business?.id;
+  const bizMin = flow.business?.min_stock_default;
+  const bizExp = flow.business?.expiry_days;
+  useEffect(() => {
+    if (!bizId) return;
+    setMinStock(bizMin === null || bizMin === undefined ? "" : String(bizMin));
+    setExpiryDays(bizExp === null || bizExp === undefined ? "" : String(bizExp));
+  }, [bizId, bizMin, bizExp]);
 
   async function saveGeneral() {
+    if (!flow.business) return;
     setSaving(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
     const min = minStock.trim() === "" ? null : Math.max(0, parseInt(minStock, 10) || 0);
     const days = expiryDays.trim() === "" ? null : Math.min(365, Math.max(1, parseInt(expiryDays, 10) || 30));
-    const { error } = await supabase.from("profiles").upsert({ id: user!.id, min_stock_default: min, expiry_days: days });
+    const { error } = await supabase.from("businesses").update({ min_stock_default: min, expiry_days: days }).eq("id", flow.business.id);
     setSaving(false);
-    if (error) return toast("error", error.message);
-    toast("success", "Avisos guardados. Se aplican en todo el inventario.");
+    if (error) return toast("error", friendlyError(error));
+    toast("success", "Avisos guardados. Se aplican en todo el inventario y para todo el equipo.");
+    flow.refresh();
   }
 
   async function setCategoryMin(cat: Category, raw: string) {

@@ -14,8 +14,8 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 | C1 · Campos del sistema como columnas | ✅ 2026-11-17 | `020_campos_sistema.sql` | `npm run test:fields` + `test:variants` | 17.1 |
 | C2 · Operaciones atómicas | ✅ 2026-11-17 | `021_operaciones.sql` | `npm run test:ops` | 17.2 |
 | C3 · El dinero como pagos | ✅ 2026-11-18 | `022_pagos.sql` | `npm run test:ops` (ampliada) | 17.3 |
-| C4 · Ajustes del negocio y zona horaria | ⏳ siguiente | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
-| C5 · Permisos en la base | pendiente | `024_permisos.sql` (+ `025_fotos_privadas.sql`) | `npm run test:access` | 17.5 |
+| C4 · Ajustes del negocio y zona horaria | ✅ 2026-11-18 | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
+| C5 · Permisos en la base | ⏳ siguiente | `024_permisos.sql` (+ `025_fotos_privadas.sql`) | `npm run test:access` | 17.5 |
 | C6 · Calidad continua | pendiente | `schema_migrations` | CI | 17.6 |
 | C7 · Reconstrucción visual completa (C7.1–C7.9) | pendiente (tras C5) | — | manual + `test:e2e` + prueba con 3 personas | 17.7–17.15 |
 
@@ -126,6 +126,15 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 **Código:** `FlowProvider` usa `session_context()` al abrir y tras cambios (no en cada ruta); se reemplazan las lecturas de `profiles.business_name` (`sell`, `dashboard`, `digest`, `customers/detail`, `settings`, `api/ask`, `api/setup`, `PresetPicker`); `fmtMoney(n)` usa la moneda del negocio; cortes de día de caja y reportes en SQL con `business_day`.
 
 **Acepta cuando:** el vendedor ve el nombre real del negocio en el ticket; una venta a las 21:00 (hora de Bolivia) cae en el día correcto; navegar entre pantallas no repite las 7 consultas.
+
+**Resultado (2026-11-18):** `023_ajustes_negocio.sql` aplicada (solo agrega: la versión publicada siguió funcionando). Los 2 negocios quedaron con zona `America/La_Paz` y moneda «Bs»; «Importadora Rios» ya tenía su nombre; el otro sigue «Mi negocio» porque su perfil no tenía nombre. `npm run test:ops` 50/50 (6 nuevas de C4: el vendedor recibe nombre y moneda del negocio y su rol; `session_context` trae equipo y conteos; el vendedor no puede cambiar el negocio; zona inválida rechazada; una venta a las 21:30 de Bolivia cae en su día en la caja y en otro si el negocio está en España). `test:fields`, `test:variants`, `test:team`, `test:import`, `test:backup` en verde.
+
+**Cómo quedó (y diferencias con lo previsto):**
+- `lib/dates.ts`: «hoy», «hace N días» y «este mes» en la zona del negocio (`businessDayStart`, `businessMonthStart`, `businessDayKey`), usado en caja, inicio, resumen, movimientos, reportes, clientes, filtro «hoy» del inventario y nombres de archivos. **Los reportes siguen calculándose en el navegador** (con la zona correcta); pasarlos a SQL queda en E3 (C7 · Números).
+- `money(n)` / `currencyLabel()` en `lib/inventory.ts`: 144 importes y 10 etiquetas dejaron de tener «Bs» escrito a mano.
+- `FlowProvider` sigue refrescando al cambiar de pantalla, pero con **1 llamada** (`session_context`) en lugar de ~7.
+- `profiles.business_name`, `profiles.min_stock_default` y `profiles.expiry_days` quedan en la tabla sin uso (no se borran; se pueden quitar en C6 con el registro de migraciones).
+- Ajustes: el dueño edita nombre, moneda y zona horaria; el vendedor los ve sin poder cambiarlos (RLS ya lo impedía; ver test).
 
 ## C5 · Permisos en la base (cierra S1–S10, S12; adelanta la Fase 7)
 

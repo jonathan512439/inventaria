@@ -107,17 +107,15 @@ export function registerPaymentOp(db: DB, op: { id: string; customerId: string; 
   return call(db, "register_payment", { p_id: op.id, p_customer: op.customerId, p_amount: op.amount, p_method: op.method, p_note: op.note ?? null });
 }
 
-/** Zona horaria del negocio para los cortes de día (en C4 pasa a ser un ajuste del negocio). */
-export const BUSINESS_TZ = "America/La_Paz";
-
 /** Caja de un día (por defecto hoy): cobros por medio (ventas + abonos), ingresos/retiros, efectivo esperado y último cierre. */
 export function cashSummary(db: DB, day?: string | null) {
-  return call(db, "cash_summary", { p_day: day ?? null, p_tz: BUSINESS_TZ });
+  // El servidor corta el día en la zona horaria del negocio (023)
+  return call(db, "cash_summary", { p_day: day ?? null });
 }
 
 /** Cierra la caja: guarda un cierre NUEVO (historial) calculado en el servidor. */
 export function closeCash(db: DB, op: { id: string; day?: string | null; counted: number | null; note?: string | null }) {
-  return call(db, "close_cash", { p_id: op.id, p_day: op.day ?? null, p_counted: op.counted, p_note: op.note ?? null, p_tz: BUSINESS_TZ });
+  return call(db, "close_cash", { p_id: op.id, p_day: op.day ?? null, p_counted: op.counted, p_note: op.note ?? null });
 }
 
 // ---------- Compras ----------

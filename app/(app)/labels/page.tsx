@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, Product, ProductVariant } from "@/types/database";
 import { getDescendantIds } from "@/lib/categories";
-import { SUMMARY_COLS, fmtMoney, fromSummary, priceOf, stockOf } from "@/lib/inventory";
+import { fromSummary, money, priceOf, stockOf, SUMMARY_COLS } from "@/lib/inventory";
 import { productTitle } from "@/lib/fields";
 import { useFlow } from "@/components/FlowProvider";
 import CoachTip from "@/components/CoachTip";
@@ -180,7 +180,7 @@ export default function LabelsPage() {
                   <input type="checkbox" checked={on} onChange={() => toggle(r)} className="h-5 w-5 shrink-0" />
                   <button onClick={() => toggle(r)} className="min-w-0 flex-1 text-left">
                     <span className="block truncate text-sm font-semibold text-ink">{r.name}{r.variant ? <span className="font-normal text-slate-500"> · {r.variant}</span> : null}</span>
-                    <span className="block truncate text-[11px] text-slate-500">{r.code ? <span className="font-mono">{r.code}</span> : <span className="text-amber-700">sin código</span>}{r.price !== null ? ` · Bs ${fmtMoney(r.price)}` : ""} · {r.stock} en stock</span>
+                    <span className="block truncate text-[11px] text-slate-500">{r.code ? <span className="font-mono">{r.code}</span> : <span className="text-amber-700">sin código</span>}{r.price !== null ? ` · ${money(r.price)}` : ""} · {r.stock} en stock</span>
                   </button>
                   {on && (
                     <span className="flex shrink-0 items-center gap-1 text-xs text-slate-500">
@@ -291,7 +291,7 @@ function Label({ code, name, variant, price, business }: { code: string; name: s
         {(variant || business) && <div className="l-sub">{[variant, business].filter(Boolean).join(" · ")}</div>}
       </div>
       <svg ref={ref} />
-      {price !== null && <div className="l-price">Bs {fmtMoney(price)}</div>}
+      {price !== null && <div className="l-price">{money(price)}</div>}
     </div>
   );
 }

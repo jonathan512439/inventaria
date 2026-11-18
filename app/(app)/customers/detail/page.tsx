@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Consignment, ConsignmentItem, Customer, PayMethod, Payment, Sale, SaleItem } from "@/types/database";
-import { fmtMoney } from "@/lib/inventory";
+import { currencyLabel, money } from "@/lib/inventory";
 import { METHOD_LABEL, STATUS_LABEL } from "@/lib/sales";
 import { debtOf, oldestDebtDays, registerPayment, reminderText, waLink } from "@/lib/customers";
 import { newOpId } from "@/lib/data/ops";
@@ -13,6 +13,7 @@ import { friendlyError } from "@/lib/errors";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
+import { useFlow } from "@/components/FlowProvider";
 import { IconArrowLeft, IconCheck, IconChevronRight, IconEdit, IconTag, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 
 export default function CustomerDetailPage() {
@@ -36,7 +37,7 @@ function CustomerDetail() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [consignments, setConsignments] = useState<Consignment[]>([]);
   const [consItems, setConsItems] = useState<ConsignmentItem[]>([]);
-  const [business, setBusiness] = useState<string | null>(null);
+  const business = useFlow().business?.name ?? null;
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState<{ amount: string; method: PayMethod; note: string } | null>(null);
   const [editing, setEditing] = useState<{ name: string; phone: string; note: string; credit_limit: string } | null>(null);
@@ -49,13 +50,12 @@ function CustomerDetail() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [c, s, p, co, prof, bal] = await Promise.all([
+    const [c, s, p, co, bal] = await Promise.all([
       supabase.from("customers").select("*").eq("id", id).maybeSingle(),
       supabase.from("sales").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
       // Solo los abonos: lo pagado al vender ya figura en cada venta
       supabase.from("payments").select("*").eq("customer_id", id).eq("kind", "abono").order("created_at", { ascending: false }).limit(50),
       supabase.from("consignments").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
-      supabase.from("profiles").select("business_name").maybeSingle(),
       supabase.from("customer_balances").select("balance").eq("customer_id", id).maybeSingle(),
     ]);
     setCredit(Math.max(0, -Number(bal.data?.balance ?? 0)));
@@ -64,7 +64,6 @@ function CustomerDetail() {
     setSales(list);
     setPayments((p.data ?? []) as Payment[]);
     setConsignments((co.data ?? []) as Consignment[]);
-    setBusiness(prof.data?.business_name ?? null);
     if (list.length) {
       const { data: its } = await supabase.from("sale_items").select("*").in("sale_id", list.map((x) => x.id));
       setItems((its ?? []) as SaleItem[]);
@@ -90,11 +89,11 @@ function CustomerDetail() {
     if (amount <= 0) return toast("info", "Escribe cuánto paga");
     const ok = await confirm({
       title: "¿Registramos el abono?",
-      body: amount > debt ? `Se descuenta de lo más antiguo que debe; los Bs ${fmtMoney(amount - debt)} que sobran quedan a su favor para su próxima compra fiada.` : "Se descuenta de lo más antiguo que debe.",
+      body: amount > debt ? `Se descuenta de lo más antiguo que debe; los ${money(amount - debt)} que sobran quedan a su favor para su próxima compra fiada.` : "Se descuenta de lo más antiguo que debe.",
       details: [
-        { label: "Paga", value: `Bs ${fmtMoney(amount)} · ${METHOD_LABEL[paying.method]}`, tone: "ok" },
-        { label: "Debía", value: `Bs ${fmtMoney(debt)}` },
-        { label: "Le quedará", value: `Bs ${fmtMoney(Math.max(0, debt - amount))}`, tone: debt - amount > 0 ? "warn" : "ok" },
+        { label: "Paga", value: `${money(amount)} · ${METHOD_LABEL[paying.method]}`, tone: "ok" },
+        { label: "Debía", value: `${money(debt)}` },
+        { label: "Le quedará", value: `${money(Math.max(0, debt - amount))}`, tone: debt - amount > 0 ? "warn" : "ok" },
       ],
       confirmLabel: "Sí, abonar",
       tone: "success",
@@ -103,7 +102,7 @@ function CustomerDetail() {
     setSaving(true);
     try {
       const r = await registerPayment(supabase, customer.id, amount, paying.method, paying.note, payId);
-      toast("success", r.left > 0 ? `Abono registrado. Bs ${fmtMoney(r.left)} quedan a favor de ${customer.name}.` : `Abono de Bs ${fmtMoney(amount)} registrado`);
+      toast("success", r.left > 0 ? `Abono registrado. ${money(r.left)} quedan a favor de ${customer.name}.` : `Abono de ${money(amount)} registrado`);
       setPayId(newOpId());
       setPaying(null);
       load();
@@ -128,7 +127,7 @@ function CustomerDetail() {
     if (!customer) return;
     const ok = await confirm({
       title: `¿Quitar a ${customer.name}?`,
-      body: debt > 0 ? `Todavía debe Bs ${fmtMoney(debt)}. Sus ventas se conservan, pero dejará de aparecer en la lista.` : "Sus ventas se conservan; solo deja de aparecer en la lista.",
+      body: debt > 0 ? `Todavía debe ${money(debt)}. Sus ventas se conservan, pero dejará de aparecer en la lista.` : "Sus ventas se conservan; solo deja de aparecer en la lista.",
       confirmLabel: "Quitar cliente",
       tone: "danger",
     });
@@ -165,7 +164,7 @@ function CustomerDetail() {
             <input className="input" placeholder="Teléfono (WhatsApp)" inputMode="tel" value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} />
             <input className="input" placeholder="Nota (p. ej. vive en la esquina)" value={editing.note} onChange={(e) => setEditing({ ...editing, note: e.target.value })} />
             <label className="flex items-center gap-2 text-xs text-slate-600">
-              Límite de fiado (Bs)
+              Límite de fiado ({currencyLabel()})
               <input type="number" min={0} step="any" inputMode="decimal" className="input py-1.5 tabular-nums" placeholder="sin límite" value={editing.credit_limit} onChange={(e) => setEditing({ ...editing, credit_limit: e.target.value })} />
             </label>
           </div>
@@ -179,10 +178,10 @@ function CustomerDetail() {
       {/* Saldo */}
       <section className={`animate-in rounded-3xl p-4 text-white shadow-float ${debt > 0 ? "bg-amber-600" : "bg-emerald-600"}`}>
         <p className="text-[11px] font-semibold uppercase tracking-wide text-white/75">{debt > 0 ? "Te debe" : "Al día"}</p>
-        <p className="text-3xl font-bold tabular-nums">Bs {fmtMoney(debt)}</p>
+        <p className="text-3xl font-bold tabular-nums">{money(debt)}</p>
         <p className="text-xs text-white/85">
-          {debt > 0 ? `desde hace ${days} día${days === 1 ? "" : "s"}` : credit > 0 ? `tiene Bs ${fmtMoney(credit)} a su favor (se usan en su próxima compra fiada)` : "no tiene deudas pendientes"}
-          {customer.credit_limit !== null ? ` · límite Bs ${fmtMoney(Number(customer.credit_limit))}${debt >= Number(customer.credit_limit) ? " (alcanzado)" : ""}` : ""}
+          {debt > 0 ? `desde hace ${days} día${days === 1 ? "" : "s"}` : credit > 0 ? `tiene ${money(credit)} a su favor (se usan en su próxima compra fiada)` : "no tiene deudas pendientes"}
+          {customer.credit_limit !== null ? ` · límite ${money(Number(customer.credit_limit))}${debt >= Number(customer.credit_limit) ? " (alcanzado)" : ""}` : ""}
           {outUnits ? ` · ${outUnits} unid. entregadas` : ""}
         </p>
         {debt > 0 && (
@@ -218,7 +217,7 @@ function CustomerDetail() {
               <li key={s.id} className="py-2">
                 <div className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate">{new Date(s.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })} · Venta N.º {s.number}</span>
-                  <span className="font-bold tabular-nums text-amber-700">Bs {fmtMoney(Number(s.total) - Number(s.paid))}</span>
+                  <span className="font-bold tabular-nums text-amber-700">{money(Number(s.total) - Number(s.paid))}</span>
                 </div>
                 <p className="truncate text-xs text-slate-500">{items.filter((i) => i.sale_id === s.id).map((i) => `${i.qty} ${i.product_name ?? "producto"}${i.variant_label ? ` (${i.variant_label})` : ""}`).join(", ")}</p>
               </li>
@@ -257,13 +256,13 @@ function CustomerDetail() {
                 <button onClick={() => setOpen(open === s.id ? null : s.id)} className="flex w-full items-center gap-2 py-2 text-left">
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${s.status === "pagado" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{s.status === "pagado" ? "Pagado" : STATUS_LABEL[s.status]}</span>
                   <span className="min-w-0 flex-1 truncate">{new Date(s.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })} · N.º {s.number} · {s.items} producto{s.items === 1 ? "" : "s"}</span>
-                  <span className="font-bold tabular-nums">Bs {fmtMoney(Number(s.total))}</span>
+                  <span className="font-bold tabular-nums">{money(Number(s.total))}</span>
                   <IconChevronRight size={14} className={`text-slate-300 transition ${open === s.id ? "rotate-90" : ""}`} />
                 </button>
                 {open === s.id && (
                   <ul className="mb-2 space-y-0.5 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
                     {items.filter((i) => i.sale_id === s.id).map((i) => (
-                      <li key={i.id} className="flex justify-between"><span>{i.qty} × {i.product_name}{i.variant_label ? ` (${i.variant_label})` : ""}</span><span className="tabular-nums">Bs {fmtMoney(Number(i.line_total))}</span></li>
+                      <li key={i.id} className="flex justify-between"><span>{i.qty} × {i.product_name}{i.variant_label ? ` (${i.variant_label})` : ""}</span><span className="tabular-nums">{money(Number(i.line_total))}</span></li>
                     ))}
                   </ul>
                 )}
@@ -280,7 +279,7 @@ function CustomerDetail() {
             {payments.map((p) => (
               <li key={p.id} className="flex items-center gap-2 py-1.5">
                 <span className="min-w-0 flex-1 truncate text-slate-600">{new Date(p.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })} · {METHOD_LABEL[p.method]}{p.note ? ` · ${p.note}` : ""}</span>
-                <span className="font-bold tabular-nums text-emerald-700">Bs {fmtMoney(Number(p.amount))}</span>
+                <span className="font-bold tabular-nums text-emerald-700">{money(Number(p.amount))}</span>
               </li>
             ))}
           </ul>

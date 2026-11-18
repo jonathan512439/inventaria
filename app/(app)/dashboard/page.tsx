@@ -5,19 +5,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { queueSummary, useQueue } from "@/lib/queue";
-import { DEFAULT_MIN_STOCK, EXPIRY_SOON_DAYS, daysToExpiry, fmtMoney } from "@/lib/inventory";
+import { daysToExpiry, DEFAULT_MIN_STOCK, EXPIRY_SOON_DAYS, money } from "@/lib/inventory";
 import { StepByStep, computeStates, type GuideProgress } from "@/components/guide/Guide";
 import AiUsageCard from "@/components/AiUsageCard";
 import CleanupCard from "@/components/CleanupCard";
 import { useFlow } from "@/components/FlowProvider";
 import WhoIsServing from "@/components/WhoIsServing";
 import { IconAlert, IconBox, IconCamera, IconCheck, IconCheckCircle, IconChevronRight, IconDownload, IconList, IconSettings, IconSparkles, IconTag, Spinner } from "@/components/ui/Icons";
+import { businessDayStart } from "@/lib/dates";
 
 interface Stats {
   pending: number;
   confirmed: number;
   types: number;
-  business: string | null;
   onboarded: boolean;
   agotados: number;
   sinPrecio: number;
@@ -40,13 +40,12 @@ export default function DashboardPage() {
   useEffect(() => {
     const supabase = createClient();
     (async () => {
-      const dayStart = new Date();
-      dayStart.setHours(0, 0, 0, 0);
+      const dayStart = businessDayStart();
       const [d, c, t, p, prods, sales, owedRows, added] = await Promise.all([
         supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft").is("deleted_at", null),
         supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed").is("deleted_at", null),
         supabase.from("categories").select("id,parent_id,min_stock_default"),
-        supabase.from("profiles").select("business_name, onboarded_at").maybeSingle(),
+        supabase.from("profiles").select("onboarded_at").maybeSingle(),
         supabase.from("product_summaries").select("stock,precio,min_stock,expires_at,category_id").eq("status", "confirmed"),
         supabase.from("sales").select("total,cost_total").gte("created_at", dayStart.toISOString()),
         supabase.from("sales").select("total,paid").neq("status", "pagado"),
@@ -65,7 +64,6 @@ export default function DashboardPage() {
         pending: d.count ?? 0,
         confirmed: c.count ?? 0,
         types: cats.filter((c) => !c.parent_id).length,
-        business: p.data?.business_name ?? null,
         onboarded: !!p.data?.onboarded_at,
         agotados: list.filter((x) => (x.stock ?? 0) <= 0).length,
         sinPrecio: list.filter((x) => x.precio === null).length,
@@ -150,7 +148,7 @@ export default function DashboardPage() {
       <header className="animate-in flex items-end justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-slate-500">{greeting}</p>
-          <h1 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">{stats.business || "Tu inventario"}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">{flow.business?.name || "Tu inventario"}</h1>
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-card ring-1 ring-slate-900/10">
@@ -199,7 +197,7 @@ export default function DashboardPage() {
       <div className="animate-in grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Tile href="/products" label="En inventario" value={String(stats.confirmed)} hint={`${stats.types} categoría${stats.types === 1 ? "" : "s"}`} />
         <Tile href="/review" label="Por revisar" value={String(pending)} hint={pending ? "toca para confirmar" : "nada pendiente"} tone={pending ? "amber" : undefined} />
-        <Tile href={stats.owed > 0 ? "/customers?tab=deben" : "/movements"} label="Ventas de hoy" value={`Bs ${fmtMoney(stats.salesToday.total)}`} hint={stats.owed > 0 ? `te deben Bs ${fmtMoney(stats.owed)}` : `${stats.salesToday.count} venta${stats.salesToday.count === 1 ? "" : "s"}`} tone="emerald" />
+        <Tile href={stats.owed > 0 ? "/customers?tab=deben" : "/movements"} label="Ventas de hoy" value={`${money(stats.salesToday.total)}`} hint={stats.owed > 0 ? `te deben ${money(stats.owed)}` : `${stats.salesToday.count} venta${stats.salesToday.count === 1 ? "" : "s"}`} tone="emerald" />
         <Tile href="/restock" label="Por reponer" value={String(stats.porReponer)} hint={stats.porVencer ? `${stats.porVencer} por vencer · ${stats.sinPrecio} sin precio` : stats.sinPrecio ? `${stats.sinPrecio} sin precio` : "todo en orden"} tone={stats.porReponer + stats.porVencer ? "rose" : undefined} />
       </div>
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } from "@/types/database";
 import { axesFor, summarizeVariants } from "@/lib/variants";
 import { fieldLabel, getEffectiveFields, getValue, productTitle } from "@/lib/fields";
-import { daysToExpiry, fmtMoney, minStockOf, needsRestock, priceOf, stockOf } from "@/lib/inventory";
+import { daysToExpiry, minStockOf, money, needsRestock, priceOf, stockOf } from "@/lib/inventory";
 import { useFlow } from "./FlowProvider";
 import { categoryColor } from "@/lib/colors";
 import Photo from "./ui/Photo";
@@ -93,7 +93,7 @@ export default function ProductRow({ product: p, categories, templates, showSub,
             {/* Precio y stock */}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {price !== null ? (
-                <span className="text-lg font-bold tabular-nums leading-none text-emerald-700">Bs {fmtMoney(price)}</span>
+                <span className="text-lg font-bold tabular-nums leading-none text-emerald-700">{money(price)}</span>
               ) : (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Sin precio</span>
               )}
