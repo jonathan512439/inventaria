@@ -18,6 +18,9 @@ import { newOpId } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
 import { IconArrowLeft, IconBox, IconCheck, IconPlus, IconSearch, IconTag, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 
+type SplitMethod = "efectivo" | "qr" | "transferencia";
+const SPLIT_METHODS: SplitMethod[] = ["efectivo", "qr", "transferencia"];
+
 /** Vender: carrito con varios productos, medio de pago y ticket. Descuenta el stock y guarda la ganancia real. */
 export default function SellPage() {
   const supabase = createClient();
@@ -29,7 +32,9 @@ export default function SellPage() {
   const [results, setResults] = useState<Product[]>([]);
   const [picking, setPicking] = useState<{ product: Product; variants: ProductVariant[] } | null>(null);
   const [method, setMethod] = useState<PayMethod>("efectivo");
-  const [status, setStatus] = useState<SaleStatus>("pagado");
+  const [statusChoice, setStatus] = useState<SaleStatus>("pagado");
+  // «Varios medios» (pago mixto real, 022): cuánto paga con cada uno
+  const [split, setSplit] = useState<Record<SplitMethod, string>>({ efectivo: "", qr: "", transferencia: "" });
   const [paid, setPaid] = useState("");
   const [discount, setDiscount] = useState("");
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -112,12 +117,18 @@ export default function SellPage() {
   const subtotal = cartSubtotal(lines);
   const disc = Math.min(subtotal, Math.max(0, Number(discount.replace(",", ".")) || 0));
   const total = Math.round((subtotal - disc) * 100) / 100;
-  const paidNum = status === "pagado" ? total : Math.min(total, Math.max(0, Number(paid.replace(",", ".")) || 0));
+  const splitPays = method === "mixto" ? SPLIT_METHODS.map((m) => ({ method: m, amount: Math.round((Number(split[m].replace(",", ".")) || 0) * 100) / 100 })).filter((p) => p.amount > 0) : null;
+  const splitSum = Math.round((splitPays ?? []).reduce((s, p) => s + p.amount, 0) * 100) / 100;
+  // Con varios medios el estado sale de lo cobrado (igual que en el servidor); si falta, queda fiado a nombre del cliente
+  const status: SaleStatus = method === "mixto" ? (splitSum >= total ? "pagado" : splitSum > 0 ? "parcial" : "fiado") : statusChoice;
+  const paidNum = method === "mixto" ? Math.min(total, splitSum) : status === "pagado" ? total : Math.min(total, Math.max(0, Number(paid.replace(",", ".")) || 0));
   const units = lines.reduce((s, l) => s + l.qty, 0);
   const stockWarn = useMemo(() => lines.filter((l) => l.qty > (l.variant ? l.variant.stock : stockOf(l.product) ?? 0)), [lines]);
 
   async function finish() {
     if (!lines.length) return;
+    if (method === "mixto" && splitSum > total) return toast("info", `Los montos suman Bs ${fmtMoney(splitSum)} y el total es Bs ${fmtMoney(total)}: anota solo lo que se queda (el vuelto no)`);
+    if (method === "mixto" && splitSum === 0) return toast("info", "Escribe cuánto paga con cada medio");
     if (status !== "pagado" && !customer) return toast("info", "Elige o crea el cliente que va a deber");
     const overLimit = !!customer && customer.credit_limit !== null && status !== "pagado" && customerDebt + (total - paidNum) > Number(customer.credit_limit);
     const ok = await confirm({
@@ -141,12 +152,13 @@ export default function SellPage() {
     if (!ok) return;
     setSaving(true);
     try {
-      const out = await registerSale(supabase, lines, { id: saleId, method, status, paid: paidNum, discount: disc, customerId: customer?.id ?? null, customerName: customer?.name ?? null });
+      const out = await registerSale(supabase, lines, { id: saleId, method, status, paid: paidNum, payments: splitPays, discount: disc, customerId: customer?.id ?? null, customerName: customer?.name ?? null });
       setDone(out);
       setSaleId(newOpId()); // la próxima venta lleva otro id
       setLines([]);
       setDiscount("");
       setPaid("");
+      setSplit({ efectivo: "", qr: "", transferencia: "" });
       setCustomer(null);
       setStatus("pagado");
       flow.refresh();
@@ -302,13 +314,30 @@ export default function SellPage() {
 
           <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">¿Cómo paga?</p>
-            <div className="grid grid-cols-3 gap-2">
-              {(["efectivo", "qr", "transferencia"] as PayMethod[]).map((m) => (
-                <button key={m} onClick={() => setMethod(m)} className={`rounded-xl border-2 px-2 py-2 text-sm font-semibold ${method === m ? "border-brand-500 bg-brand-500 text-white" : "border-slate-200 bg-white text-slate-700"}`}>{METHOD_LABEL[m]}</button>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {(["efectivo", "qr", "transferencia", "mixto"] as PayMethod[]).map((m) => (
+                <button key={m} onClick={() => setMethod(m)} className={`rounded-xl border-2 px-2 py-2 text-sm font-semibold ${method === m ? "border-brand-500 bg-brand-500 text-white" : "border-slate-200 bg-white text-slate-700"}`}>{m === "mixto" ? "Varios" : METHOD_LABEL[m]}</button>
               ))}
             </div>
+            {method === "mixto" && (
+              <div className="mt-2 grid gap-2 rounded-2xl bg-slate-50 p-3">
+                {SPLIT_METHODS.map((m) => (
+                  <label key={m} className="flex items-center justify-between gap-2 text-sm font-semibold text-slate-700">
+                    {METHOD_LABEL[m]}
+                    <input type="number" min={0} step="any" inputMode="decimal" className="input w-32 py-1.5 text-right tabular-nums" placeholder="0" value={split[m]} onChange={(e) => setSplit({ ...split, [m]: e.target.value })} />
+                  </label>
+                ))}
+                <p className={`text-xs font-semibold ${splitSum > total ? "text-rose-700" : splitSum < total ? "text-amber-800" : "text-emerald-700"}`}>
+                  {splitSum > total
+                    ? `Suman Bs ${fmtMoney(splitSum)}: anota solo lo que se queda (el vuelto no)`
+                    : splitSum < total
+                      ? `Faltan Bs ${fmtMoney(total - splitSum)}${splitSum > 0 ? ": quedarán fiados a nombre del cliente" : ""}`
+                      : "✓ La suma es exacta"}
+                </p>
+              </div>
+            )}
           </div>
-          <div>
+          {method !== "mixto" && <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">¿Paga todo ahora?</p>
             <div className="grid grid-cols-3 gap-2">
               {([["pagado", "Sí, todo"], ["parcial", "Una parte"], ["fiado", "Fiado"]] as [SaleStatus, string][]).map(([k, t]) => (
@@ -326,7 +355,7 @@ export default function SellPage() {
                 <p className="text-[11px] text-amber-800 sm:col-span-2">Queda pendiente <b>Bs {fmtMoney(total - paidNum)}</b> a nombre de {customer ? <b>{customer.name}</b> : "el cliente que elijas arriba"}. Lo verás en su ficha, con sus productos, para cobrarlo o recordárselo por WhatsApp.</p>
               </div>
             )}
-          </div>
+          </div>}
         </section>
       )}
 

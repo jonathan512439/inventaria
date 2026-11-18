@@ -1,7 +1,7 @@
 "use client";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, PayMethod, Product, ProductVariant, Sale, SaleItem, SaleStatus } from "@/types/database";
+import type { Database, PayMethod, PaymentInput, Product, ProductVariant, Sale, SaleItem, SaleStatus } from "@/types/database";
 import { fmtMoney, priceOf } from "./inventory";
 import { newOpId, registerSaleOp } from "./data/ops";
 
@@ -23,6 +23,8 @@ export interface SaleOptions {
   customerId?: string | null;
   customerName?: string | null;
   note?: string | null;
+  /** Varios medios (pago mixto real, 022): [{method, amount}]. El estado (pagado/parcial/fiado) lo deduce el servidor. */
+  payments?: PaymentInput[] | null;
 }
 
 export const METHOD_LABEL: Record<PayMethod, string> = { efectivo: "Efectivo", qr: "QR", transferencia: "Transferencia", mixto: "Mixto" };
@@ -56,6 +58,7 @@ export async function registerSale(supabase: SupabaseClient<Database>, lines: Ca
     customerName: opts.customerName ?? null,
     note: opts.note ?? null,
     at: opts.at ?? null,
+    payments: opts.payments ?? null,
   });
   return { sale: out.sale, items: out.items };
 }

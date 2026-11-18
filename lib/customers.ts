@@ -3,6 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Customer, Database, PayMethod, Sale, SaleItem } from "@/types/database";
 import { fmtMoney } from "./inventory";
+import { newOpId, registerPaymentOp } from "./data/ops";
 
 /** Lo que debe un cliente = suma de (total − cobrado) de sus ventas fiadas o a medias. */
 export function debtOf(sales: Sale[]): number {
@@ -18,31 +19,20 @@ export function oldestDebtDays(sales: Sale[]): number | null {
 }
 
 /**
- * Registra un abono y lo aplica a las ventas pendientes más antiguas primero.
- * Devuelve cuánto se aplicó y cuánto sobró (si pagó de más, queda anotado en la nota).
+ * Registra un abono en UNA operación del servidor (`register_payment`, 022): se reparte entre las ventas pendientes
+ * más antiguas; si paga de más, lo que sobra queda como SALDO A FAVOR y se usa en su próxima venta fiada.
+ * `id` hace el abono idempotente (reintentar con el mismo id no lo duplica).
  */
-export async function registerPayment(supabase: SupabaseClient<Database>, customerId: string, amount: number, method: PayMethod, note?: string | null): Promise<{ applied: number; left: number }> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("No autenticado");
-  const { data: open } = await supabase.from("sales").select("*").eq("customer_id", customerId).neq("status", "pagado").order("created_at", { ascending: true });
-  let left = Math.round(amount * 100) / 100;
-  let applied = 0;
-  for (const s of (open ?? []) as Sale[]) {
-    if (left <= 0) break;
-    const due = Math.round((Number(s.total) - Number(s.paid)) * 100) / 100;
-    if (due <= 0) continue;
-    const pay = Math.min(due, left);
-    const paid = Math.round((Number(s.paid) + pay) * 100) / 100;
-    const { error } = await supabase.from("sales").update({ paid, status: paid >= Number(s.total) ? "pagado" : "parcial" }).eq("id", s.id);
-    if (error) throw new Error(error.message);
-    left = Math.round((left - pay) * 100) / 100;
-    applied = Math.round((applied + pay) * 100) / 100;
-  }
-  const { error } = await supabase.from("payments").insert({ user_id: user.id, customer_id: customerId, amount, method, note: [note?.trim(), left > 0 ? `Sobraron Bs ${fmtMoney(left)} (a favor del cliente)` : ""].filter(Boolean).join(" · ") || null });
-  if (error) throw new Error(error.message);
-  return { applied, left };
+export async function registerPayment(
+  supabase: SupabaseClient<Database>,
+  customerId: string,
+  amount: number,
+  method: PayMethod,
+  note?: string | null,
+  id?: string
+): Promise<{ applied: number; left: number; balance: number }> {
+  const out = await registerPaymentOp(supabase, { id: id ?? newOpId(), customerId, amount, method, note: note ?? null });
+  return { applied: Number(out.applied), left: Number(out.left), balance: Number(out.balance) };
 }
 
 /** Mensaje de WhatsApp con el saldo y el detalle de lo que se llevó. */

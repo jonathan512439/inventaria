@@ -10,6 +10,7 @@
 3. Documentar en `docs/CHANGELOG.md` con **Qué** y **Validar**.
 4. `git commit` + `git push origin main` → GitHub Actions despliega a Cloudflare Pages. Migraciones: `npm run db:sql supabase/<archivo>.sql`.
 5. Sin preguntar entre pasos; el usuario valida cada despliegue.
+6. Si una migración quita o cambia algo que usa la versión publicada (índices únicos, firmas de funciones, columnas), aplicarla **justo al publicar** el código que la usa, no antes: entre ambos momentos la app en producción falla (pasó con `022` y «Cerrar caja»).
 
 ## Restricciones técnicas
 - Nunca construir para Cloudflare desde Windows (`vercel build` mezcla bundles): el despliegue es solo por GitHub Actions.

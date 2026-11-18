@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import type { CashClosing, CashMovement, PayMethod, Sale } from "@/types/database";
+import type { CashClosing, CashMovement, CashSummary } from "@/types/database";
+import { cashSummary, closeCash, newOpId } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import { fmtMoney } from "@/lib/inventory";
 import { METHOD_LABEL } from "@/lib/sales";
 import CoachTip from "@/components/CoachTip";
@@ -13,55 +15,57 @@ import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import { IconArrowLeft, IconCheck, IconPlus, Spinner } from "@/components/ui/Icons";
 
-const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-/** Caja del día: cuánto entró por cada medio, dinero que salió, cuánto efectivo debería haber y cierre. */
+/**
+ * Caja del día (022): lo calcula el servidor desde los COBROS del día por medio (ventas + abonos de fiados),
+ * más ingresos y retiros. Cada cierre es una fila nueva: volver a cerrar no borra el anterior y los días
+ * cerrados no cambian si después alguien paga una deuda vieja.
+ */
 export default function CashPage() {
   const supabase = createClient();
   const toast = useToast();
   const confirm = useConfirm();
-  const { isOwner, business } = useFlow();
-  const [sales, setSales] = useState<Sale[]>([]);
+  const { isOwner } = useFlow();
+  const [sm, setSm] = useState<CashSummary | null>(null);
   const [moves, setMoves] = useState<CashMovement[]>([]);
   const [closings, setClosings] = useState<CashClosing[]>([]);
-  const [todayClosing, setTodayClosing] = useState<CashClosing | null>(null);
   const [loading, setLoading] = useState(true);
   const [counted, setCounted] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [moveForm, setMoveForm] = useState<{ tipo: "ingreso" | "retiro"; amount: string; note: string } | null>(null);
+  // Id del cierre en curso (idempotencia): se renueva al guardarlo
+  const [closeId, setCloseId] = useState(newOpId);
 
   const load = useCallback(async () => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
-    const [s, m, c, tc] = await Promise.all([
-      supabase.from("sales").select("*").gte("created_at", start.toISOString()).order("created_at", { ascending: false }),
-      supabase.from("cash_movements").select("*").gte("created_at", start.toISOString()).order("created_at", { ascending: false }),
-      supabase.from("cash_closings").select("*").order("day", { ascending: false }).limit(14),
-      supabase.from("cash_closings").select("*").eq("day", dayKey()).maybeSingle(),
-    ]);
-    setSales((s.data ?? []) as Sale[]);
-    setMoves((m.data ?? []) as CashMovement[]);
-    setClosings((c.data ?? []) as CashClosing[]);
-    setTodayClosing((tc.data as CashClosing | null) ?? null);
+    try {
+      const [summary, m, c] = await Promise.all([
+        cashSummary(supabase),
+        supabase.from("cash_movements").select("*").gte("created_at", start.toISOString()).order("created_at", { ascending: false }),
+        supabase.from("cash_closings").select("*").order("closed_at", { ascending: false }).limit(20),
+      ]);
+      setSm(summary);
+      setMoves((m.data ?? []) as CashMovement[]);
+      setClosings((c.data ?? []) as CashClosing[]);
+    } catch (e) {
+      toast("error", friendlyError(e, "No se pudo cargar la caja"));
+    }
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, toast]);
   useEffect(() => {
     load();
   }, [load]);
 
-  const byMethod = useMemo(() => {
-    const out: Record<PayMethod, number> = { efectivo: 0, qr: 0, transferencia: 0, mixto: 0 };
-    sales.forEach((s) => (out[s.method] += Number(s.paid)));
-    return out;
-  }, [sales]);
-  const totalSales = sales.reduce((a, s) => a + Number(s.total), 0);
-  const collected = sales.reduce((a, s) => a + Number(s.paid), 0);
-  const pending = totalSales - collected;
-  const profit = sales.reduce((a, s) => a + (Number(s.total) - Number(s.cost_total)), 0);
-  const cashIn = moves.filter((m) => m.tipo === "ingreso").reduce((a, m) => a + Number(m.amount), 0);
-  const cashOut = moves.filter((m) => m.tipo === "retiro").reduce((a, m) => a + Number(m.amount), 0);
-  const expectedCash = byMethod.efectivo + cashIn - cashOut;
+  const todayClosing = sm?.last_closing ?? null;
+  const byMethod = sm?.by_method ?? { efectivo: 0, qr: 0, transferencia: 0 };
+  const abonos = sm?.abonos_by_method ?? { efectivo: 0, qr: 0, transferencia: 0 };
+  const totalSales = Number(sm?.total_sales ?? 0);
+  const collected = Number(sm?.collected_sales ?? 0) + Number(sm?.collected_abonos ?? 0);
+  const pending = Number(sm?.credit_given ?? 0);
+  const profit = Number(sm?.profit ?? 0);
+  const salesCount = sm?.sales_count ?? 0;
+  const expectedCash = Number(sm?.expected_cash ?? 0);
   const countedNum = counted.trim() === "" ? null : Number(counted.replace(",", ".")) || 0;
   const diff = countedNum === null ? null : Math.round((countedNum - expectedCash) * 100) / 100;
 
@@ -73,7 +77,7 @@ export default function CashPage() {
       data: { user },
     } = await supabase.auth.getUser();
     const { error } = await supabase.from("cash_movements").insert({ user_id: user!.id, tipo: moveForm.tipo, amount, note: moveForm.note.trim() || null });
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     setMoveForm(null);
     toast("success", moveForm.tipo === "retiro" ? `Retiro de Bs ${fmtMoney(amount)} anotado` : `Ingreso de Bs ${fmtMoney(amount)} anotado`);
     load();
@@ -81,10 +85,11 @@ export default function CashPage() {
 
   async function close() {
     const ok = await confirm({
-      title: todayClosing ? "¿Actualizamos el cierre de hoy?" : "¿Cerramos la caja de hoy?",
+      title: todayClosing ? "¿Cerramos la caja otra vez?" : "¿Cerramos la caja de hoy?",
       body: countedNum === null ? "No escribiste cuánto efectivo contaste; se guardará el cierre sin comparar." : diff === 0 ? "El efectivo contado coincide con lo que debería haber." : `Hay una diferencia de Bs ${fmtMoney(Math.abs(diff!))} ${diff! > 0 ? "de más" : "de menos"}. Quedará anotada.`,
       details: [
-        { label: "Ventas de hoy", value: `${sales.length} · Bs ${fmtMoney(totalSales)}` },
+        { label: "Ventas de hoy", value: `${salesCount} · Bs ${fmtMoney(totalSales)}` },
+        ...(Number(sm?.collected_abonos ?? 0) > 0 ? [{ label: "Abonos de fiados", value: `Bs ${fmtMoney(Number(sm?.collected_abonos))}` }] : []),
         { label: "Efectivo que debería haber", value: `Bs ${fmtMoney(expectedCash)}` },
         ...(countedNum !== null ? [{ label: "Efectivo contado", value: `Bs ${fmtMoney(countedNum)}`, tone: (diff === 0 ? "ok" : "warn") as "ok" | "warn" }] : []),
         ...(isOwner ? [{ label: "Ganancia del día", value: `Bs ${fmtMoney(profit)}`, tone: "ok" as const }] : []),
@@ -94,27 +99,17 @@ export default function CashPage() {
     });
     if (!ok) return;
     setSaving(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const row = {
-      user_id: user!.id,
-      business_id: business?.id ?? null,
-      day: dayKey(),
-      sales_count: sales.length,
-      total_sales: Math.round(totalSales * 100) / 100,
-      by_method: byMethod,
-      cash_in: cashIn,
-      cash_out: cashOut,
-      expected_cash: Math.round(expectedCash * 100) / 100,
-      counted_cash: countedNum,
-      difference: diff,
-      profit: Math.round(profit * 100) / 100,
-      note: note.trim() || null,
-    };
-    const { error } = await supabase.from("cash_closings").upsert(row, { onConflict: "business_id,day" });
+    try {
+      // El servidor recalcula todo al cerrar (no se guarda lo que muestra la pantalla) y guarda un cierre nuevo
+      await closeCash(supabase, { id: closeId, counted: countedNum, note: note.trim() || null });
+      setCloseId(newOpId());
+    } catch (e) {
+      setSaving(false);
+      return toast("error", friendlyError(e, "No se pudo cerrar la caja"));
+    }
     setSaving(false);
-    if (error) return toast("error", error.message);
+    setCounted("");
+    setNote("");
     navigator.vibrate?.(30);
     toast("success", "Caja cerrada");
     load();
@@ -137,7 +132,7 @@ export default function CashPage() {
         <>
           {todayClosing && (
             <p className="animate-in rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-              Hoy ya cerraste la caja a las {new Date(todayClosing.closed_at).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}. Si vendiste más después, puedes volver a cerrar y se actualiza.
+              Hoy ya cerraste la caja a las {new Date(todayClosing.closed_at).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}. Si vendiste o cobraste algo después, puedes cerrar otra vez: queda un cierre nuevo y el anterior se conserva en la lista.
             </p>
           )}
 
@@ -145,22 +140,28 @@ export default function CashPage() {
             <div className="rounded-3xl bg-emerald-600 p-4 text-white shadow-float">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Vendido hoy</p>
               <p className="text-2xl font-bold tabular-nums">Bs {fmtMoney(totalSales)}</p>
-              <p className="text-xs text-white/80">{sales.length} venta{sales.length === 1 ? "" : "s"}{isOwner ? ` · ganancia Bs ${fmtMoney(profit)}` : ""}</p>
+              <p className="text-xs text-white/80">{salesCount} venta{salesCount === 1 ? "" : "s"}{isOwner ? ` · ganancia Bs ${fmtMoney(profit)}` : ""}</p>
             </div>
             <div className="rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-900/10">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cobrado</p>
               <p className="text-2xl font-bold tabular-nums text-ink">Bs {fmtMoney(collected)}</p>
-              <p className="text-xs text-slate-500">{pending > 0 ? `Bs ${fmtMoney(pending)} quedaron fiados` : "todo cobrado"}</p>
+              <p className="text-xs text-slate-500">
+                {pending > 0 ? `Bs ${fmtMoney(pending)} quedaron fiados` : "todo cobrado"}
+                {Number(sm?.collected_abonos ?? 0) > 0 ? ` · incluye Bs ${fmtMoney(Number(sm?.collected_abonos))} de abonos` : ""}
+              </p>
             </div>
           </section>
 
           <section className="animate-in card space-y-2 p-4">
             <p className="text-sm font-bold text-ink">Por cómo pagaron</p>
             <ul className="divide-y divide-slate-100 text-sm">
-              {(["efectivo", "qr", "transferencia"] as PayMethod[]).map((m) => (
+              {(["efectivo", "qr", "transferencia"] as const).map((m) => (
                 <li key={m} className="flex items-center justify-between py-2">
-                  <span className="text-slate-600">{METHOD_LABEL[m]}</span>
-                  <span className="font-semibold tabular-nums">Bs {fmtMoney(byMethod[m])}</span>
+                  <span className="text-slate-600">
+                    {METHOD_LABEL[m]}
+                    {Number(abonos[m]) > 0 && <span className="block text-xs text-slate-500">incluye Bs {fmtMoney(Number(abonos[m]))} de abonos de fiados</span>}
+                  </span>
+                  <span className="font-semibold tabular-nums">Bs {fmtMoney(Number(byMethod[m]))}</span>
                 </li>
               ))}
             </ul>
@@ -226,7 +227,7 @@ export default function CashPage() {
                 {closings.map((c) => (
                   <li key={c.id} className="flex items-center gap-3 py-2">
                     <span className="min-w-0 flex-1">
-                      <span className="block font-semibold text-ink">{new Date(c.day + "T00:00:00").toLocaleDateString("es", { weekday: "short", day: "2-digit", month: "short" })}</span>
+                      <span className="block font-semibold text-ink">{new Date(c.day + "T00:00:00").toLocaleDateString("es", { weekday: "short", day: "2-digit", month: "short" })} · {new Date(c.closed_at).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}</span>
                       <span className="block text-xs text-slate-500">{c.sales_count} venta{c.sales_count === 1 ? "" : "s"}{isOwner ? ` · ganancia Bs ${fmtMoney(Number(c.profit))}` : ""}</span>
                     </span>
                     <span className="font-bold tabular-nums">Bs {fmtMoney(Number(c.total_sales))}</span>

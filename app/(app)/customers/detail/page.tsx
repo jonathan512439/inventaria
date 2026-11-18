@@ -8,6 +8,8 @@ import type { Consignment, ConsignmentItem, Customer, PayMethod, Payment, Sale, 
 import { fmtMoney } from "@/lib/inventory";
 import { METHOD_LABEL, STATUS_LABEL } from "@/lib/sales";
 import { debtOf, oldestDebtDays, registerPayment, reminderText, waLink } from "@/lib/customers";
+import { newOpId } from "@/lib/data/ops";
+import { friendlyError } from "@/lib/errors";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
@@ -40,16 +42,23 @@ function CustomerDetail() {
   const [editing, setEditing] = useState<{ name: string; phone: string; note: string; credit_limit: string } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /** Saldo a favor (pagó de más): se usa solo en su próxima venta fiada (022) */
+  const [credit, setCredit] = useState(0);
+  // Id del abono en curso (idempotencia): se renueva cuando se guardó
+  const [payId, setPayId] = useState(newOpId);
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [c, s, p, co, prof] = await Promise.all([
+    const [c, s, p, co, prof, bal] = await Promise.all([
       supabase.from("customers").select("*").eq("id", id).maybeSingle(),
       supabase.from("sales").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
-      supabase.from("payments").select("*").eq("customer_id", id).order("created_at", { ascending: false }).limit(50),
+      // Solo los abonos: lo pagado al vender ya figura en cada venta
+      supabase.from("payments").select("*").eq("customer_id", id).eq("kind", "abono").order("created_at", { ascending: false }).limit(50),
       supabase.from("consignments").select("*").eq("customer_id", id).order("created_at", { ascending: false }),
       supabase.from("profiles").select("business_name").maybeSingle(),
+      supabase.from("customer_balances").select("balance").eq("customer_id", id).maybeSingle(),
     ]);
+    setCredit(Math.max(0, -Number(bal.data?.balance ?? 0)));
     setCustomer((c.data as Customer | null) ?? null);
     const list = (s.data ?? []) as Sale[];
     setSales(list);
@@ -81,7 +90,7 @@ function CustomerDetail() {
     if (amount <= 0) return toast("info", "Escribe cuánto paga");
     const ok = await confirm({
       title: "¿Registramos el abono?",
-      body: "Se descuenta de lo más antiguo que debe.",
+      body: amount > debt ? `Se descuenta de lo más antiguo que debe; los Bs ${fmtMoney(amount - debt)} que sobran quedan a su favor para su próxima compra fiada.` : "Se descuenta de lo más antiguo que debe.",
       details: [
         { label: "Paga", value: `Bs ${fmtMoney(amount)} · ${METHOD_LABEL[paying.method]}`, tone: "ok" },
         { label: "Debía", value: `Bs ${fmtMoney(debt)}` },
@@ -93,12 +102,13 @@ function CustomerDetail() {
     if (!ok) return;
     setSaving(true);
     try {
-      const r = await registerPayment(supabase, customer.id, amount, paying.method, paying.note);
-      toast("success", r.left > 0 ? `Abono registrado. Sobraron Bs ${fmtMoney(r.left)} a favor de ${customer.name}.` : `Abono de Bs ${fmtMoney(amount)} registrado`);
+      const r = await registerPayment(supabase, customer.id, amount, paying.method, paying.note, payId);
+      toast("success", r.left > 0 ? `Abono registrado. Bs ${fmtMoney(r.left)} quedan a favor de ${customer.name}.` : `Abono de Bs ${fmtMoney(amount)} registrado`);
+      setPayId(newOpId());
       setPaying(null);
       load();
     } catch (e) {
-      toast("error", e instanceof Error ? e.message : "No se pudo registrar el abono");
+      toast("error", friendlyError(e, "No se pudo registrar el abono"));
     } finally {
       setSaving(false);
     }
@@ -171,7 +181,7 @@ function CustomerDetail() {
         <p className="text-[11px] font-semibold uppercase tracking-wide text-white/75">{debt > 0 ? "Te debe" : "Al día"}</p>
         <p className="text-3xl font-bold tabular-nums">Bs {fmtMoney(debt)}</p>
         <p className="text-xs text-white/85">
-          {debt > 0 ? `desde hace ${days} día${days === 1 ? "" : "s"}` : "no tiene deudas pendientes"}
+          {debt > 0 ? `desde hace ${days} día${days === 1 ? "" : "s"}` : credit > 0 ? `tiene Bs ${fmtMoney(credit)} a su favor (se usan en su próxima compra fiada)` : "no tiene deudas pendientes"}
           {customer.credit_limit !== null ? ` · límite Bs ${fmtMoney(Number(customer.credit_limit))}${debt >= Number(customer.credit_limit) ? " (alcanzado)" : ""}` : ""}
           {outUnits ? ` · ${outUnits} unid. entregadas` : ""}
         </p>

@@ -141,7 +141,7 @@ Leyenda de riesgo: **P** = probabilidad (1–5), **I** = impacto (1–5), **R = 
 
 Alcance: migraciones `001`–`019`, `lib/`, rutas `app/api/*`, pantallas `(app)`, flujos de CI. Método: lectura del código + comprobación del estado real de Supabase y de GitHub Actions. `npx tsc --noEmit` y `npm run lint` pasan sin errores. Las pruebas `test:*` no se pudieron correr porque la base está pausada (§2.0).
 
-Gravedad: **C** = crítico (datos o seguridad), **A** = alto (cifras de negocio incorrectas), **M** = medio (escala, rendimiento, mantenimiento), **B** = bajo. El plan de corrección y el **estado de cada hallazgo** están en `PLAN_CIMIENTOS.md` (resueltos al 2026-11-17: §2.0 y M8 en C0; S11, E1, E2 y la base de M2 en C1; C1, C2, C3, C4, C5, N4 y N7 en C2).
+Gravedad: **C** = crítico (datos o seguridad), **A** = alto (cifras de negocio incorrectas), **M** = medio (escala, rendimiento, mantenimiento), **B** = bajo. El plan de corrección y el **estado de cada hallazgo** están en `PLAN_CIMIENTOS.md` (resueltos al 2026-11-17: §2.0 y M8 en C0; S11, E1, E2 y la base de M2 en C1; C1, C2, C3, C4, C5, N4 y N7 en C2; C6, N1, N2 y N6 en C3).
 
 ## 2.0 Incidente: «no puedo iniciar sesión» (`POST /auth/v1/token?grant_type=password` sin respuesta)
 

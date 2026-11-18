@@ -3,6 +3,19 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-18 · Fase 6.9 · C3 — El dinero como pagos: caja que cuadra, pago con varios medios y saldo a favor
+
+Migración `022_pagos.sql` aplicada (las ventas existentes conservan exactamente su estado y lo cobrado). `npm run test:ops` 44/44; `test:fields`, `test:variants`, `test:team`, `test:import` en verde.
+
+### 17.3 Cobros, abonos y caja
+- **Qué**: cada cobro queda anotado como un **pago** con su medio y su hora: lo que se paga al vender y lo que un cliente abona de su deuda.
+  - **Los abonos entran en la caja del día** en que se cobran y por su medio (antes no aparecían en la caja: el efectivo esperado no cuadraba cuando alguien pagaba un fiado).
+  - **Pago con varios medios**: en Vender, «¿Cómo paga?» tiene la opción **Varios** (por ejemplo Bs 60 en efectivo + Bs 40 por QR). La caja suma cada parte en su medio. Si falta una parte, queda fiada a nombre del cliente.
+  - **Saldo a favor**: si un cliente paga de más, lo que sobra queda a su favor (se ve en su ficha) y se usa solo en su próxima compra fiada.
+  - **Cierres de caja con historial**: cerrar otra vez el mismo día guarda un cierre nuevo y conserva el anterior; los días cerrados no cambian si después alguien paga una deuda vieja. Los totales los calcula el servidor al cerrar.
+  - La lista de abonos de la ficha del cliente muestra solo abonos (lo pagado al vender figura en cada venta).
+- **Validar**: vender Bs 100 con «Varios» = 60 efectivo + 40 QR → en Caja, Efectivo +60 y QR +40; a un cliente que debe, registrar un abono por QR → aparece en Caja de hoy como QR («incluye … de abonos de fiados») y su deuda baja; abonar más de lo que debe → la ficha muestra «tiene Bs … a su favor»; cerrar la caja dos veces → la lista «Cierres anteriores» muestra ambos con su hora.
+
 ## 2026-11-17 · Fase 6.9 · C2 — Ventas, stock, compras, entregas y conteos que no se pierden
 
 Migración `021_operaciones.sql` aplicada (el inventario quedó idéntico). `npm run test:ops` 30/30; `test:fields`, `test:variants`, `test:team`, `test:import` en verde.

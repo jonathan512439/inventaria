@@ -155,6 +155,52 @@ try {
   const ac2 = await a.rpc("apply_count", { p_id: cid, p_category: null, p_category_name: "Bebidas", p_rows: [{ product_id: P1.id, variant_id: null, expected: 8, counted: 20 }] });
   const { data: adj } = await admin.from("stock_movements").select("motivo").eq("count_id", cid);
   check(!ac.error && (await stockOf(P1.id)) === 20 && ac2.data?.repeated && adj?.length === 1 && adj[0].motivo.startsWith("+12"), `conteo 20 (+12), repetido una vez → ${await stockOf(P1.id)} · ${adj?.[0]?.motivo} ${ac.error?.message ?? ""}`);
+  // ===================== C3 · el dinero como pagos (022) =====================
+  const sum = async (c = a) => (await c.rpc("cash_summary", { p_day: null, p_tz: "America/La_Paz" })).data;
+  const k0 = await sum();
+  // 14) Pago mixto real: 60 en efectivo + 40 por QR
+  const mx = await a.rpc("register_sale", { p_id: uuid(), p_lines: [line(P1.id, 10, 10)], p_payments: [{ method: "efectivo", amount: 60 }, { method: "qr", amount: 40 }] });
+  const { data: mxPays } = await admin.from("payments").select("method,amount,kind").eq("sale_id", mx.data?.sale?.id);
+  check(!mx.error && mx.data?.sale?.status === "pagado" && mx.data?.sale?.method === "mixto" && mxPays?.length === 2, `venta 100 = 60 efectivo + 40 QR → ${mx.data?.sale?.status}/${mx.data?.sale?.method}, ${mxPays?.length} pagos ${mx.error?.message ?? ""}`);
+  const k1 = await sum();
+  check(Number(k1.by_method.efectivo) - Number(k0.by_method.efectivo) === 60 && Number(k1.by_method.qr) - Number(k0.by_method.qr) === 40, `caja: +60 efectivo y +40 QR → +${Number(k1.by_method.efectivo) - Number(k0.by_method.efectivo)} / +${Number(k1.by_method.qr) - Number(k0.by_method.qr)}`);
+  const mx2 = await a.rpc("register_sale", { p_id: uuid(), p_lines: [line(P1.id, 1, 10)], p_payments: [{ method: "efectivo", amount: 4 }] });
+  check(!!mx2.error && /cliente/i.test(mx2.error.message), `pago incompleto sin cliente se rechaza → ${mx2.error?.message}`);
+  const mx3 = await a.rpc("register_sale", { p_id: uuid(), p_lines: [line(P1.id, 1, 10)], p_payments: [{ method: "efectivo", amount: 15 }] });
+  check(!!mx3.error, `cobrar más que el total se rechaza → ${mx3.error?.message}`);
+
+  // 15) Abono de Juanito (debe 18 de la consignación): paga 25 por QR → 18 a la deuda, 7 a su favor, entra hoy como QR
+  const { data: bal0 } = await a.from("customer_balances").select("balance").eq("customer_id", cust.id).single();
+  check(Number(bal0?.balance) === 18, `Juanito debe 18 → ${bal0?.balance}`);
+  const payId = uuid();
+  const ab = await a.rpc("register_payment", { p_id: payId, p_customer: cust.id, p_amount: 25, p_method: "qr", p_note: null });
+  check(!ab.error && Number(ab.data?.applied) === 18 && Number(ab.data?.left) === 7 && Number(ab.data?.balance) === -7, `abono 25 → aplicado ${ab.data?.applied}, a favor ${ab.data?.left}, saldo ${ab.data?.balance} ${ab.error?.message ?? ""}`);
+  const { data: settled } = await admin.from("sales").select("status,paid").eq("id", st.data?.sale?.id).single();
+  check(settled?.status === "pagado" && Number(settled?.paid) === 18, `la venta fiada quedó pagada → ${settled?.status} ${settled?.paid}`);
+  const k2 = await sum();
+  check(Number(k2.by_method.qr) - Number(k1.by_method.qr) === 25 && Number(k2.abonos_by_method.qr) - Number(k1.abonos_by_method.qr) === 25, "el abono entra en la caja de hoy como QR");
+  const ab2 = await a.rpc("register_payment", { p_id: payId, p_customer: cust.id, p_amount: 25, p_method: "qr", p_note: null });
+  const { count: nAb } = await admin.from("payments").select("id", { count: "exact", head: true }).eq("customer_id", cust.id).eq("kind", "abono");
+  check(!ab2.error && nAb === 1, `abono repetido no se duplica (${nAb})`);
+
+  // 16) Su saldo a favor (7) se usa en su próxima venta fiada de 10 → debe 3
+  const fz = await a.rpc("register_sale", { p_id: uuid(), p_lines: [line(P1.id, 1, 10)], p_status: "fiado", p_customer: cust.id });
+  const { data: bal1 } = await a.from("customer_balances").select("balance").eq("customer_id", cust.id).single();
+  check(!fz.error && fz.data?.sale?.status === "parcial" && Number(fz.data?.sale?.paid) === 7 && Number(bal1?.balance) === 3, `fiado 10 con 7 a favor → ${fz.data?.sale?.status} pagado ${fz.data?.sale?.paid}, debe ${bal1?.balance} ${fz.error?.message ?? ""}`);
+
+  // 17) Cierres de caja: historial, idempotentes, y un cierre no cambia con cobros posteriores
+  const exp = Number(k2.expected_cash);
+  const cl1Id = uuid();
+  const cl1 = await a.rpc("close_cash", { p_id: cl1Id, p_day: null, p_counted: exp, p_note: null, p_tz: "America/La_Paz" });
+  await a.rpc("close_cash", { p_id: cl1Id, p_day: null, p_counted: exp, p_note: null, p_tz: "America/La_Paz" });
+  check(!cl1.error && Number(cl1.data?.difference) === 0, `cierre con lo esperado cuadra (diferencia ${cl1.data?.difference}) ${cl1.error?.message ?? ""}`);
+  await a.rpc("register_payment", { p_id: uuid(), p_customer: cust.id, p_amount: 3, p_method: "efectivo", p_note: null });
+  const cl2 = await a.rpc("close_cash", { p_id: uuid(), p_day: null, p_counted: null, p_note: "segundo", p_tz: "America/La_Paz" });
+  const { data: closes } = await admin.from("cash_closings").select("id,collected_abonos,expected_cash").eq("business_id", A.bid).order("closed_at");
+  check(!cl2.error && closes?.length === 2, `dos cierres el mismo día quedan en el historial (${closes?.length}) ${cl2.error?.message ?? ""}`);
+  check(Number(closes?.[0]?.collected_abonos) === 25 && Number(closes?.[1]?.collected_abonos) === 28, `el primer cierre no cambia con el abono posterior → ${closes?.[0]?.collected_abonos} / ${closes?.[1]?.collected_abonos}`);
+  const sv = await sum(v);
+  check(sv?.profit === null && k2?.profit !== null, "el vendedor no recibe la ganancia en la caja");
 } catch (e) {
   failed++;
   console.error("ERROR", e);

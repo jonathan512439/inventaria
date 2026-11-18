@@ -13,8 +13,8 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 | C0 · Operación y alertas | ✅ 2026-11-17 | — | ejecución manual de `keepalive` y `backup` | 17.0 |
 | C1 · Campos del sistema como columnas | ✅ 2026-11-17 | `020_campos_sistema.sql` | `npm run test:fields` + `test:variants` | 17.1 |
 | C2 · Operaciones atómicas | ✅ 2026-11-17 | `021_operaciones.sql` | `npm run test:ops` | 17.2 |
-| C3 · El dinero como pagos | ⏳ siguiente | `022_pagos.sql` | `npm run test:ops` (ampliada) | 17.3 |
-| C4 · Ajustes del negocio y zona horaria | pendiente | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
+| C3 · El dinero como pagos | ✅ 2026-11-18 | `022_pagos.sql` | `npm run test:ops` (ampliada) | 17.3 |
+| C4 · Ajustes del negocio y zona horaria | ⏳ siguiente | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
 | C5 · Permisos en la base | pendiente | `024_permisos.sql` (+ `025_fotos_privadas.sql`) | `npm run test:access` | 17.5 |
 | C6 · Calidad continua | pendiente | `schema_migrations` | CI | 17.6 |
 | C7 · Reconstrucción visual completa (C7.1–C7.9) | pendiente (tras C5) | — | manual + `test:e2e` + prueba con 3 personas | 17.7–17.15 |
@@ -108,6 +108,14 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 **Código:** caja (`cash/page.tsx`) lee `cash_summary`; clientes y Vender leen `customer_balances`; hoja de cobro con «varios medios».
 
 **Acepta cuando:** un abono en QR de una venta de la semana pasada aparece en la caja de hoy como QR y el cierre de ayer no cambia; venta de Bs 100 con 60 efectivo + 40 QR cuadra en la caja; un sobrepago queda como saldo a favor.
+
+**Resultado (2026-11-17/18):** `022_pagos.sql` aplicada; relleno verificado (las 3 ventas conservan exactamente su estado y lo cobrado; deuda total 325 = saldo de clientes 325; 2 pagos «venta» reconstruidos, 0 abonos previos). `npm run test:ops` 44/44 (14 nuevas de C3: pago mixto 60+40 en la caja por medio, pago incompleto sin cliente y cobro mayor al total rechazados, abono de 25 sobre deuda de 18 → 7 a favor y entra hoy como QR, abono repetido no se duplica, saldo a favor usado en la siguiente venta fiada, cierres en historial e idempotentes, un cierre no cambia con cobros posteriores, el vendedor no recibe la ganancia). `test:fields`, `test:variants`, `test:team`, `test:import` en verde.
+
+**Detalles de implementación:**
+- `sales.status` se deduce siempre de lo cobrado (`pagado` / `parcial` / `fiado`), también al vender: con «Varios medios» la pantalla no pregunta «¿paga todo?», lo calcula igual que el servidor.
+- La zona horaria de la caja es `America/La_Paz` fija en `lib/data/ops.ts` (`BUSINESS_TZ`) hasta C4, que la pasa a ajuste del negocio.
+- La lista de ingresos/retiros de la caja aún filtra «hoy» con la hora del celular (solo para mostrarla; los totales vienen del servidor). Se unifica en C4.
+- Entre la aplicación de `022` y el despliegue del código, «Cerrar caja» de la versión anterior fallaba (usaba `upsert` sobre el índice único por día, que se quitó). Lección: desplegar el código **antes o junto** con una migración que cambia restricciones usadas por la pantalla.
 
 ## C4 · Ajustes del negocio y zona horaria (cierra N3, N5, E4, V6)
 

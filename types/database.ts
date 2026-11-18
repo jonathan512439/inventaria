@@ -115,15 +115,51 @@ export type Customer = {
 };
 
 /** Abono de un cliente contra su saldo (se aplica a las ventas más antiguas primero). */
+/**
+ * Un cobro (022): `venta` = pagado al vender (una fila por medio: pago mixto real); `abono` = pago de deuda de un cliente,
+ * repartido entre sus ventas más antiguas (`payment_allocations`); lo que sobra queda como saldo a favor.
+ */
 export type Payment = {
   id: string;
   user_id: string;
-  customer_id: string;
+  customer_id: string | null;
+  sale_id?: string | null;
+  kind?: "venta" | "abono";
   amount: number;
   method: PayMethod;
   note: string | null;
   created_at: string;
 };
+
+/** Saldo de un cliente (vista customer_balances, 022): balance > 0 debe · < 0 a favor. */
+export type CustomerBalance = {
+  customer_id: string;
+  business_id: string | null;
+  name: string;
+  sold: number;
+  paid: number;
+  balance: number;
+  oldest_open: string | null;
+};
+
+/** Resumen de la caja de un día (cash_summary, 022). `profit` es null para el vendedor. */
+export type CashSummary = {
+  day: string;
+  sales_count: number;
+  total_sales: number;
+  collected_sales: number;
+  collected_abonos: number;
+  credit_given: number;
+  by_method: Record<"efectivo" | "qr" | "transferencia", number>;
+  abonos_by_method: Record<"efectivo" | "qr" | "transferencia", number>;
+  cash_in: number;
+  cash_out: number;
+  expected_cash: number;
+  profit: number | null;
+  last_closing: CashClosing | null;
+};
+
+export type PaymentInput = { method: "efectivo" | "qr" | "transferencia"; amount: number };
 
 /** Entrega en consignación: mercadería tuya en manos de un revendedor hasta que la vende o la devuelve. */
 export type Consignment = {
@@ -169,6 +205,8 @@ export type CashClosing = {
   profit: number;
   note: string | null;
   closed_at: string;
+  /** Abonos de clientes cobrados ese día (022) */
+  collected_abonos?: number;
 };
 
 export type StockMovement = {
@@ -691,6 +729,7 @@ export interface Database {
     };
     Views: {
       product_summaries: { Row: ProductSummary; Relationships: [] };
+      customer_balances: { Row: CustomerBalance; Relationships: [] };
     };
     Functions: {
       accept_invite: { Args: { p_code: string; p_display_name?: string | null }; Returns: string };
@@ -716,9 +755,16 @@ export interface Database {
           p_customer_name?: string | null;
           p_note?: string | null;
           p_at?: string | null;
+          p_payments?: PaymentInput[] | null;
         };
         Returns: { sale: Sale; items: SaleItem[]; repeated: boolean };
       };
+      register_payment: {
+        Args: { p_id: string; p_customer: string; p_amount: number; p_method: PayMethod; p_note?: string | null };
+        Returns: { payment: Payment; applied: number; left: number; balance: number };
+      };
+      cash_summary: { Args: { p_day?: string | null; p_tz?: string }; Returns: CashSummary };
+      close_cash: { Args: { p_id: string; p_day?: string | null; p_counted?: number | null; p_note?: string | null; p_tz?: string }; Returns: CashClosing & { repeated: boolean } };
       register_purchase: {
         Args: { p_id: string; p_supplier: string | null; p_doc: string | null; p_note: string | null; p_lines: PurchaseLineInput[] };
         Returns: { purchase: Purchase; repeated: boolean };
