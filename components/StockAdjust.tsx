@@ -12,6 +12,7 @@ import { registerSale } from "@/lib/sales";
 import { adjustStock, newOpId } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
 import { IconCheck, IconPlus, IconX, Spinner } from "./ui/Icons";
+import { StoredImg } from "./ui/Photo";
 
 interface Props {
   product: Product;
@@ -141,7 +142,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
       <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" />
       <div className="animate-in relative w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl md:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-start gap-3">
-          {product.image_url && <img src={product.image_url} alt="" className="h-12 w-12 rounded-xl object-cover" />}
+          {product.image_url && <StoredImg src={product.image_url} alt="" className="h-12 w-12 rounded-xl object-cover" />}
           <div className="min-w-0 flex-1">
             <p className="truncate font-bold text-ink">{productTitle(product.data) || "Producto"}</p>
             {sel && <p className="truncate text-xs font-semibold text-violet-700">Variante: {sel.label}</p>}

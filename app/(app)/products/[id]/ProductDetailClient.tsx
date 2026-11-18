@@ -23,6 +23,7 @@ import { STOCK_KEYS, newOpId, setStock, withoutStock } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
 import type { PriceHistory, StockMovement } from "@/types/database";
 import { withCosts } from "@/lib/data/costs";
+import { StoredImg } from "@/components/ui/Photo";
 
 export default function ProductDetailClient() {
   const { id } = useParams<{ id: string }>();
@@ -222,7 +223,7 @@ export default function ProductDetailClient() {
         <div className="animate-in space-y-3">
           <div className="card overflow-hidden p-0">
             {product.image_url ? (
-              <img src={product.image_url} alt="" className="w-full object-contain" />
+              <StoredImg src={product.image_url} alt="" className="w-full object-contain" />
             ) : (
               <div className="flex h-48 items-center justify-center text-sm text-slate-400">Sin foto</div>
             )}

@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/Toast";
 import { adjustStock, newOpId } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
 import { IconArrowLeft, IconBox, IconCamera, IconCheck, IconChevronRight, IconPlus, IconSearch, IconSparkles, IconTag, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
+import { StoredImg } from "@/components/ui/Photo";
 
 interface PublicInfo { nombre: string; marca: string; contenido: string; categorias: string[]; imagen: string | null; fuente: string }
 type Found =
@@ -464,7 +465,7 @@ export default function ScanPage() {
             <div className="card space-y-3 border-2 border-amber-300">
               <p className="flex items-center gap-2 font-bold text-amber-900"><IconBox size={20} /> Ya está en tu inventario</p>
               <Link href={`/products/${result.product.id}`} className="flex items-center gap-3 rounded-2xl border-2 border-slate-200 p-3 hover:border-brand-400">
-                {result.product.image_url ? <img src={result.product.image_url} alt="" className="h-14 w-14 rounded-xl object-cover" /> : <span className="grid h-14 w-14 place-items-center rounded-xl bg-slate-100 text-slate-400"><IconBox /></span>}
+                {result.product.image_url ? <StoredImg src={result.product.image_url} alt="" className="h-14 w-14 rounded-xl object-cover" /> : <span className="grid h-14 w-14 place-items-center rounded-xl bg-slate-100 text-slate-400"><IconBox /></span>}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold text-ink">{productTitle(result.product.data) || "Sin nombre"}</span>
                   <span className="block truncate text-xs text-slate-500">{categoryPath(categories, result.product.category_id)}</span>

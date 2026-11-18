@@ -41,6 +41,7 @@ import {
   Spinner,
 } from "@/components/ui/Icons";
 import { withCosts } from "@/lib/data/costs";
+import { StoredImg } from "@/components/ui/Photo";
 
 export default function ReviewPage() {
   return (
@@ -822,7 +823,7 @@ function Review() {
       {zoom && current.image_url && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90" onClick={() => setZoom(false)}>
           <div className="h-full w-full overflow-auto" style={{ touchAction: "pinch-zoom" }}>
-            <img src={current.image_url} alt="" className="mx-auto h-full w-auto max-w-none object-contain" />
+            <StoredImg src={current.image_url} alt="" className="mx-auto h-full w-auto max-w-none object-contain" />
           </div>
           <button type="button" className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white backdrop-blur" onClick={() => setZoom(false)}>
             <IconX size={22} />

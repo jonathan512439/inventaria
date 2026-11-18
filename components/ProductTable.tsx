@@ -13,6 +13,7 @@ import { IconChevronRight } from "./ui/Icons";
 import FieldInput from "./FieldInput";
 import { STOCK_KEYS, newOpId, setStock, withoutStock } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
+import { StoredImg } from "./ui/Photo";
 
 interface Props {
   products: Product[];
@@ -203,7 +204,7 @@ export default function ProductTable({ products, categories, templates, mode, on
                         <td className="sticky left-0 z-10 bg-white px-3 py-1.5">
                           <Link href={`/products/${p.id}`}>
                             {p.image_url ? (
-                              <img src={p.image_url} alt="" className="h-12 w-12 rounded-md object-cover" loading="lazy" />
+                              <StoredImg src={p.image_url} alt="" className="h-12 w-12 rounded-md object-cover" loading="lazy" />
                             ) : (
                               <div className="h-12 w-12 rounded-md bg-slate-100" />
                             )}

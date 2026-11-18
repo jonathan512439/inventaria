@@ -180,6 +180,19 @@ try {
   const { data: vMov } = await v.from("stock_movements").select("precio_unitario").eq("product_id", P.id).not("purchase_id", "is", null);
   check((vMov ?? []).every((m) => m.precio_unitario === null), "las entradas por compra no muestran el costo en Movimientos");
 
+  // --- Fotos privadas (026) ---
+  const b = await signIn(B);
+  const photoPath = `${A.id}/prueba-${Date.now()}.jpg`;
+  const jpeg = new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], { type: "image/jpeg" });
+  const { error: phUp } = await a.storage.from("product-images").upload(photoPath, jpeg, { contentType: "image/jpeg" });
+  const publicUrl = admin.storage.from("product-images").getPublicUrl(photoPath).data.publicUrl;
+  const anonFetch = await fetch(publicUrl);
+  const { data: vSigned } = await v.storage.from("product-images").createSignedUrl(photoPath, 60);
+  const { data: bSigned } = await b.storage.from("product-images").createSignedUrl(photoPath, 60);
+  const vFetch = vSigned?.signedUrl ? await fetch(vSigned.signedUrl) : null;
+  check(!phUp && !anonFetch.ok && vFetch?.ok === true && !bSigned?.signedUrl, `fotos: sin enlace firmado no se ven; el equipo sí; otro negocio no → público ${anonFetch.status}, equipo ${vFetch?.status}, otro ${bSigned?.signedUrl ? "sí" : "no"} ${phUp?.message ?? ""}`);
+  await admin.storage.from("product-images").remove([photoPath]);
+
   // --- Rutas API protegidas (opcional) ---
   if (BASE) {
     const ref = new URL(URL_).hostname.split(".")[0];
