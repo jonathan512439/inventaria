@@ -3,6 +3,20 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-18 · Fase 6.9 · C7.3 — Productos: una sola lista para encontrar y cambiar todo
+
+### 17.10 Productos y ficha
+- **Qué**:
+  - **Una sola lista** en lugar de «estantes» por categoría: buscador (nombre, marca, código o lo que diga la descripción) con **escáner** (si el código es de un producto, abre su ficha).
+  - **Filtros** debajo del buscador, con su cantidad: Categoría ▾ (con cuántos productos tiene cada una y cuánto valen) · Pendientes · Por reponer · Por vencer · Agotados · Sin precio · Sin foto · Papelera (dueño). **Reposición, Papelera, Cambiar precios y Etiquetas dejan de ser pantallas aparte.**
+  - **Por reponer** trae el botón **Lista de pedido**: agrupada por proveedor, cantidad sugerida editable, WhatsApp y Excel; la × deja de avisar de un producto.
+  - **Seleccionar**: marcar varios (o «Todos») y, con la barra de abajo, **Precio** (dueño: +%, monto o margen, con vista previa), **Etiquetas** (A4 o rollo, crea códigos internos), **Mover** de categoría, **Excel** o **Papelera** (dueño, con «Deshacer»).
+  - Cada fila muestra foto, precio y estado con color (Agotado, Quedan N, En inventario) y un botón **±** para sumar o restar stock sin abrir la ficha.
+  - En computadora, el botón **Tabla** cambia a la tabla editable sobre la misma lista filtrada.
+  - **Ficha con 4 pestañas**: **Datos** (foto, categoría, campos, código con escáner, volver a analizar con IA) · **Stock** (cantidad grande, +/− Stock, tallas y colores, «avisarme cuando queden», vencimiento) · **Precios** (venta, compra solo dueño, mayorista, cuánto ganas por unidad e historial de precios) · **Historial** (las últimas 30 ventas, entradas y retiros). Un solo «Guardar cambios».
+  - Las direcciones antiguas (/restock, /trash, /prices, /labels, /products/table, /products/c/…) llevan al filtro correspondiente.
+- **Validar**: Productos → escribir parte de un nombre → aparece al instante; tocar el escáner y leer un código → abre la ficha. Tocar «Por reponer» → «Lista de pedido» → WhatsApp. Seleccionar 3 → Etiquetas → Imprimir (vista previa del navegador con las etiquetas). Seleccionar 2 → Precio → +10 % → Aplicar → los precios cambian en la lista. Abrir un producto → pestaña Stock → +/− Stock → vender 1 → el número baja. Como vendedor: no aparecen Precio, Papelera ni el costo.
+
 ## 2026-11-18 · Fase 6.9 · C7.2 — Inicio con lo que hay que hacer hoy y un Vender más rápido
 
 ### 17.9 Inicio y Vender

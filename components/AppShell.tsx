@@ -13,7 +13,7 @@ import Sheet from "./ui/Sheet";
 import { LogoMark, LogoWordmark } from "./ui/Logo";
 import {
   IconBell, IconBox, IconCamera, IconCart, IconChart, IconCheckCircle, IconClipboard, IconCloud, IconDownload, IconHelp, IconHome,
-  IconList, IconLogout, IconMore, IconPrinter, IconRegister, IconScan, IconSettings, IconSparkles, IconStore, IconTable, IconTag,
+  IconList, IconLogout, IconMore, IconPrinter, IconRegister, IconScan, IconSettings, IconSparkles, IconStore, IconTable,
   IconTrash, IconTruck, IconUsers,
 } from "./ui/Icons";
 
@@ -29,7 +29,7 @@ type IconT = (p: { size?: number; className?: string; strokeWidth?: number }) =>
 
 const AREAS: { key: string; href: string; label: string; Icon: IconT; match: string[] }[] = [
   { key: "inicio", href: "/dashboard", label: "Inicio", Icon: IconHome, match: ["/dashboard", "/onboarding"] },
-  { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/review", "/drafts", "/capture", "/scan", "/count", "/purchases", "/restock", "/prices", "/labels", "/trash", "/import", "/export"] },
+  { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/review", "/drafts", "/capture", "/scan", "/count", "/purchases", "/import", "/export"] },
   { key: "vender", href: "/sell", label: "Vender", Icon: IconCart, match: ["/sell"] },
   { key: "clientes", href: "/customers", label: "Clientes", Icon: IconUsers, match: ["/customers", "/consign"] },
 ];
@@ -51,9 +51,8 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { href: "/scan", label: "Escanear un código", hint: "Buscar, sumar stock o dar de alta", Icon: IconScan },
       { href: "/purchases", label: "Llegó mercadería", hint: "Anota una compra y su costo", Icon: IconTruck, ownerOnly: true },
       { href: "/count", label: "Contar", hint: "Revisa un estante y corrige", Icon: IconClipboard },
-      { href: "/restock", label: "Qué falta y qué vence", hint: "Lista para pedir", Icon: IconBell },
-      { href: "/prices", label: "Cambiar precios", hint: "Muchos productos a la vez", Icon: IconTag, ownerOnly: true },
-      { href: "/labels", label: "Etiquetas", hint: "Imprime códigos con precio", Icon: IconPrinter },
+      { href: "/products?filter=restock", label: "Qué falta", hint: "Lista de pedido para WhatsApp", Icon: IconBell },
+      { href: "/products?select=1", label: "Precios y etiquetas", hint: "Elige productos y cámbialos o imprímelos", Icon: IconPrinter },
     ],
   },
   {

@@ -90,7 +90,7 @@ export default function DigestPage() {
           <div className="animate-in grid grid-cols-2 gap-2">
             <Tile label="Vendido hoy" value={`${money(t.total)}`} hint={`ayer ${money(y.total)}`} tone="emerald" />
             {isOwner ? <Tile label="Ganancia de hoy" value={`${money(t.profit)}`} hint={`ayer ${money(y.profit)}`} /> : <Tile label="Ventas de hoy" value={String(salesToday.length)} hint={`ayer ${salesYesterday.length}`} />}
-            <Tile label="Agotados" value={String(out.length)} hint={restock.length ? `+${restock.length} por reponer` : "nada por reponer"} tone={out.length ? "rose" : undefined} href="/restock" />
+            <Tile label="Agotados" value={String(out.length)} hint={restock.length ? `+${restock.length} por reponer` : "nada por reponer"} tone={out.length ? "rose" : undefined} href="/products?filter=restock" />
             <Tile label="Te deben" value={`${money(debts.reduce((a, d) => a + d.amount, 0))}`} hint={oldDebts.length ? `${oldDebts.length} con más de 30 días` : `${debts.length} cliente${debts.length === 1 ? "" : "s"}`} tone={oldDebts.length ? "amber" : undefined} href="/customers?tab=deben" />
           </div>
 

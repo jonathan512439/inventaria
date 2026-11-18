@@ -329,7 +329,7 @@ export default function CountPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <header className="animate-in">
-        <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
+        <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Productos</Link>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Contar lo que tengo</h1>
         <p className="text-sm text-slate-500">Revisa cuántas unidades hay de verdad en el estante. Si no coincide con lo que dice la app, se corrige al instante y queda anotado.</p>
       </header>

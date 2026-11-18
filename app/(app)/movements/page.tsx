@@ -93,7 +93,7 @@ export default function MovementsPage() {
   return (
     <div className="w-full space-y-5">
       <header className="animate-in">
-        <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Mi inventario</Link>
+        <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Productos</Link>
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-ink">Ventas y movimientos</h1>

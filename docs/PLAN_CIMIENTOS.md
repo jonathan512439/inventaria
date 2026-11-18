@@ -18,7 +18,7 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 | C5.1 · Permisos por rol y operación, negocio activo, firma | ✅ 2026-11-18 | `024_permisos.sql` | `npm run test:access` (24) + `test:team` | 17.5 |
 | C5.2 · Costos fuera del alcance del vendedor | ✅ 2026-11-18 | `025_costos.sql` | `npm run test:access` (ampliada) | 17.6 |
 | C5.3 · Fotos privadas | ✅ 2026-11-18 | `026_fotos_privadas.sql` | `npm run test:access` (ampliada) | 17.7 |
-| C7 · Reconstrucción visual completa (C7.1–C7.9) | ⏳ en curso (C7.1 ✅ 2026-11-18) | — | manual + `test:e2e` + prueba con 3 personas | 17.8– |
+| C7 · Reconstrucción visual completa (C7.1–C7.9) | ⏳ en curso (C7.1–C7.3 ✅ 2026-11-18) | — | manual + `test:e2e` + prueba con 3 personas | 17.8– |
 | C6 · Calidad continua | pendiente (al final, a pedido del usuario 2026-11-18) | `schema_migrations` | CI | — |
 
 **Orden (2026-11-18):** el usuario pidió hacer **C7 antes que C6**; C6 queda al final. Avance de C7 y decisiones de cada paso: `RECONSTRUCCION_VISUAL.md` → §7.

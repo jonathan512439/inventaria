@@ -76,7 +76,7 @@ export default function CleanupCard() {
     ? [
         { n: counts.noCategory, title: `${counts.noCategory} productos sin categoría`, href: "/review" },
         { n: counts.noPrice, title: `${counts.noPrice} productos sin precio`, href: "/products" },
-        { n: counts.trash, title: `${counts.trash} en la papelera (se borran a los 30 días)`, href: "/trash" },
+        { n: counts.trash, title: `${counts.trash} en la papelera (se borran a los 30 días)`, href: "/products?filter=trash" },
       ].filter((x) => x.n > 0)
     : [];
 

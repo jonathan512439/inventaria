@@ -2,40 +2,54 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import CoachTip from "@/components/CoachTip";
-import BarcodeCamera from "@/components/BarcodeCamera";
-import { CODE_FIELDS } from "@/lib/fields";
-import { useFlow } from "@/components/FlowProvider";
 import { useParams, useRouter } from "next/navigation";
+import BarcodeCamera from "@/components/BarcodeCamera";
+import { useFlow } from "@/components/FlowProvider";
 import { createClient } from "@/lib/supabase/client";
-import type { Category, FieldTemplate, Product, ProductData, ProductVariant, VariantAxis } from "@/types/database";
+import type { Category, FieldTemplate, PriceHistory, Product, ProductData, ProductVariant, StockMovement, VariantAxis } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
-import { canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
+import { CODE_FIELDS, canonicalizeData, coerceValue, fieldLabel, getEffectiveFields, productTitle } from "@/lib/fields";
 import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
-import { IconArrowLeft, IconCheck, IconEdit, IconRefresh, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
-import { useToast } from "@/components/ui/Toast";
-import { useConfirm } from "@/components/ui/Confirm";
 import StockAdjust from "@/components/StockAdjust";
 import ProductVariants from "@/components/ProductVariants";
-import { money, stockOf } from "@/lib/inventory";
+import { minStockOf, money, stockOf } from "@/lib/inventory";
 import { STOCK_KEYS, newOpId, setStock, withoutStock } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
-import type { PriceHistory, StockMovement } from "@/types/database";
 import { withCosts } from "@/lib/data/costs";
+import { storagePath } from "@/lib/photos";
 import { StoredImg } from "@/components/ui/Photo";
+import { ScreenHeader, Tabs, EmptyState } from "@/components/ui/Screen";
+import { ListSkeleton } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/Confirm";
+import { IconCheck, IconEdit, IconRefresh, IconScan, IconSparkles, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
 
+type Tab = "datos" | "stock" | "precios" | "historial";
+const PRICE_RE = /^(precio|precio_venta|price|precio_compra|costo|cost|precio_mayorista|unidades_por_paquete)$/i;
+const COST_RE = /^(precio_compra|costo|cost)$/i;
+const STOCK_RE = /^(stock|cantidad|existencias)$/i;
+
+/**
+ * Ficha de producto (C7.3): cuatro pestañas ordenadas por tema —
+ * Datos (foto, nombre, categoría, campos) · Stock (+/−, variantes, mínimo, vencimiento) ·
+ * Precios (venta, compra, mayorista e historial) · Historial (movimientos). Un solo «Guardar cambios».
+ */
 export default function ProductDetailClient() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
+  const ask = useConfirm();
+  const { isOwner, alerts } = useFlow();
+  const [tab, setTab] = useState<Tab>("datos");
   const [product, setProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
   const [data, setData] = useState<ProductData>({});
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [minStock, setMinStock] = useState<string>("");
-  const [expiresAt, setExpiresAt] = useState<string>("");
+  const [minStock, setMinStock] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,40 +58,10 @@ export default function ProductDetailClient() {
   const [reanalyzing, setReanalyzing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const { isOwner } = useFlow();
-  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [movements, setMovements] = useState<StockMovement[] | null>(null);
   const [priceHist, setPriceHist] = useState<PriceHistory[]>([]);
   const [axes, setAxes] = useState<VariantAxis[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
-  const toast = useToast();
-  const ask = useConfirm();
-
-  /** Vuelve a analizar la foto con la IA (1 petición). Conserva precio, stock y datos manuales. */
-  async function reanalyze(keepCategory: boolean) {
-    if (!product) return;
-    const ok = await ask({
-      title: "¿Que la IA lea la foto otra vez?",
-      body: keepCategory
-        ? "Actualiza nombre, marca y descripción. No toca el precio, el stock ni la categoría."
-        : "Actualiza los datos y puede cambiarlo de categoría. No toca el precio ni el stock.",
-      details: [{ label: "Análisis que usa", value: "1 de tu cupo diario", tone: "warn" }],
-      confirmLabel: "Sí, analizar de nuevo",
-      tone: "primary",
-    });
-    if (!ok) return;
-    setReanalyzing(true);
-    const res = await fetch("/api/reanalyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ product_id: product.id, keep_category: keepCategory }),
-    });
-    const json = (await res.json().catch(() => ({}))) as { product?: Product; changed?: string[]; error?: string };
-    setReanalyzing(false);
-    if (!res.ok) return toast("error", json.error || "No se pudo volver a analizar");
-    await load();
-    const n = json.changed?.length ?? 0;
-    toast("success", n ? `Actualizado: ${json.changed!.map(fieldLabel).join(", ")}` : "La IA no encontró nada nuevo que cambiar");
-  }
 
   const load = useCallback(async () => {
     const [p, c, t, a, v] = await Promise.all([
@@ -91,8 +75,8 @@ export default function ProductDetailClient() {
     setTemplates(t.data ?? []);
     setAxes((a.data ?? []) as VariantAxis[]);
     setVariants((v.data ?? []) as ProductVariant[]);
-    supabase.from("stock_movements").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(8).then(({ data }) => setMovements((data ?? []) as StockMovement[]));
-    supabase.from("price_history").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(6).then(({ data }) => setPriceHist((data ?? []) as PriceHistory[]));
+    supabase.from("stock_movements").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(30).then(({ data }) => setMovements((data ?? []) as StockMovement[]));
+    supabase.from("price_history").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(20).then(({ data }) => setPriceHist((data ?? []) as PriceHistory[]));
     // El costo vive en product_costs (025): para el dueño se vuelve a poner en data; al vendedor no le llega
     const full = p.data ? (await withCosts(supabase, [p.data]))[0] : null;
     if (!full) setNotFound(true);
@@ -110,11 +94,36 @@ export default function ProductDetailClient() {
     load();
   }, [load]);
 
+  /** Vuelve a analizar la foto con la IA (1 petición). Conserva precio, stock y datos manuales. */
+  async function reanalyze(keepCategory: boolean) {
+    if (!product) return;
+    const ok = await ask({
+      title: "¿Que la IA lea la foto otra vez?",
+      body: keepCategory ? "Actualiza nombre, marca y descripción. No toca el precio, el stock ni la categoría." : "Actualiza los datos y puede cambiarlo de categoría. No toca el precio ni el stock.",
+      details: [{ label: "Análisis que usa", value: "1 de tu cupo diario", tone: "warn" }],
+      confirmLabel: "Sí, analizar de nuevo",
+      tone: "primary",
+    });
+    if (!ok) return;
+    setReanalyzing(true);
+    const res = await fetch("/api/reanalyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ product_id: product.id, keep_category: keepCategory }) });
+    const json = (await res.json().catch(() => ({}))) as { changed?: string[]; error?: string };
+    setReanalyzing(false);
+    if (!res.ok) return toast("error", json.error || "No se pudo volver a analizar");
+    await load();
+    const n = json.changed?.length ?? 0;
+    toast("success", n ? `Actualizado: ${json.changed!.map(fieldLabel).join(", ")}` : "La IA no encontró nada nuevo que cambiar");
+  }
+
   const fields = getEffectiveFields(templates, categories, categoryId);
   // Dato donde vive el código de barras (el definido por la categoría, o uno propio)
   const codeField = fields.find((f) => CODE_FIELDS.includes(f.name.toLowerCase()))?.name ?? "codigo_barras";
+  const isCode = (n: string) => CODE_FIELDS.includes(n.toLowerCase());
+  const dataFields = fields.filter((f) => !isCode(f.name) && !PRICE_RE.test(f.name) && !STOCK_RE.test(f.name));
+  const priceFields = fields.filter((f) => PRICE_RE.test(f.name) && (isOwner || !COST_RE.test(f.name)));
+  const stockField = fields.find((f) => STOCK_RE.test(f.name)) ?? null;
   // Valores guardados que no pertenecen a ningún campo actual (p. ej. campo eliminado)
-  const orphanKeys = Object.keys(data).filter((k) => !fields.some((f) => f.name === k));
+  const orphanKeys = Object.keys(data).filter((k) => !fields.some((f) => f.name === k) && !STOCK_RE.test(k) && !isCode(k) && (isOwner || !COST_RE.test(k)));
 
   async function save(status?: Product["status"]) {
     if (!product) return;
@@ -148,298 +157,320 @@ export default function ProductDetailClient() {
     setSaving(false);
     toast("success", "Cambios guardados");
     // Tras editar, se vuelve a la lista de donde vino el producto
-    if (status === "draft") router.push("/review");
-    else router.push("/products");
+    router.push(status === "draft" || (!status && product.status === "draft") ? "/review" : "/products");
   }
 
   async function remove() {
     if (!product) return;
     if (product.status === "confirmed") {
       // Papelera: se puede recuperar durante 30 días (la foto se conserva)
-      const ok = await ask({
-        title: "¿Enviar a la papelera?",
-        body: "Sale del inventario pero no se borra: puedes recuperarlo durante 30 días desde Ordenar y limpiar → Papelera.",
-        confirmLabel: "Sí, a la papelera",
-        tone: "danger",
-      });
+      const ok = await ask({ title: "¿Enviar a la papelera?", body: "Sale del inventario pero no se borra: puedes recuperarlo durante 30 días con el filtro Papelera de Productos.", confirmLabel: "Sí, a la papelera", tone: "danger" });
       if (!ok) return;
       const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", product.id);
-      if (error) return setError(error.message);
+      if (error) return setError(friendlyError(error));
       toast("success", "Enviado a la papelera", { label: "Deshacer", onClick: async () => { await supabase.from("products").update({ deleted_at: null }).eq("id", product.id); } });
       router.push("/products");
       return;
     }
     const okDraft = await ask({ title: "¿Eliminar este pendiente?", body: "Se borra junto con su foto. Como todavía no estaba en el inventario, no se puede recuperar.", confirmLabel: "Eliminar", tone: "danger" });
     if (!okDraft) return;
-    if (product.image_url) {
-      const idx = product.image_url.indexOf("/product-images/");
-      if (idx >= 0) await supabase.storage.from("product-images").remove([product.image_url.slice(idx + "/product-images/".length)]);
-    }
     const { error } = await supabase.from("products").delete().eq("id", product.id);
-    if (error) return setError(error.message);
+    if (error) return setError(friendlyError(error));
+    const path = storagePath(product.image_url);
+    if (path) await supabase.storage.from("product-images").remove([path]);
     router.push("/review");
   }
 
   async function restore() {
     if (!product) return;
     const { error } = await supabase.from("products").update({ deleted_at: null }).eq("id", product.id);
-    if (error) return setError(error.message);
+    if (error) return setError(friendlyError(error));
     toast("success", "Producto recuperado");
     load();
   }
 
-  if (loading) return <p className="text-sm text-slate-500">Cargando...</p>;
+  if (loading) return <ListSkeleton rows={4} />;
   if (notFound || !product)
-    return (
-      <div className="card text-sm">
-        Producto no encontrado. <Link href="/products" className="text-brand-600 underline">Volver</Link>
-      </div>
-    );
+    return <EmptyState title="Producto no encontrado" body="Puede que lo hayan borrado." action={<Link href="/products" className="btn-primary">Volver a Productos</Link>} />;
 
   const isDraft = product.status === "draft";
+  const totalStock = variants.length ? variants.reduce((t, v) => t + v.stock, 0) : stockOf(product) ?? 0;
+  const effMin = minStockOf({ ...product, min_stock: minStock.trim() === "" ? null : Number(minStock) }, categories, alerts);
+  const price = Number(data.precio ?? data.precio_venta ?? "") || null;
+  const cost = Number(data.precio_compra ?? data.costo ?? "") || null;
 
   return (
-    <div className="has-action mx-auto w-full max-w-4xl space-y-5 overflow-x-hidden">
-      <div className="animate-in flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <Link href={isDraft ? "/review" : "/products"} className="mb-1 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700">
-            <IconArrowLeft size={16} /> {isDraft ? "Pendientes" : "Inventario"}
-          </Link>
-          <h1 className="break-words text-2xl font-bold tracking-tight text-ink">{productTitle(data) || "Producto"}</h1>
-          <p className="text-xs text-slate-500">
-            {categoryPath(categories, product.category_id)} · {new Date(product.created_at).toLocaleDateString("es")}
-          </p>
+    <div className={`${tab === "historial" ? "" : "has-action"} mx-auto w-full max-w-3xl space-y-4 overflow-x-hidden`}>
+      <ScreenHeader
+        back={isDraft ? { href: "/review", label: "Pendientes" } : { href: "/products", label: "Productos" }}
+        title={<span className="break-words">{productTitle(data) || "Producto"}</span>}
+        subtitle={
+          <span className="flex flex-wrap items-center gap-2">
+            <span>{categoryPath(categories, product.category_id) || "Sin categoría"}</span>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isDraft ? "bg-info-100 text-info-700" : totalStock <= 0 ? "bg-danger-100 text-danger-700" : "bg-ok-100 text-ok-700"}`}>
+              {isDraft ? "Pendiente" : totalStock <= 0 ? "Agotado" : "En inventario"}
+            </span>
+          </span>
+        }
+        help={
+          <>
+            <p><b>Datos:</b> foto, nombre, categoría y código. <b>Stock:</b> sumar o restar unidades, tallas y colores, cuándo avisarte y el vencimiento. <b>Precios:</b> venta, mayorista y su historial. <b>Historial:</b> cada venta, entrada y retiro.</p>
+            <p>Lo que cambies en Datos, Stock o Precios se guarda junto con <b>Guardar cambios</b>. El botón <b>+/− Stock</b> se guarda al instante.</p>
+          </>
+        }
+      />
+
+      {product.deleted_at && (
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-danger-50 p-3 text-sm text-danger-800">
+          <IconTrash size={16} />
+          <span className="flex-1">Está en la <b>papelera</b> desde el {new Date(product.deleted_at).toLocaleDateString("es")}. Se borra definitivamente a los 30 días.</span>
+          {isOwner && <button onClick={restore} className="btn-success btn-sm min-h-[44px]">Recuperar</button>}
         </div>
-        <span className={`badge ${isDraft ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
-          {isDraft ? "Pendiente" : "En inventario"}
-        </span>
-      </div>
+      )}
 
-      <CoachTip screen="product" title="¿Qué cambio?">
-        Para stock usa <b>+/− Stock</b> (registra ventas y reposiciones). Para el resto, edita y toca <b>Guardar cambios</b>, fijo abajo. Lo demás está en <b>Más opciones</b>.
-      </CoachTip>
+      <Tabs<Tab>
+        value={tab}
+        onChange={setTab}
+        items={[
+          { value: "datos", label: "Datos" },
+          { value: "stock", label: "Stock" },
+          { value: "precios", label: "Precios" },
+          { value: "historial", label: "Historial" },
+        ]}
+      />
 
-      <div className="mx-auto grid w-full max-w-xl grid-cols-1 gap-5 md:max-w-none md:grid-cols-[340px_1fr]">
-        <div className="animate-in space-y-3">
-          <div className="card overflow-hidden p-0">
-            {product.image_url ? (
-              <StoredImg src={product.image_url} alt="" className="w-full object-contain" />
-            ) : (
-              <div className="flex h-48 items-center justify-center text-sm text-slate-400">Sin foto</div>
+      {/* DATOS */}
+      {tab === "datos" && (
+        <div className="animate-in grid gap-4 md:grid-cols-[260px_1fr]">
+          <div className="space-y-3">
+            <div className="card overflow-hidden p-0">
+              {product.image_url ? <StoredImg src={product.image_url} alt="" className="max-h-72 w-full object-contain" /> : <div className="flex h-40 items-center justify-center text-sm text-muted">Sin foto</div>}
+            </div>
+            {product.ai_meta?.etiqueta && (
+              <p className="flex gap-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+                <IconTag size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                <span><b className="text-slate-700">En la etiqueta se lee:</b> {product.ai_meta.etiqueta}</span>
+              </p>
+            )}
+            {product.image_url && (
+              <div className="rounded-2xl border-2 border-brand-200 bg-brand-50/60 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-brand-900"><IconSparkles size={14} className="text-brand-600" /> ¿La IA se equivocó?</p>
+                <p className="mt-0.5 text-xs text-slate-600">Vuelve a leer la foto. Precio y stock no se tocan.</p>
+                <div className="mt-2 grid gap-2">
+                  <button onClick={() => reanalyze(true)} disabled={reanalyzing} className="btn-primary btn-sm min-h-[44px] w-full justify-start">
+                    {reanalyzing ? <Spinner size={14} /> : <IconRefresh size={16} />} Actualizar los datos
+                  </button>
+                  <button onClick={() => reanalyze(false)} disabled={reanalyzing} className="btn-secondary btn-sm min-h-[44px] w-full justify-start">
+                    <IconRefresh size={16} className="text-brand-600" /> Analizar y recolocar
+                    <span className="ml-auto text-xs font-normal text-muted">puede cambiar la categoría</span>
+                  </button>
+                </div>
+              </div>
             )}
           </div>
-          {/* Sumar / restar stock */}
-          <button onClick={() => setAdjusting(true)} className="btn-primary w-full justify-start">
-            <IconCheck size={18} /> +/− Stock: sumar, vender o retirar
-            <span className="ml-auto text-xs font-normal opacity-80">sin editar el producto</span>
-          </button>
-          <ProductVariants product={{ ...product, data }} categories={categories} axes={axes} variants={variants} onChanged={load} />
-          {movements.length > 0 && (
-            <div className="rounded-2xl border-2 border-slate-200 p-3">
-              <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Últimos movimientos</p>
-              <ul className="space-y-1 text-xs">
-                {movements.map((m) => (
-                  <li key={m.id} className="flex items-center gap-2">
-                    <span className={`w-14 shrink-0 rounded-full px-1.5 py-0.5 text-center font-bold ${m.tipo === "venta" ? "bg-emerald-100 text-emerald-800" : m.tipo === "entrada" ? "bg-brand-100 text-brand-800" : "bg-slate-200 text-slate-700"}`}>{m.tipo === "venta" ? "venta" : m.tipo === "entrada" ? "entrada" : "retiro"}</span>
-                    <span className="flex-1 text-slate-600">{new Date(m.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}{m.variant_label ? ` · ${m.variant_label}` : ""}{m.motivo ? ` · ${m.motivo}` : ""}</span>
-                    <span className="font-bold tabular-nums text-ink">{m.tipo === "entrada" ? "+" : "−"}{m.cantidad}</span>
-                    {m.tipo === "venta" && <span className="font-semibold text-emerald-700">{money(m.total ?? 0)}</span>}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/movements" className="mt-2 inline-block text-xs font-semibold text-brand-700 hover:underline">Ver todos →</Link>
-            </div>
-          )}
 
-          {isOwner && priceHist.length > 0 && (
-            <div className="rounded-2xl border-2 border-slate-200 p-3">
-              <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">Historial de precios</p>
-              <ul className="space-y-1 text-xs">
-                {priceHist.map((h) => (
-                  <li key={h.id} className="flex items-center gap-2">
-                    <span className="w-24 shrink-0 text-slate-500">{new Date(h.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })} · {h.field === "precio" ? "venta" : h.field === "precio_compra" ? "compra" : "mayorista"}</span>
-                    <span className="tabular-nums text-slate-400 line-through">{h.old_value === null ? "—" : `${money(Number(h.old_value))}`}</span>
-                    <span className="font-bold tabular-nums text-ink">{h.new_value === null ? "—" : `${money(Number(h.new_value))}`}</span>
-                    <span className="ml-auto text-slate-400">{h.source}</span>
-                  </li>
-                ))}
-              </ul>
+          <div className="card min-w-0 space-y-4">
+            <div>
+              <label className="label">Categoría</label>
+              <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} onCategoriesChange={setCategories} emptyLabel="Sin categoría" />
             </div>
-          )}
+            {dataFields.map((f) => (
+              <div key={f.id}>
+                <label className="label flex items-center gap-1">{fieldLabel(f.name)} {f.is_ai_fillable && <IconSparkles size={12} className="text-brand-500" />}</label>
+                <FieldInput field={f} value={data[f.name]} onChange={(v) => setData({ ...data, [f.name]: v })} />
+              </div>
+            ))}
+            {/* Código de barras: se puede leer con la cámara (la IA no siempre lo ve en la foto) */}
+            <div>
+              <label className="label" htmlFor="code">Código de barras</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <input id="code" className="input w-auto min-w-[10rem] flex-1 font-mono text-sm" placeholder="Sin código" value={String(data[codeField] ?? "")} onChange={(e) => setData({ ...data, [codeField]: e.target.value })} />
+                <button type="button" onClick={() => setScanning((v) => !v)} className={`chip min-h-[44px] shrink-0 ${scanning ? "chip-active" : ""}`}>
+                  <IconScan size={16} /> {scanning ? "Cerrar cámara" : data[codeField] ? "Volver a escanear" : "Escanear"}
+                </button>
+              </div>
+              {scanning && (
+                <div className="mt-2">
+                  <BarcodeCamera
+                    label="Apuntar al código"
+                    onCode={(code) => {
+                      setData((d) => ({ ...d, [codeField]: code }));
+                      setScanning(false);
+                      navigator.vibrate?.(20);
+                      toast("success", `Código ${code} listo. Toca Guardar cambios para confirmarlo.`);
+                    }}
+                  />
+                </div>
+              )}
+              <p className="mt-1 text-xs text-muted">Con el código, Vender y Contar reconocen este producto al instante. Sin código, crea uno interno al imprimir etiquetas.</p>
+            </div>
+            {orphanKeys.length > 0 && (
+              <details className="text-xs text-muted">
+                <summary className="cursor-pointer">Otros datos guardados ({orphanKeys.length})</summary>
+                <ul className="mt-1 space-y-1">
+                  {orphanKeys.map((k) => (
+                    <li key={k}><span className="font-medium">{k}:</span> {String(data[k] ?? "")}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
 
-          {/* Volver a analizar con IA */}
-          <div className="rounded-2xl border-2 border-brand-200 bg-brand-50/60 p-3">
-            <p className="flex items-center gap-1.5 text-xs font-bold text-brand-900">
-              <IconSparkles size={14} className="text-brand-600" /> ¿La IA se equivocó?
-            </p>
-            <p className="mt-0.5 text-xs text-slate-600">Vuelve a leer la foto y corrige los datos. Precio y stock no se tocan.</p>
-            <div className="mt-2 grid gap-2">
-              <button onClick={() => reanalyze(false)} disabled={reanalyzing || !product.image_url} className="btn-primary btn-sm w-full justify-start">
-                {reanalyzing ? <Spinner size={14} /> : <IconRefresh size={16} />} Volver a analizar con IA
-                <span className="ml-auto text-xs font-normal opacity-80">puede recolocarlo</span>
-              </button>
-              <button onClick={() => reanalyze(true)} disabled={reanalyzing || !product.image_url} className="btn-secondary btn-sm w-full justify-start">
-                <IconRefresh size={16} className="text-brand-600" /> Solo actualizar los datos
-                <span className="ml-auto text-xs font-normal text-slate-500">mantiene la categoría</span>
-              </button>
-            </div>
+            <button type="button" onClick={() => setMoreActions((v) => !v)} className="min-h-[44px] text-sm font-semibold text-muted underline hover:text-ink">
+              {moreActions ? "Ocultar más opciones" : "Más opciones"}
+            </button>
+            {moreActions && (
+              <div className="animate-in grid gap-2 rounded-2xl border-2 border-slate-200 p-3">
+                {isDraft ? (
+                  <button className="btn-secondary w-full justify-start" onClick={() => save()} disabled={saving}>
+                    <IconEdit size={16} /> Guardar sin pasarlo al inventario <span className="ml-auto text-xs font-normal text-muted">sigue en Pendientes</span>
+                  </button>
+                ) : (
+                  <button className="btn-secondary w-full justify-start" onClick={() => save("draft")} disabled={saving}>
+                    <IconEdit size={16} /> Marcar para revisar de nuevo <span className="ml-auto text-xs font-normal text-muted">vuelve a Pendientes</span>
+                  </button>
+                )}
+                {(isDraft || isOwner) && !product.deleted_at && (
+                  <button className="btn-destructive w-full justify-start" onClick={remove} disabled={saving}>
+                    <IconTrash size={16} /> {isDraft ? "Eliminar este pendiente" : "Enviar a la papelera"} <span className="ml-auto text-xs font-normal">{isDraft ? "y su foto" : "recuperable 30 días"}</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
-
-          {product.ai_meta?.etiqueta && (
-            <div className="flex gap-2 rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
-              <IconTag size={16} className="mt-0.5 shrink-0 text-slate-400" />
-              <p><span className="font-semibold text-slate-700">En la etiqueta se lee:</span> {product.ai_meta.etiqueta}</p>
-            </div>
-          )}
         </div>
+      )}
 
-        <div className="animate-in card min-w-0 space-y-4">
-          {product.deleted_at && (
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-rose-50 p-3 text-sm text-rose-900">
-              <IconTrash size={16} />
-              <span className="flex-1">Este producto está en la <b>papelera</b> desde el {new Date(product.deleted_at).toLocaleDateString("es")}. Se borrará definitivamente a los 30 días.</span>
-              <button onClick={restore} className="btn-success btn-sm">Recuperar</button>
+      {/* STOCK */}
+      {tab === "stock" && (
+        <div className="animate-in space-y-4">
+          <div className="card flex flex-wrap items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">{variants.length ? "Stock (suma de las variantes)" : "Stock"}</p>
+              <p className={`text-4xl font-bold tabular-nums ${totalStock <= 0 ? "text-danger-700" : totalStock <= effMin ? "text-warn-700" : "text-ink"}`}>{totalStock}</p>
+              <p className="text-xs text-muted">{totalStock <= 0 ? "Agotado" : totalStock <= effMin ? `Por reponer: avisa con ${effMin} o menos` : `Avisa con ${effMin} o menos`}</p>
             </div>
-          )}
-          <div>
-            <label className="label">Categoría</label>
-            <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} onCategoriesChange={setCategories} emptyLabel="Sin categoría" />
+            {!isDraft && (
+              <button onClick={() => setAdjusting(true)} className="btn-primary btn-lg">
+                <IconCheck size={20} /> +/− Stock
+              </button>
+            )}
           </div>
+          {!isDraft && <p className="-mt-2 text-xs text-muted">+/− registra al instante una venta, una entrada o un retiro, con su motivo.</p>}
 
-          {/* Control de stock: mínimo y vencimiento */}
-          <div className="space-y-3">
+          <ProductVariants product={{ ...product, data }} categories={categories} axes={axes} variants={variants} onChanged={load} />
+
+          <div className="card space-y-4">
+            {stockField && !variants.length && (
+              <div>
+                <label className="label">{isDraft ? "Cantidad que tienes" : "Corregir el stock"}</label>
+                <FieldInput field={stockField} value={data[stockField.name]} onChange={(v) => setData({ ...data, [stockField.name]: v })} />
+                {!isDraft && <p className="mt-1 text-xs text-muted">Úsalo solo si contaste y no coincide; queda como «corrección» en el historial.</p>}
+              </div>
+            )}
             <div>
               <label className="label" htmlFor="min-stock">Avisarme cuando queden</label>
               <div className="flex items-center gap-2">
-                <input id="min-stock" type="number" min={0} inputMode="numeric" className="input w-20 shrink-0 py-2 text-center tabular-nums" placeholder="3" value={minStock} onChange={(e) => setMinStock(e.target.value)} />
-                <span className="min-w-0 flex-1 text-xs text-slate-500">unidades o menos. Vacío = usa el de su categoría.</span>
+                <input id="min-stock" type="number" min={0} inputMode="numeric" className="input h-11 w-20 shrink-0 text-center tabular-nums" placeholder={String(minStockOf({ ...product, min_stock: null }, categories, alerts))} value={minStock} onChange={(e) => setMinStock(e.target.value)} />
+                <span className="min-w-0 flex-1 text-xs text-muted">unidades o menos. Vacío = usa el de su categoría.</span>
               </div>
             </div>
             <div>
               <label className="label" htmlFor="expires">Vence el</label>
               <div className="flex flex-wrap items-center gap-2">
-                <input id="expires" type="date" className="input w-auto min-w-[9.5rem] flex-1 py-2" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
-                <button type="button" onClick={() => setExpiresAt("")} className={`chip shrink-0 ${expiresAt === "" ? "chip-active" : ""}`} title="Producto que no vence">
-                  Sin fecha
-                </button>
+                <input id="expires" type="date" className="input h-11 w-auto min-w-[9.5rem] flex-1" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+                <button type="button" onClick={() => setExpiresAt("")} className={`chip min-h-[44px] shrink-0 ${expiresAt === "" ? "chip-active" : ""}`}>Sin fecha</button>
               </div>
-              <p className="mt-1 text-xs text-slate-500">{expiresAt ? "Se avisa antes de que venza (los días se ajustan en Cuándo avisarme)." : "Sin fecha: no vence. Toca el calendario solo si quieres ponerle una."}</p>
+              <p className="mt-1 text-xs text-muted">{expiresAt ? `Te avisamos ${alerts.expiryDays} días antes.` : "Sin fecha: no vence."}</p>
             </div>
-          </div>
-
-          {/* Código de barras: se puede leer con la cámara (la IA no siempre lo ve en la foto) */}
-          <div>
-            <label className="label" htmlFor="code">Código de barras</label>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                id="code"
-                className="input w-auto min-w-[10rem] flex-1 font-mono text-sm"
-                placeholder="Sin código"
-                value={String(data[codeField] ?? "")}
-                onChange={(e) => setData({ ...data, [codeField]: e.target.value })}
-              />
-              <button type="button" onClick={() => setScanning((v) => !v)} className={`chip shrink-0 ${scanning ? "chip-active" : ""}`}>
-                <IconTag size={14} /> {scanning ? "Cerrar cámara" : data[codeField] ? "Volver a escanear" : "Escanear"}
-              </button>
-            </div>
-            {scanning && (
-              <div className="mt-2">
-                <BarcodeCamera
-                  label="Apuntar al código"
-                  onCode={(code) => {
-                    setData((d) => ({ ...d, [codeField]: code }));
-                    setScanning(false);
-                    navigator.vibrate?.(20);
-                    toast("success", `Código ${code} guardado en el formulario. Toca Guardar para confirmarlo.`);
-                  }}
-                />
-              </div>
-            )}
-            <p className="mt-1 text-xs text-slate-500">Con el código, el escáner y el conteo reconocen este producto al instante.</p>
-          </div>
-
-          {fields.map((f) =>
-            CODE_FIELDS.includes(f.name.toLowerCase()) || (!isOwner && /^(precio_compra|costo|cost)$/i.test(f.name)) ? null :
-            variants.length > 0 && /^(stock|cantidad|existencias)$/i.test(f.name) ? (
-              <div key={f.id}>
-                <label className="label">{fieldLabel(f.name)}</label>
-                <p className="rounded-xl bg-violet-50 px-3 py-2 text-lg font-bold tabular-nums text-violet-900">
-                  {variants.reduce((t, v) => t + v.stock, 0)} <span className="text-xs font-normal text-violet-700">· suma de las variantes (se cambia desde la cuadrícula)</span>
-                </p>
-              </div>
-            ) : (
-              <div key={f.id}>
-                <label className="label flex items-center gap-1">
-                  {fieldLabel(f.name)} {f.is_ai_fillable && <IconSparkles size={12} className="text-brand-500" />}
-                </label>
-                <FieldInput field={f} value={data[f.name]} onChange={(v) => setData({ ...data, [f.name]: v })} />
-              </div>
-            )
-          )}
-
-          {orphanKeys.length > 0 && (
-            <details className="text-xs text-slate-500">
-              <summary className="cursor-pointer">Otros datos guardados ({orphanKeys.length})</summary>
-              <ul className="mt-1 space-y-1">
-                {orphanKeys.map((k) => (
-                  <li key={k}><span className="font-medium">{k}:</span> {String(data[k] ?? "")}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          {/* Acciones: una principal clara + el resto en "Más opciones" */}
-          <div className="grid w-full gap-2 pt-2">
-            <div className="sticky-action">
-              {isDraft ? (
-                <button className="btn-success btn-lg w-full" onClick={() => save("confirmed")} disabled={saving}>
-                  {saving ? <Spinner /> : <IconCheck size={20} />} Guardar en el inventario
-                </button>
-              ) : (
-                <button className="btn-primary btn-lg w-full" onClick={() => save()} disabled={saving}>
-                  {saving ? <Spinner /> : <IconEdit size={18} />} Guardar cambios
-                </button>
-              )}
-            </div>
-
-            <button type="button" onClick={() => setMoreActions((v) => !v)} className="text-sm font-semibold text-slate-500 underline hover:text-ink">
-              {moreActions ? "Ocultar más opciones" : "Más opciones"}
-            </button>
-
-            {moreActions && (
-              <div className="animate-in grid gap-2 rounded-2xl border-2 border-slate-200 p-3">
-                {isDraft ? (
-                  <button className="btn-secondary w-full justify-start" onClick={() => save()} disabled={saving}>
-                    <IconEdit size={16} /> Guardar sin pasarlo al inventario
-                    <span className="ml-auto text-xs font-normal text-slate-500">sigue en pendientes</span>
-                  </button>
-                ) : (
-                  <button className="btn-secondary w-full justify-start" onClick={() => save("draft")} disabled={saving}>
-                    <IconEdit size={16} /> Marcar para revisar de nuevo
-                    <span className="ml-auto text-xs font-normal text-slate-500">vuelve a pendientes</span>
-                  </button>
-                )}
-                {(isDraft || isOwner) && (
-                  <button className="btn-destructive w-full justify-start" onClick={remove} disabled={saving}>
-                    <IconTrash size={16} /> {isDraft ? "Eliminar este pendiente" : "Enviar a la papelera"}
-                    <span className="ml-auto text-xs font-normal">{isDraft ? "y su foto" : "recuperable 30 días"}</span>
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </div>
-      </div>
-      {adjusting && product && (
-        <StockAdjust
-          product={{ ...product, data }}
-          variants={variants}
-          onClose={() => setAdjusting(false)}
-          onSaved={() => load()}
-        />
       )}
+
+      {/* PRECIOS */}
+      {tab === "precios" && (
+        <div className="animate-in space-y-4">
+          <div className="card space-y-4">
+            {priceFields.length === 0 && <p className="text-sm text-muted">Esta categoría no tiene datos de precio. Agrégalos en Ajustes → Categorías y datos.</p>}
+            {priceFields.map((f) => (
+              <div key={f.id}>
+                <label className="label">{fieldLabel(f.name)}{COST_RE.test(f.name) && <span className="ml-1 text-xs font-normal text-muted">(solo lo ves tú)</span>}</label>
+                <FieldInput field={f} value={data[f.name]} onChange={(v) => setData({ ...data, [f.name]: v })} />
+              </div>
+            ))}
+            {isOwner && price !== null && cost !== null && (
+              <p className={`rounded-2xl px-3 py-2 text-sm ${price > cost ? "bg-ok-50 text-ok-800" : "bg-danger-50 text-danger-800"}`}>
+                {price > cost ? <>Ganas <b>{money(price - cost)}</b> por unidad ({Math.round(((price - cost) / cost) * 100)} % sobre el costo).</> : <>Lo vendes a <b>costo o menos</b>: revisa el precio.</>}
+              </p>
+            )}
+          </div>
+          {isOwner && (
+            <section className="card">
+              <h2 className="mb-2 text-sm font-bold text-ink">Historial de precios</h2>
+              {priceHist.length === 0 ? (
+                <p className="text-sm text-muted">Todavía no cambió de precio.</p>
+              ) : (
+                <ul className="divide-y divide-slate-100 text-sm">
+                  {priceHist.map((h) => (
+                    <li key={h.id} className="flex items-center gap-2 py-2">
+                      <span className="w-28 shrink-0 text-xs text-muted">{new Date(h.created_at).toLocaleDateString("es", { day: "2-digit", month: "short", year: "2-digit" })} · {h.field === "precio" ? "venta" : h.field === "precio_compra" ? "compra" : "mayorista"}</span>
+                      <span className="tabular-nums text-slate-400 line-through">{h.old_value === null ? "—" : money(Number(h.old_value))}</span>
+                      <span className="font-bold tabular-nums text-ink">{h.new_value === null ? "—" : money(Number(h.new_value))}</span>
+                      <span className="ml-auto truncate text-xs text-muted">{h.source}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+        </div>
+      )}
+
+      {/* HISTORIAL */}
+      {tab === "historial" && (
+        <section className="animate-in card">
+          {movements === null ? (
+            <ListSkeleton rows={3} />
+          ) : movements.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted">Todavía no tiene ventas, entradas ni retiros.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100 text-sm">
+              {movements.map((m) => (
+                <li key={m.id} className="flex items-center gap-2 py-2">
+                  <span className={`w-16 shrink-0 rounded-full px-1.5 py-0.5 text-center text-xs font-bold ${m.tipo === "venta" ? "bg-ok-100 text-ok-800" : m.tipo === "entrada" ? "bg-info-100 text-info-700" : "bg-slate-200 text-slate-700"}`}>
+                    {m.tipo === "venta" ? "venta" : m.tipo === "entrada" ? "entrada" : "retiro"}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-slate-600">
+                    {new Date(m.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}
+                    {m.variant_label ? ` · ${m.variant_label}` : ""}
+                    {m.motivo ? ` · ${m.motivo}` : ""}
+                  </span>
+                  <span className="font-bold tabular-nums text-ink">{m.tipo === "entrada" ? "+" : "−"}{m.cantidad}</span>
+                  {m.tipo === "venta" && <span className="w-20 text-right font-semibold tabular-nums text-ok-700">{money(m.total ?? 0)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link href="/movements" className="mt-2 inline-flex min-h-[44px] items-center text-sm font-semibold text-brand-700 hover:underline">Ver todos los movimientos →</Link>
+        </section>
+      )}
+
+      {error && <p className="text-sm text-danger-700">{error}</p>}
+
+      {tab !== "historial" && (
+        <div className="sticky-action">
+          {isDraft ? (
+            <button className="btn-success btn-lg w-full" onClick={() => save("confirmed")} disabled={saving}>
+              {saving ? <Spinner /> : <IconCheck size={20} />} Guardar en el inventario
+            </button>
+          ) : (
+            <button className="btn-primary btn-lg w-full" onClick={() => save()} disabled={saving}>
+              {saving ? <Spinner /> : <IconEdit size={18} />} Guardar cambios
+            </button>
+          )}
+        </div>
+      )}
+
+      {adjusting && <StockAdjust product={{ ...product, data }} variants={variants} onClose={() => setAdjusting(false)} onSaved={() => load()} />}
     </div>
   );
 }

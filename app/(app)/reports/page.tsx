@@ -211,10 +211,10 @@ export default function ReportsPage() {
             <Kpi label="Ganancia si vendes todo" value={`${money(value.sale - value.cost)}`} sub="a precios de hoy" />
           </div>
           <div className="animate-in grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <Link href="/restock" className="press flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 hover:ring-orange-400">
+            <Link href="/products?filter=restock" className="press flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 hover:ring-orange-400">
               <span className="min-w-0 flex-1"><span className="block text-2xl font-bold tabular-nums text-orange-700">{restock}</span><span className="block text-xs text-slate-500">por reponer</span></span><IconChevronRight className="text-slate-300" />
             </Link>
-            <Link href="/restock?tab=vencer" className="press flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 hover:ring-amber-400">
+            <Link href="/products?filter=expiring" className="press flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 hover:ring-amber-400">
               <span className="min-w-0 flex-1"><span className="block text-2xl font-bold tabular-nums text-amber-700">{expiring}</span><span className="block text-xs text-slate-500">por vencer</span></span><IconChevronRight className="text-slate-300" />
             </Link>
             <button onClick={() => setTab("rotacion")} className="press flex items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-card ring-1 ring-slate-900/10 hover:ring-slate-400">

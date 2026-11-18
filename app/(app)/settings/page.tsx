@@ -150,7 +150,7 @@ export default function SettingsPage() {
         {flow.isOwner && <Row href="/export" icon={<IconDownload />} title="Exportar a Excel" subtitle="Descarga tu inventario" />}
         {flow.isOwner && <Row href="/import" icon={<IconTable />} title="Importar desde Excel" subtitle="Carga tu inventario desde una planilla" />}
         {flow.isOwner && <Row href="/backup" icon={<IconRefresh />} title="Respaldos" subtitle="Copia completa cada semana; guarda o descarga una ahora" />}
-        <Row href="/labels" icon={<IconTag />} title="Etiquetas para imprimir" subtitle="Código de barras, nombre y precio para pegar en cada producto" />
+        <Row href="/products?select=1" icon={<IconTag />} title="Etiquetas para imprimir" subtitle="En Productos: Seleccionar → Etiquetas" />
         <Row href="/dashboard#guia" icon={<IconList />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" />
         <Row href="/dashboard#limpiar" icon={<IconTrash />} title="Ordenar y limpiar" subtitle="Pendientes viejos, categorías vacías y fotos sueltas" />
       </section>

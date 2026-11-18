@@ -179,8 +179,8 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 |---|---|---|
 | C7.1 · Sistema visual y armazón | ✅ 2026-11-18 | 17.8 |
 | C7.2 · Inicio y Vender | ✅ 2026-11-18 | 17.9 |
-| C7.3 · Productos | ⏳ siguiente | |
-| C7.4 · Agregar y Revisar | pendiente | |
+| C7.3 · Productos | ✅ 2026-11-18 | 17.10 |
+| C7.4 · Agregar y Revisar | ⏳ siguiente | |
 | C7.5 · Mercadería | pendiente | |
 | C7.6 · Clientes | pendiente | |
 | C7.7 · Números | pendiente | |
@@ -198,6 +198,15 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 **C7.2 (2026-11-18):**
 - **Inicio «Hoy»** (`app/(app)/dashboard/page.tsx`): botón grande **Vender** con lo vendido hoy (y la ganancia, solo dueño); **primeros pasos** (tienda → productos → primera venta) mientras falte alguno; hasta **4 tareas** con su botón (fotos analizándose, pendientes, caja sin cerrar después de las 18 h, clientes que deben hace más de 30 días, por vencer, por reponer, sin precio); «En inventario» y «Te deben». Se quitaron la tarjeta de colores con una sola acción y los pasos ①②③. **Corrección:** «por reponer» ahora usa la misma regla que la lista de reposición (mínimos del negocio, categoría y producto, y avisos silenciados); antes contaba con mínimo fijo 3.
 - **Transitorio:** «Herramientas» (consumo de IA, ordenar y limpiar, guía) queda plegado al final de Inicio, solo para el dueño, hasta C7.8 (Ajustes → Mis datos e Inteligencia artificial). Los enlaces `/dashboard#limpiar` y `#guia` siguen abriéndolo.
+
+**C7.3 (2026-11-18):**
+- `app/(app)/products/page.tsx` reescrita: lista única sobre `product_summaries` (todas las filas, ≈200 B c/u; copia sin conexión en `bizKey("inventory")` con variantes). Estado en la dirección: `?filter=pending|restock|expiring|out|noprice|nophoto|trash`, `?category=<id>|none`, `?view=table`, `?select=1`. Búsqueda local (nombre, marca, código, código de variante) + `search` en el servidor (descripción, etiqueta). Páginas de 60 filas.
+- «Por reponer» usa `restockLines()` (`components/products/RestockSheet.tsx`), la misma regla de la lista de pedido: por variante cuando tiene variantes, mínimos de producto › categoría › negocio, respeta avisos silenciados. **Diferencia conocida:** Inicio y Reportes siguen contando por stock total del producto (`needsRestock`); se unifica en C7.7 al pasar los números a SQL (E3).
+- Borrados `components/ProductRow.tsx` y `components/SwipeRow.tsx` (sin uso). Componentes nuevos en `components/products/`: `RestockSheet` (antes /restock; descartar = botón × en vez de deslizar), `TrashList` (antes /trash; borrar para siempre y vaciar solo dueño, igual que la base), `PriceSheet` (antes /prices; ahora sobre la selección en vez de por categoría — para toda una categoría: filtrar → Seleccionar → Todos), `LabelSheet` (antes /labels; la hoja impresa va en un portal `#labels-sheet` fuera de la hoja inferior). «Mover» usa `CategoryPicker` y un `update ... in (ids)`.
+- La barra de selección reutiliza `.sticky-action` (no hizo falta un `SelectionBar` aparte).
+- Los totales por categoría (antes estantes) quedan en la hoja «Categoría ▾» (productos y valor de venta); el detalle completo va a Números › Productos en C7.7. La cifra «Ventas este mes» de la lista se quitó (está en Inicio y Reportes).
+- Ficha `products/[id]/ProductDetailClient.tsx` con `Tabs`: Datos · Stock · Precios · Historial. Los campos se reparten por nombre (precios: `precio|precio_compra|precio_mayorista|unidades_por_paquete|…`; stock: `stock|cantidad|existencias`; código: `CODE_FIELDS`). Guardado igual que antes (`withoutStock` + `setStock` si se corrigió). Historial: 30 movimientos; historial de precios: 20 (solo dueño).
+- Redirecciones en `next.config.mjs`: `/products/c/:id`, `/products/table`, `/restock` (con `?tab=vencer` → `filter=expiring`), `/trash`, `/prices`, `/labels`. Borradas esas 6 rutas. «Más» pasa a «Qué falta» y «Precios y etiquetas».
 - **Vender** (`app/(app)/sell/page.tsx`): `ProductFinder` (buscar o escanear; elige la variante en una hoja) + los más vendidos + carrito con `QtyStepper` y precio por línea (atajo a mayorista) + acción fija **Cobrar**. La hoja **Cobrar** reemplaza al diálogo de confirmación: total y descuento; Efectivo · QR · Transf. · Varios; «Paga todo / Paga una parte / A cuenta»; en efectivo, **teclado grande** con montos rápidos (exacto y billetes redondos) y **vuelto**; cliente (obligatorio si queda debiendo) con aviso de límite de fiado y de stock insuficiente dentro de la hoja. El ticket final muestra el vuelto. Sigue siendo una sola operación `register_sale` con id idempotente.
 - **Caja dentro de Vender:** la pantalla pasó a `/sell/cash` (botón «Caja» en Vender); `/cash` redirige (`next.config.mjs` → `redirects`, primera redirección de §3.3).
 - Componentes nuevos: `components/ProductFinder.tsx`, `components/ui/NumberPad.tsx` (`NumberPad`, `QtyStepper`, `padNumber`).
