@@ -22,6 +22,7 @@ import { money, stockOf } from "@/lib/inventory";
 import { STOCK_KEYS, newOpId, setStock, withoutStock } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
 import type { PriceHistory, StockMovement } from "@/types/database";
+import { withCosts } from "@/lib/data/costs";
 
 export default function ProductDetailClient() {
   const { id } = useParams<{ id: string }>();
@@ -91,13 +92,15 @@ export default function ProductDetailClient() {
     setVariants((v.data ?? []) as ProductVariant[]);
     supabase.from("stock_movements").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(8).then(({ data }) => setMovements((data ?? []) as StockMovement[]));
     supabase.from("price_history").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(6).then(({ data }) => setPriceHist((data ?? []) as PriceHistory[]));
-    if (!p.data) setNotFound(true);
+    // El costo vive en product_costs (025): para el dueño se vuelve a poner en data; al vendedor no le llega
+    const full = p.data ? (await withCosts(supabase, [p.data]))[0] : null;
+    if (!full) setNotFound(true);
     else {
-      setProduct(p.data);
-      setData(canonicalizeData(p.data.data, getEffectiveFields(t.data ?? [], c.data ?? [], p.data.category_id)));
-      setCategoryId(p.data.category_id);
-      setMinStock(p.data.min_stock === null || p.data.min_stock === undefined ? "" : String(p.data.min_stock));
-      setExpiresAt(p.data.expires_at ?? "");
+      setProduct(full);
+      setData(canonicalizeData(full.data, getEffectiveFields(t.data ?? [], c.data ?? [], full.category_id)));
+      setCategoryId(full.category_id);
+      setMinStock(full.min_stock === null || full.min_stock === undefined ? "" : String(full.min_stock));
+      setExpiresAt(full.expires_at ?? "");
     }
     setLoading(false);
   }, [supabase, id]);

@@ -43,7 +43,7 @@ export default function CashPage() {
       const [summary, m, c] = await Promise.all([
         cashSummary(supabase),
         supabase.from("cash_movements").select("*").gte("created_at", start.toISOString()).order("created_at", { ascending: false }),
-        supabase.from("cash_closings").select("*").order("closed_at", { ascending: false }).limit(20),
+        supabase.from("cash_closings_v").select("*").order("closed_at", { ascending: false }).limit(20),
       ]);
       setSm(summary);
       setMoves((m.data ?? []) as CashMovement[]);

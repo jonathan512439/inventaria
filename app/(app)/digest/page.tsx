@@ -30,8 +30,8 @@ export default function DigestPage() {
       const [p, c, st, sy, open] = await Promise.all([
         supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed"),
         supabase.from("categories").select("*"),
-        supabase.from("sales").select("*").gte("created_at", today.toISOString()),
-        supabase.from("sales").select("*").gte("created_at", yesterday.toISOString()).lt("created_at", today.toISOString()),
+        supabase.from("sales_v").select("*").gte("created_at", today.toISOString()),
+        supabase.from("sales_v").select("*").gte("created_at", yesterday.toISOString()).lt("created_at", today.toISOString()),
         supabase.from("sales").select("customer_name,total,paid,created_at").neq("status", "pagado"),
       ]);
       setProducts((p.data ?? []).map(fromSummary));

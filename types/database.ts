@@ -449,6 +449,9 @@ export type Product = {
   search?: string | null;
 };
 
+/** Costo de un producto o de una variante (025): tabla que solo lee el dueño. */
+export type ProductCost = { id: string; business_id: string; product_id: string; variant_id: string | null; cost: number; updated_at: string };
+
 /** Entradas y resultados de las operaciones atómicas (021). */
 export type SaleLineInput = { product_id: string; variant_id: string | null; qty: number; unit_price: number };
 export type PurchaseLineInput = { product_id: string; variant_id: string | null; qty: number; unit_cost: number | null; expires_at: string | null };
@@ -716,6 +719,12 @@ export interface Database {
         Update: Partial<StockCountItem>;
         Relationships: [];
       };
+      product_costs: {
+        Row: ProductCost;
+        Insert: Omit<ProductCost, "id" | "updated_at" | "variant_id"> & { id?: string; updated_at?: string; variant_id?: string | null };
+        Update: Partial<ProductCost>;
+        Relationships: [];
+      };
       price_history: {
         Row: PriceHistory;
         Insert: Omit<PriceHistory, "id" | "created_at" | "product_id" | "variant_id" | "old_value" | "new_value" | "source"> & {
@@ -759,6 +768,10 @@ export interface Database {
     Views: {
       product_summaries: { Row: ProductSummary; Relationships: [] };
       customer_balances: { Row: CustomerBalance; Relationships: [] };
+      // Vistas del dueño (025): mismas columnas de siempre; al vendedor el costo/ganancia le llegan vacíos
+      sales_v: { Row: Sale; Relationships: [] };
+      sale_items_v: { Row: SaleItem; Relationships: [] };
+      cash_closings_v: { Row: CashClosing; Relationships: [] };
     };
     Functions: {
       accept_invite: { Args: { p_code: string; p_display_name?: string | null }; Returns: string };

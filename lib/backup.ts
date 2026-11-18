@@ -19,14 +19,15 @@ export const BACKUP_TABLES = [
   "product_variants",
   "variant_axes",
   "stock_movements",
-  "sales",
-  "sale_items",
+  "sales_v",
+  "sale_items_v",
   "customers",
   "payments",
   "consignments",
   "consignment_items",
   "cash_movements",
-  "cash_closings",
+  "cash_closings_v",
+  "product_costs",
   "suppliers",
   "purchases",
   "purchase_items",
@@ -38,8 +39,8 @@ export const BACKUP_TABLES = [
 
 /** Columnas a exportar por tabla, en orden, con su título en español. */
 const SHEETS: { table: (typeof BACKUP_TABLES)[number]; name: string; cols: [string, string][] }[] = [
-  { table: "sales", name: "Ventas", cols: [["number", "N.º"], ["created_at", "Fecha"], ["customer_name", "Cliente"], ["status", "Estado"], ["method", "Pago"], ["subtotal", "Subtotal"], ["discount", "Descuento"], ["total", "Total"], ["paid", "Pagado"], ["cost_total", "Costo"], ["items", "Productos"], ["note", "Nota"], ["user_id", "Atendió"], ["id", "Id"]] },
-  { table: "sale_items", name: "Detalle de ventas", cols: [["sale_id", "Venta"], ["created_at", "Fecha"], ["product_name", "Producto"], ["variant_label", "Variante"], ["qty", "Cantidad"], ["unit_price", "Precio"], ["unit_cost", "Costo"], ["line_total", "Total"], ["product_id", "Id producto"]] },
+  { table: "sales_v", name: "Ventas", cols: [["number", "N.º"], ["created_at", "Fecha"], ["customer_name", "Cliente"], ["status", "Estado"], ["method", "Pago"], ["subtotal", "Subtotal"], ["discount", "Descuento"], ["total", "Total"], ["paid", "Pagado"], ["cost_total", "Costo"], ["items", "Productos"], ["note", "Nota"], ["user_id", "Atendió"], ["id", "Id"]] },
+  { table: "sale_items_v", name: "Detalle de ventas", cols: [["sale_id", "Venta"], ["created_at", "Fecha"], ["product_name", "Producto"], ["variant_label", "Variante"], ["qty", "Cantidad"], ["unit_price", "Precio"], ["unit_cost", "Costo"], ["line_total", "Total"], ["product_id", "Id producto"]] },
   { table: "customers", name: "Clientes", cols: [["name", "Nombre"], ["phone", "Teléfono"], ["credit_limit", "Límite de fiado"], ["note", "Nota"], ["created_at", "Desde"], ["deleted_at", "Borrado el"], ["id", "Id"]] },
   { table: "payments", name: "Cobros", cols: [["created_at", "Fecha"], ["kind", "Tipo (venta o abono)"], ["sale_id", "Venta (id)"], ["customer_id", "Cliente (id)"], ["amount", "Monto"], ["method", "Pago"], ["note", "Nota"], ["user_id", "Atendió"]] },
   { table: "consignments", name: "Entregas", cols: [["created_at", "Fecha"], ["customer_name", "Cliente"], ["status", "Estado"], ["closed_at", "Liquidada el"], ["note", "Nota"], ["id", "Id"]] },
@@ -50,7 +51,7 @@ const SHEETS: { table: (typeof BACKUP_TABLES)[number]; name: string; cols: [stri
   { table: "suppliers", name: "Proveedores", cols: [["name", "Nombre"], ["phone", "Teléfono"], ["note", "Nota"], ["created_at", "Desde"]] },
   { table: "stock_counts", name: "Conteos", cols: [["started_at", "Inicio"], ["closed_at", "Cierre"], ["category_name", "Categoría"], ["items", "Contados"], ["differences", "Diferencias"], ["diff_units", "Unidades de diferencia"], ["note", "Nota"], ["user_id", "Quién"]] },
   { table: "stock_count_items", name: "Detalle de conteos", cols: [["count_id", "Conteo"], ["product_name", "Producto"], ["variant_label", "Variante"], ["expected", "Había"], ["counted", "Contado"], ["reason", "Motivo"]] },
-  { table: "cash_closings", name: "Cierres de caja", cols: [["day", "Día"], ["sales_count", "Ventas"], ["total_sales", "Vendido"], ["by_method", "Por medio de pago"], ["cash_in", "Ingresos"], ["cash_out", "Retiros"], ["expected_cash", "Debía haber"], ["counted_cash", "Contado"], ["difference", "Diferencia"], ["profit", "Ganancia"], ["note", "Nota"], ["closed_at", "Cerrado el"], ["user_id", "Quién"]] },
+  { table: "cash_closings_v", name: "Cierres de caja", cols: [["day", "Día"], ["sales_count", "Ventas"], ["total_sales", "Vendido"], ["by_method", "Por medio de pago"], ["cash_in", "Ingresos"], ["cash_out", "Retiros"], ["expected_cash", "Debía haber"], ["counted_cash", "Contado"], ["difference", "Diferencia"], ["profit", "Ganancia"], ["note", "Nota"], ["closed_at", "Cerrado el"], ["user_id", "Quién"]] },
   { table: "cash_movements", name: "Caja ingresos y retiros", cols: [["created_at", "Fecha"], ["tipo", "Tipo"], ["amount", "Monto"], ["note", "Nota"], ["user_id", "Quién"]] },
   { table: "price_history", name: "Historial de precios", cols: [["created_at", "Fecha"], ["product_id", "Id producto"], ["variant_id", "Id variante"], ["field", "Precio"], ["old_value", "Antes"], ["new_value", "Después"], ["source", "Origen"]] },
   { table: "categories", name: "Categorías", cols: [["name", "Nombre"], ["parent_id", "Pertenece a (id)"], ["icon", "Ícono"], ["alerts_off", "Sin avisos"], ["id", "Id"]] },
@@ -90,6 +91,11 @@ export async function buildBackupWorkbook(XLSX: XlsxLib, fetch: Fetcher, busines
   const wsCover = XLSX.utils.aoa_to_sheet(cover);
   wsCover["!cols"] = [{ wch: 26 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, wsCover, "Respaldo");
+
+  // El costo vive en product_costs (025, solo dueño): se vuelve a poner como «precio_compra» para que la hoja
+  // Inventario quede igual que antes y se pueda volver a importar
+  const costOf = new Map((data.product_costs ?? []).filter((c) => !c.variant_id).map((c) => [String(c.product_id), Number(c.cost)]));
+  data.products = (data.products as unknown as Product[]).map((p) => (costOf.has(p.id) ? { ...p, data: { ...p.data, precio_compra: costOf.get(p.id)! } } : p)) as unknown as Row[];
 
   // Inventario con las columnas del usuario (mismo formato que Exportar a Excel)
   const products = (data.products as unknown as Product[]).filter((p) => !p.deleted_at);

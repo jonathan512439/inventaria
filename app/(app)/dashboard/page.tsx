@@ -47,7 +47,7 @@ export default function DashboardPage() {
         supabase.from("categories").select("id,parent_id,min_stock_default"),
         supabase.from("profiles").select("onboarded_at").maybeSingle(),
         supabase.from("product_summaries").select("stock,precio,min_stock,expires_at,category_id").eq("status", "confirmed"),
-        supabase.from("sales").select("total,cost_total").gte("created_at", dayStart.toISOString()),
+        supabase.from("sales_v").select("total,cost_total").gte("created_at", dayStart.toISOString()),
         supabase.from("sales").select("total,paid").neq("status", "pagado"),
         supabase.from("products").select("id", { count: "exact", head: true }).gte("created_at", dayStart.toISOString()).is("deleted_at", null),
       ]);

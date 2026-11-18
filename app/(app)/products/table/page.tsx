@@ -7,6 +7,7 @@ import type { Category, FieldTemplate, Product } from "@/types/database";
 import ProductTable from "@/components/ProductTable";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { IconArrowLeft, IconDownload } from "@/components/ui/Icons";
+import { withCosts } from "@/lib/data/costs";
 
 /** Vista de tabla completa (escritorio): agrupada por categoría › subcategoría, con edición en línea. */
 export default function InventoryTablePage() {
@@ -24,7 +25,7 @@ export default function InventoryTablePage() {
     ]);
     setCategories(c.data ?? []);
     setTemplates(t.data ?? []);
-    setProducts((p.data ?? []) as Product[]);
+    setProducts(await withCosts(supabase, (p.data ?? []) as Product[])); // costo (025): solo le llega al dueño
     setLoading(false);
   }, [supabase]);
 

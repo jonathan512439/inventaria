@@ -85,7 +85,7 @@ try {
   // 8) Como el usuario (clave anónima + RLS): vista, búsqueda, costo visible al dueño, código exacto
   const ua = createClient(URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
   await ua.auth.signInWithPassword({ email: a.email, password: PASS });
-  await admin.from("products").update({ precio_compra: 8 }).eq("id", p.id);
+  await admin.from("product_costs").insert({ business_id: a.bid, product_id: p.id, cost: 8 }); // 025: el costo vive aparte
   const { data: found } = await ua.from("product_summaries").select("id,nombre,precio_compra,stock").ilike("search", "%grano de%");
   check(found?.length === 1 && found[0].id === p.id, `búsqueda en la vista encuentra el producto → ${found?.length}`);
   check(Number(found?.[0]?.precio_compra) === 8, `el dueño ve su costo en la vista → ${found?.[0]?.precio_compra}`);

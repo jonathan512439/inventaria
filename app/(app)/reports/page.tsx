@@ -34,8 +34,8 @@ export default function ReportsPage() {
       const [p, c, s, i] = await Promise.all([
         supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed"),
         supabase.from("categories").select("*"),
-        supabase.from("sales").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(3000),
-        supabase.from("sale_items").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(6000),
+        supabase.from("sales_v").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(3000),
+        supabase.from("sale_items_v").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(6000),
       ]);
       setProducts((p.data ?? []).map(fromSummary));
       setCategories(c.data ?? []);

@@ -40,6 +40,7 @@ import {
   IconX,
   Spinner,
 } from "@/components/ui/Icons";
+import { withCosts } from "@/lib/data/costs";
 
 export default function ReviewPage() {
   return (
@@ -206,7 +207,7 @@ function Review() {
     ]);
     setCategories(c.data ?? []);
     setTemplates(t.data ?? []);
-    setProducts(p.data ?? []);
+    setProducts(await withCosts(supabase, p.data ?? [])); // costo (025): solo le llega al dueño
     setAxes((a.data ?? []) as VariantAxis[]);
     setLoading(false);
   }, [supabase]);

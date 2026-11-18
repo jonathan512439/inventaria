@@ -153,6 +153,33 @@ try {
   check(!upErr && !vDl && !!aDl, `respaldos: el dueño descarga, el vendedor no ${upErr?.message ?? ""}`);
   await admin.storage.from("backups").remove([path]);
 
+  // --- Costos (025): el vendedor no los recibe en ninguna lectura ---
+  await a.from("products").update({ data: { nombre: "Confirmado 2", precio: 10, precio_compra: 6 } }).eq("id", P.id);
+  await v.from("products").update({ data: { nombre: "Confirmado 2", precio: 10, precio_compra: 1 } }).eq("id", P.id);
+  const { data: pcost } = await admin.from("product_costs").select("cost").eq("product_id", P.id).is("variant_id", null).maybeSingle();
+  const { data: pRaw } = await admin.from("products").select("data").eq("id", P.id).single();
+  check(Number(pcost?.cost) === 6 && !("precio_compra" in pRaw.data), `el dueño fija el costo desde el formulario; el del vendedor se descarta; data queda sin costo → ${pcost?.cost}`);
+  const { data: vProd } = await v.from("products").select("*").eq("id", P.id).single();
+  const { data: vSum } = await v.from("product_summaries").select("precio_compra").eq("id", P.id).single();
+  const { data: aSum } = await a.from("product_summaries").select("precio_compra").eq("id", P.id).single();
+  check(!("precio_compra" in (vProd?.data ?? {})) && !("precio_compra" in (vProd ?? {})) && vSum?.precio_compra === null && Number(aSum?.precio_compra) === 6, "producto y vista: costo solo para el dueño");
+  const vCosts = await Promise.all(["product_costs", "sale_costs", "sale_item_costs", "cash_closing_profits"].map(async (t) => ((await v.from(t).select("*")).data ?? []).length));
+  check(vCosts.every((n) => n === 0), `tablas de costos: el vendedor no lee nada → ${vCosts.join(",")}`);
+  const { data: vSale } = await v.from("sales_v").select("cost_total").eq("id", sale.data.sale.id).single();
+  const { data: aSale } = await a.from("sales_v").select("cost_total").eq("id", sale.data.sale.id).single();
+  const { data: vItems } = await v.from("sale_items_v").select("unit_cost").eq("sale_id", sale.data.sale.id);
+  const { data: vRawSale } = await v.from("sales").select("*").eq("id", sale.data.sale.id).single();
+  check(vSale?.cost_total === null && aSale?.cost_total !== null && (vItems ?? []).every((i) => i.unit_cost === null) && !("cost_total" in (vRawSale ?? {})), "ventas y líneas: costo solo para el dueño");
+  const { data: vHist } = await v.from("price_history").select("field").eq("product_id", P.id).eq("field", "precio_compra");
+  const { data: aHist } = await a.from("price_history").select("field").eq("product_id", P.id).eq("field", "precio_compra");
+  check((vHist ?? []).length === 0 && (aHist ?? []).length >= 1, `historial del costo: solo el dueño (${(aHist ?? []).length})`);
+  const cl = await a.rpc("close_cash", { p_id: uuid(), p_day: null, p_counted: null, p_note: null });
+  const { data: vCl } = await v.from("cash_closings_v").select("profit").eq("id", cl.data?.id).single();
+  const { data: aCl } = await a.from("cash_closings_v").select("profit").eq("id", cl.data?.id).single();
+  check(!cl.error && vCl?.profit === null && aCl?.profit !== null, `cierres: la ganancia solo para el dueño ${cl.error?.message ?? ""}`);
+  const { data: vMov } = await v.from("stock_movements").select("precio_unitario").eq("product_id", P.id).not("purchase_id", "is", null);
+  check((vMov ?? []).every((m) => m.precio_unitario === null), "las entradas por compra no muestran el costo en Movimientos");
+
   // --- Rutas API protegidas (opcional) ---
   if (BASE) {
     const ref = new URL(URL_).hostname.split(".")[0];

@@ -44,7 +44,7 @@ export default function MovementsPage() {
   useEffect(() => {
     Promise.all([
       supabase.from("stock_movements").select("*").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("sales").select("*").order("created_at", { ascending: false }).limit(500),
+      supabase.from("sales_v").select("*").order("created_at", { ascending: false }).limit(500),
     ]).then(([m, s]) => {
       setRows((m.data ?? []) as StockMovement[]);
       setTickets((s.data ?? []) as Sale[]);

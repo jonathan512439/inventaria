@@ -30,8 +30,8 @@ export async function POST(request: Request) {
   const [{ data: cats }, { data: prods }, { data: sales }, { data: items }, { data: customers }, { data: ctx }] = await Promise.all([
     supabase.from("categories").select("*"),
     supabase.from("product_summaries").select("id,category_id,nombre,marca,precio,precio_compra,stock,min_stock,expires_at").eq("status", "confirmed").limit(MAX_PRODUCTS),
-    supabase.from("sales").select("id,number,customer_name,status,method,total,paid,cost_total,items,created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(1500),
-    supabase.from("sale_items").select("sale_id,product_id,product_name,variant_label,qty,unit_price,unit_cost,line_total,created_at").gte("created_at", since).limit(4000),
+    supabase.from("sales_v").select("id,number,customer_name,status,method,total,paid,cost_total,items,created_at").gte("created_at", since).order("created_at", { ascending: false }).limit(1500),
+    supabase.from("sale_items_v").select("sale_id,product_id,product_name,variant_label,qty,unit_price,unit_cost,line_total,created_at").gte("created_at", since).limit(4000),
     supabase.from("customers").select("id,name,phone").is("deleted_at", null).limit(300),
     // Nombre, moneda y «hoy» del NEGOCIO (023)
     supabase.rpc("session_context"),

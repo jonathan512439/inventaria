@@ -176,21 +176,24 @@ try {
   await admin.from("stock_movements").insert({ user_id: uid, ...B, product_id: taza.id, product_name: "Taza", tipo: "entrada", cantidad: 3, precio_unitario: 10, motivo: "compra · Distribuidora E2E", stock_resultante: 10, purchase_id: pur.id });
   const { data: mv2 } = await admin.from("stock_movements").select("purchase_id").eq("product_id", taza.id).eq("tipo", "entrada");
   ({ data: sTaza } = await admin.from("product_summaries").select("stock,expires_at").eq("id", taza.id).single());
-  const { data: tzRow } = await admin.from("products").select("data").eq("id", taza.id).single(); // el costo en la vista solo lo ve el dueño con sesión
-  check(mv2?.[0]?.purchase_id === pur.id && sTaza.stock === 10 && Number(tzRow.data.precio_compra) === 10 && sTaza.expires_at === "2027-01-31", `compra registrada: stock 10, costo 10, vence 2027-01-31`);
+  // 025: el costo pasó de data a product_costs (solo dueño)
+  const { data: tzCost } = await admin.from("product_costs").select("cost").eq("product_id", taza.id).is("variant_id", null).maybeSingle();
+  check(mv2?.[0]?.purchase_id === pur.id && sTaza.stock === 10 && Number(tzCost?.cost) === 10 && sTaza.expires_at === "2027-01-31", `compra registrada: stock 10, costo 10, vence 2027-01-31`);
   const { data: cnt } = await admin.from("stock_counts").insert({ user_id: uid, ...B, category_name: "Regalos", items: 1, differences: 1, diff_units: 2, closed_at: new Date().toISOString() }).select().single();
   const { error: cie } = await admin.from("stock_count_items").insert({ count_id: cnt.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", expected: 10, counted: 8, reason: "Merma o rotura" });
   check(!cie, "acta de conteo con diferencia guardada");
 
   // 13. Ventas: ticket con número correlativo, líneas, ganancia real y cierre de caja
-  const { data: v1 } = await admin.from("sales").insert({ user_id: uid, ...B, method: "efectivo", status: "pagado", subtotal: 25, discount: 0, total: 25, paid: 25, cost_total: 20, items: 1 }).select().single();
-  const { data: v2 } = await admin.from("sales").insert({ user_id: uid, ...B, method: "qr", status: "parcial", customer_name: "Juanito", subtotal: 12.5, discount: 0, total: 12.5, paid: 5, cost_total: 0, items: 1 }).select().single();
+  const { data: v1 } = await admin.from("sales").insert({ user_id: uid, ...B, method: "efectivo", status: "pagado", subtotal: 25, discount: 0, total: 25, paid: 25, items: 1 }).select().single();
+  const { data: v2 } = await admin.from("sales").insert({ user_id: uid, ...B, method: "qr", status: "parcial", customer_name: "Juanito", subtotal: 12.5, discount: 0, total: 12.5, paid: 5, items: 1 }).select().single();
+  await admin.from("sale_costs").insert([{ sale_id: v1.id, ...B, cost_total: 20 }, { sale_id: v2.id, ...B, cost_total: 0 }]);
   check(v1.number === 1 && v2.number === 2, `tickets numerados: N.º ${v1.number} y N.º ${v2.number}`);
-  await admin.from("sale_items").insert([
-    { sale_id: v1.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", qty: 2, unit_price: 12.5, unit_cost: 10, line_total: 25 },
-    { sale_id: v2.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", qty: 1, unit_price: 12.5, unit_cost: null, line_total: 12.5 },
-  ]);
-  const { data: sold } = await admin.from("sales").select("total,cost_total,paid,status").eq("user_id", uid);
+  const { data: its13 } = await admin.from("sale_items").insert([
+    { sale_id: v1.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", qty: 2, unit_price: 12.5, line_total: 25 },
+    { sale_id: v2.id, user_id: uid, ...B, product_id: taza.id, product_name: "Taza", qty: 1, unit_price: 12.5, line_total: 12.5 },
+  ]).select();
+  await admin.from("sale_item_costs").insert({ sale_item_id: its13.find((i) => i.sale_id === v1.id).id, ...B, unit_cost: 10 });
+  const { data: sold } = await admin.from("sales_v").select("total,cost_total,paid,status").eq("user_id", uid);
   const vendido = sold.reduce((x, y) => x + Number(y.total), 0);
   const ganancia = sold.reduce((x, y) => x + Number(y.total) - Number(y.cost_total), 0);
   const porCobrar = sold.filter((y) => y.status !== "pagado").reduce((x, y) => x + Number(y.total) - Number(y.paid), 0);
@@ -201,8 +204,8 @@ try {
   const today = new Date(); const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   await admin.from("cash_movements").insert({ user_id: uid, ...B, tipo: "retiro", amount: 5, note: "bolsas" });
   // Desde 022 cada cierre es una fila nueva (historial); el cálculo real lo prueba `npm run test:ops` con close_cash
-  const { error: ce1 } = await admin.from("cash_closings").insert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 20, difference: 0, profit: 17.5 });
-  const { error: ce2 } = await admin.from("cash_closings").insert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 18, difference: -2, profit: 17.5 });
+  const { error: ce1 } = await admin.from("cash_closings").insert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 20, difference: 0 });
+  const { error: ce2 } = await admin.from("cash_closings").insert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 18, difference: -2 });
   const { data: cls } = await admin.from("cash_closings").select("difference").eq("user_id", uid).order("closed_at");
   check(!ce1 && !ce2 && cls.length === 2 && Number(cls[1].difference) === -2, "cierre de caja: volver a cerrar guarda un cierre nuevo y conserva el anterior");
   for (const path of ["/sell", "/cash", "/movements"]) {
@@ -213,7 +216,7 @@ try {
   // 14. Clientes: fiado ligado al cliente, abono FIFO, entrega en consignación
   const { data: cli } = await admin.from("customers").insert({ user_id: uid, ...B, name: "Juanito Pérez", phone: "70011122", credit_limit: 100 }).select().single();
   await admin.from("sales").update({ customer_id: cli.id, customer_name: cli.name }).eq("id", v2.id); // la venta parcial pasa a su nombre
-  const { data: v3 } = await admin.from("sales").insert({ user_id: uid, ...B, customer_id: cli.id, customer_name: cli.name, method: "efectivo", status: "fiado", subtotal: 20, discount: 0, total: 20, paid: 0, cost_total: 10, items: 1 }).select().single();
+  const { data: v3 } = await admin.from("sales").insert({ user_id: uid, ...B, customer_id: cli.id, customer_name: cli.name, method: "efectivo", status: "fiado", subtotal: 20, discount: 0, total: 20, paid: 0, items: 1 }).select().single();
   let { data: deudas } = await admin.from("sales").select("total,paid,status,created_at").eq("customer_id", cli.id).neq("status", "pagado").order("created_at");
   const deuda = deudas.reduce((x, y) => x + Number(y.total) - Number(y.paid), 0);
   check(deuda === 27.5, `Juanito debe Bs ${deuda} en ${deudas.length} tickets`);

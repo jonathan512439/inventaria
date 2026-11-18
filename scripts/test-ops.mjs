@@ -49,10 +49,13 @@ try {
   const P1 = await ins({ data: { nombre: "Gaseosa 2L", precio: 5, precio_compra: 3, stock: 10 } });
   const P2 = await ins({ data: { nombre: "Polera", precio: 35, stock: 0 } });
   const { data: vars } = await admin.from("product_variants").insert([
-    { user_id: A.id, business_id: A.bid, product_id: P2.id, values: { talla: "S" }, label: "S", stock: 4, costo: 7 },
+    { user_id: A.id, business_id: A.bid, product_id: P2.id, values: { talla: "S" }, label: "S", stock: 4 },
     { user_id: A.id, business_id: A.bid, product_id: P2.id, values: { talla: "M" }, label: "M", stock: 2 },
   ]).select();
   const S = vars.find((v) => v.label === "S");
+  // 025: el costo de la variante vive en product_costs (solo dueño)
+  await admin.from("product_costs").insert({ business_id: A.bid, product_id: P2.id, variant_id: S.id, cost: 7 });
+  const saleCost = async (saleId) => Number((await admin.from("sale_costs").select("cost_total").eq("sale_id", saleId).maybeSingle()).data?.cost_total);
 
   const a = await signIn(A);
   const v = await signIn(V);
@@ -65,7 +68,9 @@ try {
   check((await stockOf(P1.id)) === 0, `stock 10 − 10 = 0 → ${await stockOf(P1.id)}`);
   const nums = results.map((r) => r.data?.sale?.number).filter(Boolean).sort((x, y) => x - y);
   check(new Set(nums).size === 10 && nums[0] === 1 && nums[9] === 10, `números 1…10 sin repetir → ${nums.join(",")}`);
-  check(results.every((r) => Number(r.data?.sale?.cost_total) === 3), "costo de cada venta leído en el servidor (3)");
+  const costs10 = await Promise.all(results.map((r) => saleCost(r.data?.sale?.id)));
+  check(costs10.every((c) => c === 3), `costo de cada venta leído en el servidor (3) → ${costs10.join(",")}`);
+  check(results.every((r) => !("cost_total" in (r.data?.sale ?? {}))), "la respuesta de la venta no trae el costo");
 
   // 2) La misma venta dos veces → una sola
   const sid = uuid();
@@ -84,12 +89,14 @@ try {
   check(!!r4.error && /variante/i.test(r4.error.message), `producto con tallas sin elegir talla se rechaza → ${r4.error?.message}`);
   const r5 = await a.rpc("register_sale", { p_id: uuid(), p_lines: [line(P2.id, 1, 35, S.id)] });
   check(!r5.error && (await variantStock(S.id)) === 3 && (await stockOf(P2.id)) === 5, `venta de la S → S 3, total 5 → ${await stockOf(P2.id)}`);
-  check(Number(r5.data?.items?.[0]?.unit_cost) === 7, "costo de la variante en la línea (7)");
+  const { data: ic } = await admin.from("sale_item_costs").select("unit_cost").eq("sale_item_id", r5.data?.items?.[0]?.id).maybeSingle();
+  check(Number(ic?.unit_cost) === 7, `costo de la variante en la línea (7) → ${ic?.unit_cost}`);
 
   // 5) El vendedor vende: el costo se guarda igual (antes quedaba en 0)
   await admin.from("products").update({ stock: 5 }).eq("id", P1.id);
   const r6 = await v.rpc("register_sale", { p_id: uuid(), p_lines: [line(P1.id, 2, 5)] });
-  check(!r6.error && Number(r6.data?.sale?.cost_total) === 6, `venta del vendedor con costo real 6 → ${r6.data?.sale?.cost_total} ${r6.error?.message ?? ""}`);
+  const c6 = await saleCost(r6.data?.sale?.id);
+  check(!r6.error && c6 === 6, `venta del vendedor con costo real 6 → ${c6} ${r6.error?.message ?? ""}`);
   check(r6.data?.sale?.user_id === V.id, "la venta queda firmada por el vendedor");
 
   // 6) Otro negocio no puede vender mis productos
@@ -117,9 +124,10 @@ try {
 
   // 9) Compra: stock, costo e historial de precios automático
   const pu = await a.rpc("register_purchase", { p_id: uuid(), p_supplier: null, p_doc: "F-1", p_note: null, p_lines: [{ product_id: P1.id, variant_id: null, qty: 10, unit_cost: 4, expires_at: "2027-01-31" }] });
-  const { data: p1 } = await admin.from("products").select("stock,precio_compra,expires_at,data").eq("id", P1.id).single();
-  check(!pu.error && Number(p1.stock) === 12 && Number(p1.precio_compra) === 4 && p1.expires_at === "2027-01-31", `compra: stock 12, costo 4, vence → ${p1.stock}/${p1.precio_compra}/${p1.expires_at} ${pu.error?.message ?? ""}`);
-  check(p1.data.precio_compra === 4, `el costo también queda en data → ${p1.data.precio_compra}`);
+  const { data: p1 } = await admin.from("products").select("stock,expires_at,data").eq("id", P1.id).single();
+  const { data: pc1 } = await admin.from("product_costs").select("cost").eq("product_id", P1.id).is("variant_id", null).single();
+  check(!pu.error && Number(p1.stock) === 12 && Number(pc1?.cost) === 4 && p1.expires_at === "2027-01-31", `compra: stock 12, costo 4, vence → ${p1.stock}/${pc1?.cost}/${p1.expires_at} ${pu.error?.message ?? ""}`);
+  check(!("precio_compra" in p1.data), "el costo ya no queda en data (025)");
   const { data: ph } = await admin.from("price_history").select("field,old_value,new_value,source").eq("product_id", P1.id).order("created_at");
   check(ph?.some((h) => h.field === "precio_compra" && Number(h.new_value) === 4 && h.source === "compra"), "historial: costo 3 → 4 por compra");
 

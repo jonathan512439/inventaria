@@ -6,6 +6,7 @@ import type { Category, FieldTemplate, Product, ProductVariant, VariantAxis } fr
 import { categoryPath, getDescendantIds } from "@/lib/categories";
 import { exportToExcel } from "@/lib/export";
 import CategoryPicker from "@/components/CategoryPicker";
+import { withCosts } from "@/lib/data/costs";
 
 type StatusFilter = "confirmed" | "draft" | "all";
 
@@ -35,7 +36,7 @@ export default function ExportPage() {
       ]);
       setCategories(c.data ?? []);
       setTemplates(t.data ?? []);
-      setProducts(p.data ?? []);
+      setProducts(await withCosts(supabase, p.data ?? [])); // costo (025): solo el dueño exporta
       setVariants((v.data ?? []) as ProductVariant[]);
       setAxes((a.data ?? []) as VariantAxis[]);
       setLoading(false);

@@ -16,6 +16,7 @@ import StockAdjust from "@/components/StockAdjust";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { bizKey, cacheGet, cacheSet, isNetworkError } from "@/lib/offline";
 import { IconArrowLeft, IconCamera, IconDownload, IconList, IconTable } from "@/components/ui/Icons";
+import { withCosts } from "@/lib/data/costs";
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "porReponer", label: "Por reponer" },
@@ -102,7 +103,7 @@ export default function CategoryInventoryClient() {
         supabase.from("products").select("*").in("id", chunk),
         supabase.from("product_variants").select("*").in("product_id", chunk).order("created_at"),
       ]);
-      (data ?? []).forEach((row) => fetched.set(row.id, row as Product));
+      (await withCosts(supabase, (data ?? []) as Product[])).forEach((row) => fetched.set(row.id, row)); // costo (025): solo el dueño
       if (vs?.length) setVariants((cur) => [...cur.filter((v) => !chunk.includes(v.product_id)), ...(vs as ProductVariant[])]);
     }
     // Fusión con lo que otras cargas hayan traído mientras tanto
