@@ -3,6 +3,16 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-18 · Fase 6.9 · C5.2 — El costo y la ganancia, solo para el dueño
+
+Migración `025_costos.sql` aplicada (las sumas de costos se verificaron antes de quitar las columnas). `npm run test:access` 34/34 (también contra las rutas publicadas); `test:ops`, `test:team`, `test:fields`, `test:variants`, `test:import`, `test:backup` en verde; `test:e2e` 58/58.
+
+### 17.6 Costos fuera del alcance del vendedor
+- **Qué**: hasta ahora la app no le mostraba el costo al vendedor, pero el dato le llegaba igual (alguien con la app modificada lo podía ver). Ahora el precio de compra, el costo de cada venta y la ganancia de la caja se guardan aparte y la base **solo se los entrega al dueño**: al vendedor le llegan vacíos en productos, ventas, cierres, historial de precios y movimientos.
+  - Para el dueño todo se ve igual que antes (ficha, tabla, reportes, caja, resumen, exportar y respaldos incluyen el costo).
+  - El precio de compra se sigue cambiando desde la ficha del producto, con una compra o con cambio de precios en lote; si un vendedor intenta mandarlo, se ignora.
+- **Validar**: con la cuenta del dueño → la ficha de un producto muestra y guarda el precio de compra; Reportes y Caja muestran la ganancia. Con la cuenta de un vendedor → no aparece el costo en ninguna pantalla ni en Movimientos (las entradas por compra ya no muestran a cuánto se compró).
+
 ## 2026-11-18 · Fase 6.9 · C5.1 — Cada quien puede solo lo que le toca (y la base lo hace cumplir)
 
 Migración `024_permisos.sql` aplicada. Prueba nueva `npm run test:access` 24/24 (intenta cada acción como dueño, vendedor, otro negocio y alguien con dos negocios, directo contra la base); `test:team` 22/22; `test:ops`, `test:fields`, `test:variants`, `test:import`, `test:backup` en verde.

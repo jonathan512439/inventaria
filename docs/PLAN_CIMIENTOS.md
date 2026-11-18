@@ -16,8 +16,8 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 | C3 · El dinero como pagos | ✅ 2026-11-18 | `022_pagos.sql` | `npm run test:ops` (ampliada) | 17.3 |
 | C4 · Ajustes del negocio y zona horaria | ✅ 2026-11-18 | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
 | C5.1 · Permisos por rol y operación, negocio activo, firma | ✅ 2026-11-18 | `024_permisos.sql` | `npm run test:access` (24) + `test:team` | 17.5 |
-| C5.2 · Costos fuera del alcance del vendedor | ⏳ siguiente | `025_costos.sql` | `npm run test:access` (ampliada) | 17.6 |
-| C5.3 · Fotos privadas | pendiente | `026_fotos_privadas.sql` | `npm run test:access` (ampliada) | 17.7 |
+| C5.2 · Costos fuera del alcance del vendedor | ✅ 2026-11-18 | `025_costos.sql` | `npm run test:access` (ampliada) | 17.6 |
+| C5.3 · Fotos privadas | ⏳ siguiente | `026_fotos_privadas.sql` | `npm run test:access` (ampliada) | 17.7 |
 | C6 · Calidad continua | pendiente | `schema_migrations` | CI | 17.6 |
 | C7 · Reconstrucción visual completa (C7.1–C7.9) | pendiente (tras C5) | — | manual + `test:e2e` + prueba con 3 personas | 17.7–17.15 |
 
@@ -172,6 +172,15 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 - `/api/usage` POST: solo con clave propia y solo filas propias. Consumo de IA por petición (`key.usage`), sin arreglo global.
 - Selector de negocio en Ajustes (si la persona está en más de uno).
 - Pendiente para C5.2: el vendedor todavía puede leer el costo con la clave anónima (en `products.data`, `products.precio_compra`, `product_variants.costo`, `sale_items.unit_cost`, `sales.cost_total`, `cash_closings.profit`, historial de precios del costo y `precio_unitario` de las entradas por compra). Las rutas API de IA siguen validando solo la sesión (RLS hace el resto).
+
+**Resultado C5.2 (2026-11-18):** `025_costos.sql` aplicada **justo antes** de publicar (quita columnas que leía la versión anterior; ~3 min sin código acorde). Verificación dentro de la migración: las sumas de costos copiadas coinciden con las originales (si no, se deshacía todo); inventario idéntico. `npm run test:access` **34/34** con API (10 nuevas: el dueño fija el costo desde el formulario y el del vendedor se descarta; `data` sin costo; producto, vista, ventas, líneas, historial del costo, tablas de costos y cierres: el vendedor no recibe el costo/ganancia; las entradas por compra ya no muestran el costo en Movimientos). `test:ops` 50/50 (lee los costos de las tablas nuevas; la respuesta de la venta ya no trae el costo), `test:team`, `test:fields`, `test:variants`, `test:import`, `test:backup` en verde; `test:e2e` 58/58.
+
+**Cómo quedó:**
+- Tablas solo del dueño: `product_costs` (producto y variante), `sale_costs`, `sale_item_costs`, `cash_closing_profits`. Sin escritura directa: las llenan las funciones y disparadores.
+- Se quitaron `products.precio_compra`, `product_variants.costo`, `sales.cost_total`, `sale_items.unit_cost`, `cash_closings.profit` y el costo de `products.data`; `stock_movements.precio_unitario` de las entradas por compra quedó vacío (el costo sigue en `purchase_items`, solo dueño).
+- Vistas con los mismos nombres de columna: `product_summaries.precio_compra`, `sales_v.cost_total`, `sale_items_v.unit_cost`, `cash_closings_v.profit` (al vendedor le llegan vacías). Inicio, Resumen, Movimientos, Reportes, Caja, «Pregúntale» y el respaldo las usan.
+- Formularios del dueño (ficha, tabla, Revisar, categoría, exportar): `withCosts()` (`lib/data/costs.ts`) vuelve a poner el costo en `data.precio_compra`; al guardar, el disparador `products_cost_out/save` lo pasa a `product_costs`. El historial del costo se escribe desde `product_costs`.
+- Pendiente menor: el costo por variante solo se fija con compras (no hay campo en la ficha de la variante, igual que antes).
 
 ## C6 · Calidad continua (cierra M3, M6, M7)
 
