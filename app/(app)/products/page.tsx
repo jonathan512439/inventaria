@@ -118,9 +118,9 @@ export default function ProductsPage() {
         <div className="animate-in grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
           <Stat label="Productos" value={String(total.products)} hint={`en ${shelves.length} categoría${shelves.length === 1 ? "" : "s"}`} />
           <Link href="/restock" className="rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 transition hover:ring-orange-400">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Por reponer</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Por reponer</p>
             <p className={`text-xl font-bold tabular-nums ${total.alerts.porReponer ? "text-orange-700" : "text-ink"}`}>{total.alerts.porReponer}</p>
-            <p className="truncate text-[11px] text-slate-400">{total.alerts.porReponer ? "ver lista de reposición" : `${fmtMoney(total.units)} unidades en total`}</p>
+            <p className="truncate text-xs text-slate-400">{total.alerts.porReponer ? "ver lista de reposición" : `${fmtMoney(total.units)} unidades en total`}</p>
           </Link>
           <Stat label="Valor de venta" value={`${money(total.saleValue)}`} tone="ok" hint="precio × stock" />
           {!isOwner ? (
@@ -143,9 +143,9 @@ export default function ProductsPage() {
             }
           />
           <Link href="/movements" className="rounded-2xl bg-emerald-600 p-3 text-white shadow-card transition hover:brightness-110">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Ventas este mes</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Ventas este mes</p>
             <p className="text-xl font-bold tabular-nums">{money(salesMonth?.total ?? 0)}</p>
-            <p className="text-[11px] text-white/80">{salesMonth ? `${salesMonth.count} venta${salesMonth.count === 1 ? "" : "s"} · ver detalle` : "…"}</p>
+            <p className="text-xs text-white/80">{salesMonth ? `${salesMonth.count} venta${salesMonth.count === 1 ? "" : "s"} · ver detalle` : "…"}</p>
           </Link>
         </div>
       )}
@@ -217,17 +217,17 @@ export default function ProductsPage() {
                     {s.children.length > 0 && (
                       <p className="mt-2 flex flex-wrap gap-1">
                         {s.children.slice(0, 6).map((c) => (
-                          <span key={c.category.id} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${c.products ? `${col.bg} ${col.text}` : "bg-slate-100 text-slate-400"}`}>
+                          <span key={c.category.id} className={`rounded-full px-2 py-0.5 text-xs font-medium ${c.products ? `${col.bg} ${col.text}` : "bg-slate-100 text-slate-400"}`}>
                             {c.category.name} <b>{c.products}</b>
                           </span>
                         ))}
-                        {s.children.length > 6 && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">+{s.children.length - 6}</span>}
+                        {s.children.length > 6 && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">+{s.children.length - 6}</span>}
                       </p>
                     )}
 
                     {/* Pie: último agregado y el más valioso */}
                     {(s.lastAdded || s.topProduct) && (
-                      <p className="mt-auto pt-3 text-[11px] leading-snug text-slate-500">
+                      <p className="mt-auto pt-3 text-xs leading-snug text-slate-500">
                         {s.lastAdded && <span className="block truncate">Último agregado <b className="text-slate-700">{timeAgo(s.lastAdded)}</b></span>}
                         {s.topProduct && (
                           <span className="block truncate">
@@ -266,9 +266,9 @@ const TONE = { ok: "text-emerald-700", warn: "text-amber-700", none: "text-ink" 
 function Stat({ label, value, tone, hint }: { label: string; value: string; tone?: "ok" | "warn"; hint?: string }) {
   return (
     <div className="rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className={`text-xl font-bold tabular-nums ${TONE[tone ?? "none"]}`}>{value}</p>
-      {hint && <p className="truncate text-[11px] text-slate-400">{hint}</p>}
+      {hint && <p className="truncate text-xs text-slate-400">{hint}</p>}
     </div>
   );
 }
@@ -276,7 +276,7 @@ function Stat({ label, value, tone, hint }: { label: string; value: string; tone
 function Mini({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
   return (
     <div className="min-w-0 rounded-xl bg-slate-50 px-2 py-1.5">
-      <dt className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
+      <dt className="truncate text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
       <dd className={`m-0 truncate text-sm font-bold tabular-nums ${TONE[tone ?? "none"]}`}>{value}</dd>
     </div>
   );
@@ -296,7 +296,7 @@ function AlertLine({ stats }: { stats: CategoryStats }) {
   return (
     <p className="mt-2 flex flex-wrap gap-1.5">
       {items.map((i) => (
-        <span key={i.t} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${i.c}`}>⚠ {i.t}</span>
+        <span key={i.t} className={`rounded-full px-2 py-0.5 text-xs font-semibold ${i.c}`}>⚠ {i.t}</span>
       ))}
     </p>
   );

@@ -115,7 +115,7 @@ export default function MovementsPage() {
       {/* Resumen */}
       <div className="animate-in grid grid-cols-2 gap-2 md:grid-cols-4 xl:max-w-4xl">
         <div className="rounded-3xl bg-emerald-600 p-4 text-white shadow-float">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Vendido</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Vendido</p>
           <p className="text-2xl font-bold tabular-nums">{money(ingresos)}</p>
           <p className="text-xs text-white/80">{ticketsInRange.length + looseSales.length} venta{ticketsInRange.length + looseSales.length === 1 ? "" : "s"} · {unidadesVendidas} unid.</p>
         </div>
@@ -154,7 +154,7 @@ export default function MovementsPage() {
           {ticketsInRange.map((t) => (
             <li key={t.id} className="rounded-2xl bg-white shadow-card ring-1 ring-slate-900/10">
               <button onClick={() => toggleTicket(t.id)} className="flex w-full items-center gap-3 p-3 text-left">
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${t.status === "pagado" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{t.status === "pagado" ? "Venta" : STATUS_LABEL[t.status]}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${t.status === "pagado" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{t.status === "pagado" ? "Venta" : STATUS_LABEL[t.status]}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold text-ink">N.º {t.number} · {t.items} producto{t.items === 1 ? "" : "s"}{t.customer_name ? ` · ${t.customer_name}` : ""}</span>
                   <span className="block text-xs text-slate-500">
@@ -164,7 +164,7 @@ export default function MovementsPage() {
                 </span>
                 <span className="text-right">
                   <span className="block font-bold tabular-nums text-emerald-700">{money(Number(t.total))}</span>
-                  {isOwner && <span className="block text-[11px] text-slate-500">gana {money(Number(t.total) - Number(t.cost_total))}</span>}
+                  {isOwner && <span className="block text-xs text-slate-500">gana {money(Number(t.total) - Number(t.cost_total))}</span>}
                 </span>
                 <IconChevronRight size={16} className={`text-slate-300 transition ${open === t.id ? "rotate-90" : ""}`} />
               </button>
@@ -186,7 +186,7 @@ export default function MovementsPage() {
           ))}
           {looseSales.map((r) => (
             <li key={r.id} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10">
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">Venta</span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">Venta</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold text-ink">{r.product_name || "Producto"}{r.variant_label ? <span className="text-violet-800"> · {r.variant_label}</span> : null}</span>
                 <span className="block text-xs text-slate-500">{new Date(r.created_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · registrada sin conexión</span>
@@ -203,7 +203,7 @@ export default function MovementsPage() {
             const l = LABEL[r.tipo];
             return (
               <li key={r.id} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10">
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${l.c}`}>{l.t}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${l.c}`}>{l.t}</span>
                 <span className="min-w-0 flex-1">
                   {r.product_id ? (
                     <Link href={`/products/${r.product_id}`} className="block truncate font-semibold text-ink hover:text-brand-700">{r.product_name || "Producto"}</Link>
@@ -234,7 +234,7 @@ export default function MovementsPage() {
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-900/10">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className="text-2xl font-bold tabular-nums text-ink">{value}</p>
       {hint && <p className="text-xs text-slate-400">{hint}</p>}
     </div>

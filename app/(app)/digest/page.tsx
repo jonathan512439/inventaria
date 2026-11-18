@@ -129,9 +129,9 @@ function Tile({ label, value, hint, tone, href }: { label: string; value: string
   const v = tone === "rose" ? "text-rose-700" : tone === "amber" ? "text-amber-700" : tone === "emerald" ? "" : "text-ink";
   const inner = (
     <>
-      <p className={`text-[11px] font-semibold uppercase tracking-wide ${tone === "emerald" ? "text-white/70" : "text-slate-500"}`}>{label}</p>
+      <p className={`text-xs font-semibold uppercase tracking-wide ${tone === "emerald" ? "text-white/70" : "text-slate-500"}`}>{label}</p>
       <p className={`text-xl font-bold tabular-nums ${v}`}>{value}</p>
-      <p className={`truncate text-[11px] ${tone === "emerald" ? "text-white/70" : "text-slate-400"}`}>{hint}</p>
+      <p className={`truncate text-xs ${tone === "emerald" ? "text-white/70" : "text-slate-400"}`}>{hint}</p>
     </>
   );
   return href ? <Link href={href} className={`press rounded-2xl p-3 shadow-card ring-1 ${cls}`}>{inner}</Link> : <div className={`rounded-2xl p-3 shadow-card ring-1 ${cls}`}>{inner}</div>;

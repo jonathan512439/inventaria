@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import colors from "tailwindcss/colors";
 
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.ts"],
@@ -8,8 +9,15 @@ const config: Config = {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
       },
       colors: {
+        // Sistema visual (C7 · RECONSTRUCCION_VISUAL.md §5): colores con significado, no por pantalla
         surface: "#f7f7fb",
+        canvas: "#f7f7fb",
         ink: "#0f172a",
+        muted: "#64748b",
+        ok: colors.emerald,
+        warn: colors.amber,
+        danger: colors.rose,
+        info: colors.sky,
         brand: {
           50: "#eef2ff",
           100: "#e0e7ff",

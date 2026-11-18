@@ -133,7 +133,7 @@ export default function TeamPage() {
                 </li>
               ))}
             </ul>
-            <p className="text-[11px] text-slate-500">El <b>vendedor</b> vende, cobra, cuenta y repone; no ve precios de compra, ganancia, reportes ni ajustes.</p>
+            <p className="text-xs text-slate-500">El <b>vendedor</b> vende, cobra, cuenta y repone; no ve precios de compra, ganancia, reportes ni ajustes.</p>
           </section>
 
           {flow.isOwner && (

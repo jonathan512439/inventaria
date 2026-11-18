@@ -215,7 +215,7 @@ export function StepByStep({ progress, defaultOpen }: { progress: GuideProgress;
                     <ol className="space-y-2">
                       {s.instructions.map((line, j) => (
                         <li key={j} className="flex gap-2 text-sm text-slate-600">
-                          <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">{j + 1}</span>
+                          <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">{j + 1}</span>
                           <span><Rich text={line} /></span>
                         </li>
                       ))}
@@ -246,7 +246,7 @@ export function StepByStep({ progress, defaultOpen }: { progress: GuideProgress;
             <ol className="space-y-1.5">
               {TASKS[task].steps.map((line, j) => (
                 <li key={j} className="flex gap-2 text-sm text-slate-600">
-                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white text-[11px] font-bold text-slate-500 ring-1 ring-slate-200">{j + 1}</span>
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white text-xs font-bold text-slate-500 ring-1 ring-slate-200">{j + 1}</span>
                   <span><Rich text={line} /></span>
                 </li>
               ))}

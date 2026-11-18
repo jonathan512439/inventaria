@@ -33,19 +33,11 @@ export interface FlowState {
   /** Cambiar de persona: con el token de `start_shift` (024), o null para volver a la cuenta de la sesión */
   switchActor: (userId: string | null, token?: string | null) => void;
   refresh: () => void;
-  /** Paso actual según la ruta: 1 agregar, 2 revisar, 3 inventario, 0 otra */
-  step: 0 | 1 | 2 | 3;
 }
 
 // Por defecto, rol mínimo: hasta saber quién es, nadie ve pantallas ni datos de dueño (S5)
-const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, alerts: DEFAULT_ALERTS, business: null, ready: false, businesses: 0, role: "vendedor", members: [], actorId: null, meId: null, isOwner: false, switchActor: () => {}, refresh: () => {}, step: 0 });
+const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, alerts: DEFAULT_ALERTS, business: null, ready: false, businesses: 0, role: "vendedor", members: [], actorId: null, meId: null, isOwner: false, switchActor: () => {}, refresh: () => {} });
 
-export function stepOf(pathname: string): 0 | 1 | 2 | 3 {
-  if (pathname.startsWith("/capture") || pathname.startsWith("/scan") || pathname.startsWith("/products/new")) return 1;
-  if (pathname.startsWith("/review")) return 2;
-  if (["/products", "/movements", "/restock", "/purchases", "/count", "/prices", "/trash", "/sell", "/cash", "/customers", "/consign", "/reports", "/digest", "/ask"].some((p) => pathname.startsWith(p))) return 3;
-  return 0;
-}
 
 export function FlowProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -137,9 +129,8 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
       switchActor,
       working: q.queued + q.processing,
       refresh,
-      step: stepOf(pathname),
     }),
-    [counts, alerts, team, actorRole, actorId, switchActor, q.queued, q.processing, refresh, pathname]
+    [counts, alerts, team, actorRole, actorId, switchActor, q.queued, q.processing, refresh]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

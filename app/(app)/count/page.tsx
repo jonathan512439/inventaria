@@ -241,7 +241,7 @@ export default function CountPage() {
             <div className="animate-in space-y-2">
               <BarcodeCamera onCode={onCode} label="Escanear para contar (+1 por lectura)" />
               {rows.some((r) => !r.code) && (
-                <p className="rounded-xl bg-slate-100 px-3 py-2 text-[11px] text-slate-600">
+                <p className="rounded-xl bg-slate-100 px-3 py-2 text-xs text-slate-600">
                   {rows.filter((r) => !r.code).length} de {rows.length} productos todavía no tienen su código guardado. Escanéalos: la app te preguntará de cuál es y lo aprende para la próxima.
                 </p>
               )}
@@ -250,7 +250,7 @@ export default function CountPage() {
                   {onlyPending ? "Viendo solo los que faltan" : "Ocultar los que ya conté"}
                   <span className="opacity-70">{rows.length - stats.done}</span>
                 </button>
-                <span className="min-w-0 flex-1 text-[11px] text-slate-500">
+                <span className="min-w-0 flex-1 text-xs text-slate-500">
                   {onlyPending
                     ? `Estás viendo los ${rows.length - stats.done} productos que aún no has contado.`
                     : `Estás viendo los ${rows.length} productos de esta categoría. Toca el botón para ver solo los que te faltan.`}
@@ -276,7 +276,7 @@ export default function CountPage() {
                       <li key={r.key}>
                         <button onClick={() => assignCode(r)} className="flex w-full items-center gap-2 rounded-xl bg-white px-3 py-2 text-left ring-1 ring-amber-200 hover:ring-amber-400">
                           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{r.name}{r.variant ? <span className="text-violet-800"> · {r.variant}</span> : null}</span>
-                          {r.code ? <span className="shrink-0 text-[10px] text-slate-400">ya tiene código</span> : null}
+                          {r.code ? <span className="shrink-0 text-xs text-slate-400">ya tiene código</span> : null}
                         </button>
                       </li>
                     ))}

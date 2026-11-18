@@ -172,3 +172,25 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 **Medidas de éxito:** pantallas 38 → 16; entradas de menú ~30 → 8; consejos 20 → 0 (ayuda bajo demanda); toques de Inicio a cobrar: hoy 3–4 → 2; textos < 12 px: 130 → 0.
 
 **Restricciones que se mantienen:** pantallas de `(app)` estáticas (sin `runtime = "edge"`; las de parámetro envueltas como `/products/[id]`); librerías pesadas con `await import()`; menos pantallas = Worker más chico. Prioridad móvil, escritorio funcional.
+
+## 7. Avance y decisiones de implementación
+
+| Paso | Estado | CHANGELOG |
+|---|---|---|
+| C7.1 · Sistema visual y armazón | ✅ 2026-11-18 | 17.8 |
+| C7.2 · Inicio y Vender | ⏳ siguiente | |
+| C7.3 · Productos | pendiente | |
+| C7.4 · Agregar y Revisar | pendiente | |
+| C7.5 · Mercadería | pendiente | |
+| C7.6 · Clientes | pendiente | |
+| C7.7 · Números | pendiente | |
+| C7.8 · Ajustes | pendiente | |
+| C7.9 · Limpieza y ayuda | pendiente | |
+
+**C7.1 (2026-11-18):**
+- Tokens en `tailwind.config.ts`: `ok`, `warn`, `danger`, `info`, `muted`, `canvas`. La escala de texto de Tailwind ya coincide con §5 (xs 12 · sm 14 · base 16…): se reemplazaron los 121 usos de 9–11 px por `text-xs` (12 px) en toda la app; queda solo el dibujo decorativo de la guía.
+- Íconos propios por destino en `components/ui/Icons.tsx` (carrito, caja, personas, gráfico, camión, portapapeles, impresora, nube, ayuda, tienda, campana, escáner, sin conexión, usuario, más).
+- Componentes base: `components/ui/Sheet.tsx` (hoja inferior / ventana, alto máximo y pie fijo) y `components/ui/Screen.tsx` (`ScreenHeader` con ayuda «?», `Tabs`, `ChipFilter`, `EmptyState`, `Stat`, `ListRow`, `TaskCard`). Los que dependen de un flujo (`ProductFinder`, `NumberPad`, `MoneyInput`, `QtyStepper`, `SelectionBar`) se crean en el paso que los usa (C7.2 / C7.3).
+- `components/AppShell.tsx` reemplaza a `Nav.tsx` y `StepBar.tsx` (borrados): barra inferior Inicio · Productos · **Vender** · Clientes · Más; barra lateral en escritorio; cabecera con nombre del negocio, `ConnectionChip` (antes `OfflineBar`) y «¿Quién atiende?» (salió de Inicio).
+- **Transitorio:** «Más» lleva también a Agregar, Revisar, Escanear, Compras, Contar, Reposición, Precios, Etiquetas y Caja, agrupados como en §3 (Productos · Vender y cobrar · Números · Ajustes · Ayuda), para que nada quede inaccesible mientras C7.2–C7.8 mueven cada función a su lugar. El 5.º botón del vendedor pasa a «Caja» en C7.9, cuando todo lo demás ya viva dentro de su área.
+- **Redirecciones (§3.3):** se agregan en el mismo paso que crea cada ruta nueva (en C7.1 no había destinos nuevos).

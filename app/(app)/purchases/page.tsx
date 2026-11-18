@@ -271,15 +271,15 @@ export default function PurchasesPage() {
                     <button onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="rounded-full p-1 text-slate-300 hover:bg-rose-50 hover:text-rose-600"><IconTrash size={16} /></button>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
-                    <label className="text-[11px] font-semibold uppercase text-slate-500">
+                    <label className="text-xs font-semibold uppercase text-slate-500">
                       Cantidad
                       <input type="number" min={1} inputMode="numeric" className="input mt-0.5 py-1.5 text-center font-bold tabular-nums" value={l.qty} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, qty: e.target.value } : x)))} />
                     </label>
-                    <label className="text-[11px] font-semibold uppercase text-slate-500">
+                    <label className="text-xs font-semibold uppercase text-slate-500">
                       Costo unit. ({currencyLabel()})
                       <input type="number" min={0} step="any" inputMode="decimal" className="input mt-0.5 py-1.5 text-center tabular-nums" value={l.cost} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, cost: e.target.value } : x)))} />
                     </label>
-                    <label className="text-[11px] font-semibold uppercase text-slate-500">
+                    <label className="text-xs font-semibold uppercase text-slate-500">
                       Vence
                       <input type="date" className="input mt-0.5 py-1.5 text-xs" value={l.expires} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, expires: e.target.value } : x)))} />
                     </label>

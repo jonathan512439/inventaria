@@ -230,7 +230,7 @@ export default function SellPage() {
         <BarcodeCamera onCode={onCode} label="Escanear producto" />
         {recent.length > 0 && !q && (
           <div>
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Los más vendidos</p>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Los más vendidos</p>
             <div className="flex flex-wrap gap-1.5">
               {recent.map((p) => (
                 <button key={p.id} onClick={() => add(p)} className="chip py-1 text-xs">{productTitle(p.data) || "Producto"}</button>
@@ -352,7 +352,7 @@ export default function SellPage() {
                     <input type="number" min={0} step="any" inputMode="decimal" className="input mt-1 py-1.5 tabular-nums" value={paid} onChange={(e) => setPaid(e.target.value)} />
                   </label>
                 )}
-                <p className="text-[11px] text-amber-800 sm:col-span-2">Queda pendiente <b>{money(total - paidNum)}</b> a nombre de {customer ? <b>{customer.name}</b> : "el cliente que elijas arriba"}. Lo verás en su ficha, con sus productos, para cobrarlo o recordárselo por WhatsApp.</p>
+                <p className="text-xs text-amber-800 sm:col-span-2">Queda pendiente <b>{money(total - paidNum)}</b> a nombre de {customer ? <b>{customer.name}</b> : "el cliente que elijas arriba"}. Lo verás en su ficha, con sus productos, para cobrarlo o recordárselo por WhatsApp.</p>
               </div>
             )}
           </div>}

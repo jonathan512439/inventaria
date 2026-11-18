@@ -55,7 +55,7 @@ export default function WhoIsServing() {
   return (
     <>
       <button onClick={() => { setOpen(true); setPick(null); setPin(""); }} className="flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-card ring-1 ring-slate-900/10 hover:ring-brand-300">
-        <span className="grid h-5 w-5 place-items-center rounded-full bg-brand-600 text-[10px] font-bold text-white">{(current?.display_name ?? "?").slice(0, 1).toUpperCase()}</span>
+        <span className="grid h-5 w-5 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">{(current?.display_name ?? "?").slice(0, 1).toUpperCase()}</span>
         Atiende {current?.display_name ?? "—"} ▾
       </button>
       {open &&
@@ -74,7 +74,7 @@ export default function WhoIsServing() {
                   <li key={m.user_id}>
                     <button onClick={() => { setPick(m.user_id); setPin(""); }} className={`flex w-full items-center gap-3 rounded-2xl border-2 px-3 py-2 text-left ${pick === m.user_id ? "border-brand-500 bg-brand-50" : "border-slate-200"}`}>
                       <span className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-sm font-bold text-slate-700">{(m.display_name ?? "?").slice(0, 1).toUpperCase()}</span>
-                      <span className="min-w-0 flex-1"><span className="block truncate font-semibold text-ink">{m.display_name ?? "Sin nombre"}</span><span className="block text-[11px] text-slate-500">{m.role === "dueno" ? "Dueño" : "Vendedor"}{m.user_id === flow.meId ? " · tu cuenta" : m.has_pin ? "" : " · sin PIN"}</span></span>
+                      <span className="min-w-0 flex-1"><span className="block truncate font-semibold text-ink">{m.display_name ?? "Sin nombre"}</span><span className="block text-xs text-slate-500">{m.role === "dueno" ? "Dueño" : "Vendedor"}{m.user_id === flow.meId ? " · tu cuenta" : m.has_pin ? "" : " · sin PIN"}</span></span>
                       {(flow.actorId ?? flow.meId) === m.user_id && <IconCheck size={16} className="text-brand-600" />}
                     </button>
                   </li>

@@ -178,7 +178,7 @@ function CustomerDetail() {
 
       {/* Saldo */}
       <section className={`animate-in rounded-3xl p-4 text-white shadow-float ${debt > 0 ? "bg-amber-600" : "bg-emerald-600"}`}>
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-white/75">{debt > 0 ? "Te debe" : "Al día"}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-white/75">{debt > 0 ? "Te debe" : "Al día"}</p>
         <p className="text-3xl font-bold tabular-nums">{money(debt)}</p>
         <p className="text-xs text-white/85">
           {debt > 0 ? `desde hace ${days} día${days === 1 ? "" : "s"}` : credit > 0 ? `tiene ${money(credit)} a su favor (se usan en su próxima compra fiada)` : "no tiene deudas pendientes"}
@@ -255,7 +255,7 @@ function CustomerDetail() {
             {sales.slice(0, 30).map((s) => (
               <li key={s.id}>
                 <button onClick={() => setOpen(open === s.id ? null : s.id)} className="flex w-full items-center gap-2 py-2 text-left">
-                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${s.status === "pagado" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{s.status === "pagado" ? "Pagado" : STATUS_LABEL[s.status]}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${s.status === "pagado" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{s.status === "pagado" ? "Pagado" : STATUS_LABEL[s.status]}</span>
                   <span className="min-w-0 flex-1 truncate">{new Date(s.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })} · N.º {s.number} · {s.items} producto{s.items === 1 ? "" : "s"}</span>
                   <span className="font-bold tabular-nums">{money(Number(s.total))}</span>
                   <IconChevronRight size={14} className={`text-slate-300 transition ${open === s.id ? "rotate-90" : ""}`} />

@@ -73,7 +73,7 @@ export default function ProductRow({ product: p, categories, templates, showSub,
             ) : (
               <span className="grid h-full w-full place-items-center text-slate-300"><IconBox size={28} /></span>
             )}
-            {out && <span className="absolute inset-x-0 bottom-0 bg-rose-600/90 py-0.5 text-center text-[10px] font-bold text-white">AGOTADO</span>}
+            {out && <span className="absolute inset-x-0 bottom-0 bg-rose-600/90 py-0.5 text-center text-xs font-bold text-white">AGOTADO</span>}
           </Link>
 
           {/* Contenido */}
@@ -82,7 +82,7 @@ export default function ProductRow({ product: p, categories, templates, showSub,
               <span className="min-w-0 flex-1">
                 <span className="line-clamp-2 break-words text-[15px] font-bold leading-snug text-ink group-hover:text-brand-700">{productTitle(p.data) || "Sin nombre"}</span>
                 {showSub && (
-                  <span className={`mt-1 inline-block max-w-full truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${cat?.parent_id ? `${col.bg} ${col.text}` : "bg-amber-100 text-amber-800"}`}>
+                  <span className={`mt-1 inline-block max-w-full truncate rounded-full px-2 py-0.5 text-xs font-semibold ${cat?.parent_id ? `${col.bg} ${col.text}` : "bg-amber-100 text-amber-800"}`}>
                     {cat?.parent_id ? cat.name : "sin subcategoría"}
                   </span>
                 )}
@@ -95,22 +95,22 @@ export default function ProductRow({ product: p, categories, templates, showSub,
               {price !== null ? (
                 <span className="text-lg font-bold tabular-nums leading-none text-emerald-700">{money(price)}</span>
               ) : (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Sin precio</span>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Sin precio</span>
               )}
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${out ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${out ? "bg-rose-100 text-rose-700" : "bg-slate-100 text-slate-700"}`}>
                 {out ? "0 en stock" : `${stock} en stock`}
               </span>
-              {low && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-800">por reponer · mín. {minStock}</span>}
+              {low && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800">por reponer · mín. {minStock}</span>}
               {days !== null && days <= 30 && (
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${days < 0 ? "bg-rose-100 text-rose-700" : days <= 7 ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"}`}>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${days < 0 ? "bg-rose-100 text-rose-700" : days <= 7 ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"}`}>
                   {days < 0 ? `vencido hace ${-days} d` : days === 0 ? "vence hoy" : `vence en ${days} d`}
                 </span>
               )}
               {vsum && vsum.agotadas > 0 && (
-                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">{vsum.agotadas} variante{vsum.agotadas === 1 ? "" : "s"} agotada{vsum.agotadas === 1 ? "" : "s"}</span>
+                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">{vsum.agotadas} variante{vsum.agotadas === 1 ? "" : "s"} agotada{vsum.agotadas === 1 ? "" : "s"}</span>
               )}
             </div>
-            {vsum && <p className="mt-1 truncate text-[11px] font-medium text-violet-800" title={vsum.text}>{variants.length} variantes · {vsum.text}</p>}
+            {vsum && <p className="mt-1 truncate text-xs font-medium text-violet-800" title={vsum.text}>{variants.length} variantes · {vsum.text}</p>}
           </div>
         </div>
 
@@ -121,7 +121,7 @@ export default function ProductRow({ product: p, categories, templates, showSub,
               <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
                 {visibleDetails.map((d) => (
                   <div key={d.label} className="min-w-0">
-                    <dt className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">{d.label}</dt>
+                    <dt className="truncate text-xs font-semibold uppercase tracking-wide text-slate-400">{d.label}</dt>
                     <dd className="m-0 truncate text-[13px] font-medium text-slate-800" title={d.value}>{d.value}</dd>
                   </div>
                 ))}

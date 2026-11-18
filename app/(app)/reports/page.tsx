@@ -107,9 +107,9 @@ export default function ReportsPage() {
             <div className="mt-3 flex h-36 items-end gap-1">
               {perDay.map((d) => (
                 <div key={d.day} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={`${new Date(d.day + "T00:00:00").toLocaleDateString("es")}: ${money(d.total)} en ${d.count} venta(s)`}>
-                  <span className="text-[9px] tabular-nums text-slate-500">{d.total ? fmtMoney(d.total) : ""}</span>
+                  <span className="text-xs tabular-nums text-slate-500">{d.total ? fmtMoney(d.total) : ""}</span>
                   <div className="w-full rounded-t-md bg-emerald-500/80" style={{ height: `${Math.max(2, (d.total / maxDay) * 100)}%` }} />
-                  <span className="text-[10px] text-slate-400">{d.label}</span>
+                  <span className="text-xs text-slate-400">{d.label}</span>
                 </div>
               ))}
             </div>
@@ -145,7 +145,7 @@ export default function ReportsPage() {
                       <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-800">{i + 1}</span>
                       <span className="min-w-0 flex-1">
                         <Link href={p ? `/products/${p.id}` : "#"} className="block truncate font-medium text-ink hover:text-brand-700">{r.name}</Link>
-                        <span className="block text-[11px] text-slate-500">{p ? `${stockOf(p) ?? 0} en stock` : ""}{low ? <span className="font-semibold text-orange-700"> · por reponer</span> : ""}</span>
+                        <span className="block text-xs text-slate-500">{p ? `${stockOf(p) ?? 0} en stock` : ""}{low ? <span className="font-semibold text-orange-700"> · por reponer</span> : ""}</span>
                       </span>
                       <span className="font-bold tabular-nums">{r.units} unid.</span>
                       <span className="w-20 text-right text-xs tabular-nums text-slate-500">{money(r.revenue)}</span>
@@ -164,7 +164,7 @@ export default function ReportsPage() {
                   <li key={r.product.id} className="flex items-center gap-3 py-1.5 text-sm">
                     <Link href={`/products/${r.product.id}`} className="min-w-0 flex-1">
                       <span className="block truncate font-medium text-ink">{String(r.product.data.nombre || "Sin nombre")}</span>
-                      <span className="block text-[11px] text-slate-500">{categoryPath(categories, r.product.category_id) || "Sin categoría"} · {stockOf(r.product) ?? 0} unid. · {r.lastSale ? `última venta ${new Date(r.lastSale).toLocaleDateString("es", { day: "2-digit", month: "short" })}` : "nunca vendido"}</span>
+                      <span className="block text-xs text-slate-500">{categoryPath(categories, r.product.category_id) || "Sin categoría"} · {stockOf(r.product) ?? 0} unid. · {r.lastSale ? `última venta ${new Date(r.lastSale).toLocaleDateString("es", { day: "2-digit", month: "short" })}` : "nunca vendido"}</span>
                     </Link>
                     <span className="font-bold tabular-nums text-slate-700">{money(r.value)}</span>
                   </li>
@@ -190,12 +190,12 @@ export default function ReportsPage() {
                         <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl text-base ring-1 ${col.bg} ${col.ring}`}>{m.category?.icon || "🏷️"}</span>
                         <span className="min-w-0 flex-1 truncate font-semibold text-ink">{m.category?.name ?? "Sin categoría"}</span>
                         <span className="font-bold tabular-nums text-emerald-700">{money(m.profit)}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${pct >= 30 ? "bg-emerald-100 text-emerald-800" : pct >= 15 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-700"}`}>{pct} %</span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${pct >= 30 ? "bg-emerald-100 text-emerald-800" : pct >= 15 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-700"}`}>{pct} %</span>
                       </div>
                       <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
                         <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
                       </div>
-                      <p className="mt-1 text-[11px] text-slate-500">vendido {money(m.revenue)} · costó {money(m.cost)} · {m.units} unid.</p>
+                      <p className="mt-1 text-xs text-slate-500">vendido {money(m.revenue)} · costó {money(m.cost)} · {m.units} unid.</p>
                     </li>
                   );
                 })}
@@ -249,12 +249,12 @@ export default function ReportsPage() {
 function Kpi({ label, value, sub, delta, tone }: { label: string; value: string; sub?: string; delta?: number | null; tone?: "emerald" }) {
   return (
     <div className={`rounded-2xl p-3 shadow-card ring-1 ${tone === "emerald" ? "bg-emerald-600 text-white ring-emerald-600" : "bg-white ring-slate-900/10"}`}>
-      <p className={`text-[10px] font-semibold uppercase tracking-wide ${tone === "emerald" ? "text-white/70" : "text-slate-500"}`}>{label}</p>
+      <p className={`text-xs font-semibold uppercase tracking-wide ${tone === "emerald" ? "text-white/70" : "text-slate-500"}`}>{label}</p>
       <p className="text-lg font-bold tabular-nums leading-tight sm:text-xl">{value}</p>
       {delta !== undefined && delta !== null && (
-        <p className={`text-[11px] font-bold ${tone === "emerald" ? "text-white/90" : delta >= 0 ? "text-emerald-700" : "text-rose-700"}`}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta)} %</p>
+        <p className={`text-xs font-bold ${tone === "emerald" ? "text-white/90" : delta >= 0 ? "text-emerald-700" : "text-rose-700"}`}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta)} %</p>
       )}
-      {sub && <p className={`truncate text-[10px] ${tone === "emerald" ? "text-white/70" : "text-slate-400"}`}>{sub}</p>}
+      {sub && <p className={`truncate text-xs ${tone === "emerald" ? "text-white/70" : "text-slate-400"}`}>{sub}</p>}
     </div>
   );
 }

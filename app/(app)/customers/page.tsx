@@ -187,7 +187,7 @@ export default function CustomersPage() {
                     {r.debt > 0 ? (
                       <span className="text-right">
                         <span className="block font-bold tabular-nums text-amber-700">debe {money(r.debt)}</span>
-                        <span className={`block text-[11px] ${(r.days ?? 0) >= 30 ? "text-rose-600" : "text-slate-500"}`}>{r.days} d</span>
+                        <span className={`block text-xs ${(r.days ?? 0) >= 30 ? "text-rose-600" : "text-slate-500"}`}>{r.days} d</span>
                       </span>
                     ) : null}
                     <IconChevronRight className="text-slate-300" />
@@ -205,9 +205,9 @@ export default function CustomersPage() {
 function Tile({ label, value, hint, tone }: { label: string; value: string; hint: string; tone?: "warn" | "danger" }) {
   return (
     <div className="rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className={`text-xl font-bold tabular-nums ${tone === "danger" ? "text-rose-700" : tone === "warn" ? "text-amber-700" : "text-ink"}`}>{value}</p>
-      <p className="truncate text-[11px] text-slate-400">{hint}</p>
+      <p className="truncate text-xs text-slate-400">{hint}</p>
     </div>
   );
 }

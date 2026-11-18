@@ -151,7 +151,7 @@ export default function ShelfDetect({ categoryId }: Props) {
                         key={i}
                         type="button"
                         onClick={() => toggle(i)}
-                        className={`absolute rounded-md border-2 text-[10px] font-bold leading-none ${on ? "border-emerald-400 bg-emerald-400/15" : "border-white/50 bg-black/25"}`}
+                        className={`absolute rounded-md border-2 text-xs font-bold leading-none ${on ? "border-emerald-400 bg-emerald-400/15" : "border-white/50 bg-black/25"}`}
                         style={{ left: `${x0 / 10}%`, top: `${y0 / 10}%`, width: `${(x1 - x0) / 10}%`, height: `${(y1 - y0) / 10}%` }}
                         aria-label={it.nombre_visible}
                       >
@@ -174,7 +174,7 @@ export default function ShelfDetect({ categoryId }: Props) {
                     );
                   })}
                 </ul>
-                <p className="mt-2 text-[11px] text-slate-500">Cada producto marcado se recorta y se analiza por separado (1 análisis por producto). Desmarca los que no quieras.</p>
+                <p className="mt-2 text-xs text-slate-500">Cada producto marcado se recorta y se analiza por separado (1 análisis por producto). Desmarca los que no quieras.</p>
               </div>
               <div className="border-t border-slate-100 p-3">
                 <button onClick={enqueueChecked} disabled={!checked.size || busy === "crop"} className="btn-primary btn-lg w-full">

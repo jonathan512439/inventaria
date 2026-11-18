@@ -111,7 +111,7 @@ export default function BarcodeCamera({ onCode, label = "Escanear" }: Props) {
       <div className={`relative overflow-hidden rounded-2xl bg-black ring-4 transition ${on ? "" : "hidden"} ${flash ? "ring-emerald-400" : "ring-transparent"}`}>
         <video ref={videoRef} className="block h-44 w-full object-cover" muted playsInline autoPlay />
         <button type="button" onClick={stop} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white"><IconX size={16} /></button>
-        <p className="absolute inset-x-0 bottom-0 bg-black/50 py-1 text-center text-[11px] text-white">Apunta al código · beep = leído</p>
+        <p className="absolute inset-x-0 bottom-0 bg-black/50 py-1 text-center text-xs text-white">Apunta al código · beep = leído</p>
       </div>
       {!on && (
         <button type="button" onClick={start} className="btn-secondary w-full"><IconCamera size={18} /> {label}</button>

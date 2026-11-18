@@ -276,11 +276,11 @@ export default function ProductDetailClient() {
             <div className="mt-2 grid gap-2">
               <button onClick={() => reanalyze(false)} disabled={reanalyzing || !product.image_url} className="btn-primary btn-sm w-full justify-start">
                 {reanalyzing ? <Spinner size={14} /> : <IconRefresh size={16} />} Volver a analizar con IA
-                <span className="ml-auto text-[11px] font-normal opacity-80">puede recolocarlo</span>
+                <span className="ml-auto text-xs font-normal opacity-80">puede recolocarlo</span>
               </button>
               <button onClick={() => reanalyze(true)} disabled={reanalyzing || !product.image_url} className="btn-secondary btn-sm w-full justify-start">
                 <IconRefresh size={16} className="text-brand-600" /> Solo actualizar los datos
-                <span className="ml-auto text-[11px] font-normal text-slate-500">mantiene la categoría</span>
+                <span className="ml-auto text-xs font-normal text-slate-500">mantiene la categoría</span>
               </button>
             </div>
           </div>
@@ -323,7 +323,7 @@ export default function ProductDetailClient() {
                   Sin fecha
                 </button>
               </div>
-              <p className="mt-1 text-[11px] text-slate-500">{expiresAt ? "Se avisa antes de que venza (los días se ajustan en Cuándo avisarme)." : "Sin fecha: no vence. Toca el calendario solo si quieres ponerle una."}</p>
+              <p className="mt-1 text-xs text-slate-500">{expiresAt ? "Se avisa antes de que venza (los días se ajustan en Cuándo avisarme)." : "Sin fecha: no vence. Toca el calendario solo si quieres ponerle una."}</p>
             </div>
           </div>
 
@@ -355,7 +355,7 @@ export default function ProductDetailClient() {
                 />
               </div>
             )}
-            <p className="mt-1 text-[11px] text-slate-500">Con el código, el escáner y el conteo reconocen este producto al instante.</p>
+            <p className="mt-1 text-xs text-slate-500">Con el código, el escáner y el conteo reconocen este producto al instante.</p>
           </div>
 
           {fields.map((f) =>

@@ -191,7 +191,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
           ))}
           <input type="number" min={1} inputMode="numeric" className="input w-24 py-2 text-center text-lg font-bold tabular-nums" value={qty} onChange={(e) => setQty(Math.max(1, parseInt(e.target.value, 10) || 1))} />
         </div>
-        {pack > 1 && <p className="mt-1 text-[11px] text-slate-500">Este producto viene en paquetes de {pack} unidades; el stock se lleva por unidad.</p>}
+        {pack > 1 && <p className="mt-1 text-xs text-slate-500">Este producto viene en paquetes de {pack} unidades; el stock se lleva por unidad.</p>}
         {mode === "remove" && qty > current && <p className="mt-1 text-xs text-amber-700">Solo hay {current}. El stock quedará en 0.</p>}
 
         {/* Paso 3 (solo al restar): ¿es una venta? */}

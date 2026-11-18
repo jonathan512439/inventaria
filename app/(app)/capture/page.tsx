@@ -294,10 +294,10 @@ function Thumb({ item }: { item: QueueItem }) {
     <div className={`group relative aspect-square overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-900/5 ${item.status === "processing" ? "scanning" : ""}`}>
       <img src={item.previewUrl} alt="" className={`h-full w-full object-cover transition ${item.status === "processing" ? "opacity-80" : ""}`} />
       {item.status === "processing" && (
-        <span className="absolute inset-x-0 bottom-0 bg-brand-600/85 py-0.5 text-center text-[10px] font-semibold text-white">✨ Analizando…</span>
+        <span className="absolute inset-x-0 bottom-0 bg-brand-600/85 py-0.5 text-center text-xs font-semibold text-white">✨ Analizando…</span>
       )}
       {item.status === "queued" && (
-        <span className="absolute left-1.5 top-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] font-medium text-white">en cola</span>
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-xs font-medium text-white">en cola</span>
       )}
       {(item.status === "queued" || item.status === "processing") && (
         <button
@@ -318,7 +318,7 @@ function Thumb({ item }: { item: QueueItem }) {
           {item.product && (
             <Link
               href={`/review?id=${item.product.id}`}
-              className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-4 text-[10px] font-medium text-white"
+              className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-1 pt-4 text-xs font-medium text-white"
             >
               {title || "Sin nombre"}
             </Link>
@@ -328,7 +328,7 @@ function Thumb({ item }: { item: QueueItem }) {
       {item.status === "error" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-rose-600/80 p-1 text-center text-white">
           <IconAlert size={18} />
-          <span className="line-clamp-2 text-[10px] leading-tight">{item.error}</span>
+          <span className="line-clamp-2 text-xs leading-tight">{item.error}</span>
           <span className="flex gap-1">
             <button onClick={() => retryItem(item.id)} className="rounded-full bg-white/25 p-1 hover:bg-white/40" title="Reintentar">
               <IconRefresh size={14} />

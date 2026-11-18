@@ -138,12 +138,12 @@ export default function CashPage() {
 
           <section className="animate-in grid grid-cols-2 gap-2">
             <div className="rounded-3xl bg-emerald-600 p-4 text-white shadow-float">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Vendido hoy</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Vendido hoy</p>
               <p className="text-2xl font-bold tabular-nums">{money(totalSales)}</p>
               <p className="text-xs text-white/80">{salesCount} venta{salesCount === 1 ? "" : "s"}{isOwner ? ` · ganancia ${money(profit)}` : ""}</p>
             </div>
             <div className="rounded-3xl bg-white p-4 shadow-card ring-1 ring-slate-900/10">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cobrado</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Cobrado</p>
               <p className="text-2xl font-bold tabular-nums text-ink">{money(collected)}</p>
               <p className="text-xs text-slate-500">
                 {pending > 0 ? `${money(pending)} quedaron fiados` : "todo cobrado"}
@@ -193,7 +193,7 @@ export default function CashPage() {
               <ul className="divide-y divide-slate-100 text-sm">
                 {moves.map((m) => (
                   <li key={m.id} className="flex items-center gap-2 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${m.tipo === "retiro" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-800"}`}>{m.tipo === "retiro" ? "salió" : "entró"}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${m.tipo === "retiro" ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-800"}`}>{m.tipo === "retiro" ? "salió" : "entró"}</span>
                     <span className="min-w-0 flex-1 truncate text-slate-600">{m.note || (m.tipo === "retiro" ? "Retiro" : "Ingreso")}</span>
                     <span className="font-semibold tabular-nums">{m.tipo === "retiro" ? "−" : "+"}{money(Number(m.amount))}</span>
                   </li>
@@ -232,7 +232,7 @@ export default function CashPage() {
                     </span>
                     <span className="font-bold tabular-nums">{money(Number(c.total_sales))}</span>
                     {c.difference !== null && (
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${Number(c.difference) === 0 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{Number(c.difference) === 0 ? "cuadró" : `${Number(c.difference) > 0 ? "+" : ""}${fmtMoney(Number(c.difference))}`}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${Number(c.difference) === 0 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{Number(c.difference) === 0 ? "cuadró" : `${Number(c.difference) > 0 ? "+" : ""}${fmtMoney(Number(c.difference))}`}</span>
                     )}
                   </li>
                 ))}

@@ -233,8 +233,8 @@ export default function ConsignPage() {
               {lines.map((l) => (
                 <li key={l.key} className="flex flex-wrap items-center gap-2 py-2">
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{productTitle(l.product.data)}{l.variant ? <span className="text-violet-800"> · {l.variant.label}</span> : null}</span>
-                  <label className="text-[11px] text-slate-500">unid. <input type="number" min={1} inputMode="numeric" className="input w-16 py-1 text-center font-bold tabular-nums" value={l.qty} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, qty: e.target.value } : x)))} /></label>
-                  <label className="text-[11px] text-slate-500">a {currencyLabel()} <input type="number" min={0} step="any" inputMode="decimal" className="input w-20 py-1 text-center tabular-nums" value={l.price} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, price: e.target.value } : x)))} /></label>
+                  <label className="text-xs text-slate-500">unid. <input type="number" min={1} inputMode="numeric" className="input w-16 py-1 text-center font-bold tabular-nums" value={l.qty} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, qty: e.target.value } : x)))} /></label>
+                  <label className="text-xs text-slate-500">a {currencyLabel()} <input type="number" min={0} step="any" inputMode="decimal" className="input w-20 py-1 text-center tabular-nums" value={l.price} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, price: e.target.value } : x)))} /></label>
                   <button onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="rounded-full p-1 text-slate-300 hover:text-rose-600"><IconTrash size={14} /></button>
                 </li>
               ))}
@@ -321,8 +321,8 @@ export default function ConsignPage() {
                         <li key={i.id} className="rounded-2xl bg-slate-50 p-3">
                           <p className="text-sm font-semibold text-ink">{i.product_name}{i.variant_label ? <span className="text-violet-800"> · {i.variant_label}</span> : null} <span className="text-xs font-normal text-slate-500">· {pending} afuera · {money(Number(i.unit_price))} c/u</span></p>
                           <div className="mt-2 grid grid-cols-2 gap-2">
-                            <label className="text-[11px] font-semibold uppercase text-slate-500">Vendió<input type="number" min={0} max={pending} inputMode="numeric" className="input mt-0.5 py-1.5 text-center font-bold tabular-nums" value={r.sold} onChange={(e) => setSettle({ ...settle, rows: { ...settle.rows, [i.id]: { ...r, sold: e.target.value } } })} /></label>
-                            <label className="text-[11px] font-semibold uppercase text-slate-500">Devuelve<input type="number" min={0} max={pending} inputMode="numeric" className="input mt-0.5 py-1.5 text-center font-bold tabular-nums" value={r.returned} onChange={(e) => setSettle({ ...settle, rows: { ...settle.rows, [i.id]: { ...r, returned: e.target.value } } })} /></label>
+                            <label className="text-xs font-semibold uppercase text-slate-500">Vendió<input type="number" min={0} max={pending} inputMode="numeric" className="input mt-0.5 py-1.5 text-center font-bold tabular-nums" value={r.sold} onChange={(e) => setSettle({ ...settle, rows: { ...settle.rows, [i.id]: { ...r, sold: e.target.value } } })} /></label>
+                            <label className="text-xs font-semibold uppercase text-slate-500">Devuelve<input type="number" min={0} max={pending} inputMode="numeric" className="input mt-0.5 py-1.5 text-center font-bold tabular-nums" value={r.returned} onChange={(e) => setSettle({ ...settle, rows: { ...settle.rows, [i.id]: { ...r, returned: e.target.value } } })} /></label>
                           </div>
                         </li>
                       );

@@ -10,7 +10,6 @@ import { StepByStep, computeStates, type GuideProgress } from "@/components/guid
 import AiUsageCard from "@/components/AiUsageCard";
 import CleanupCard from "@/components/CleanupCard";
 import { useFlow } from "@/components/FlowProvider";
-import WhoIsServing from "@/components/WhoIsServing";
 import { IconAlert, IconBox, IconCamera, IconCheck, IconCheckCircle, IconChevronRight, IconDownload, IconList, IconSettings, IconSparkles, IconTag, Spinner } from "@/components/ui/Icons";
 import { businessDayStart } from "@/lib/dates";
 
@@ -154,7 +153,6 @@ export default function DashboardPage() {
           <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-card ring-1 ring-slate-900/10">
             {new Date().toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" })}
           </span>
-          <WhoIsServing />
         </div>
       </header>
 
@@ -172,7 +170,7 @@ export default function DashboardPage() {
           {today.cta} <IconChevronRight size={18} />
         </Link>
         {/* Pasos del camino */}
-        <ol className="mt-4 flex items-center justify-center gap-1 text-[11px] font-semibold">
+        <ol className="mt-4 flex items-center justify-center gap-1 text-xs font-semibold">
           {[
             { n: 1, t: "Agregar", href: "/capture" },
             { n: 2, t: "Revisar", href: "/review" },
@@ -182,9 +180,9 @@ export default function DashboardPage() {
             return (
               <li key={s.n} className="flex items-center">
                 <Link href={s.href} className={`flex items-center gap-1 rounded-full px-2 py-0.5 ${st === "current" ? "bg-white text-brand-700" : st === "done" ? "bg-white/25" : "text-white/60"}`}>
-                  <span className="grid h-4 w-4 place-items-center rounded-full bg-white/30 text-[9px]">{st === "done" ? <IconCheck size={10} /> : s.n}</span>
+                  <span className="grid h-4 w-4 place-items-center rounded-full bg-white/30 text-xs">{st === "done" ? <IconCheck size={10} /> : s.n}</span>
                   {s.t}
-                  {s.n === 2 && pending > 0 && <span className="rounded-full bg-amber-400 px-1 text-[9px] text-amber-950">{pending}</span>}
+                  {s.n === 2 && pending > 0 && <span className="rounded-full bg-amber-400 px-1 text-xs text-amber-950">{pending}</span>}
                 </Link>
                 {i < 2 && <span className="mx-0.5 h-0.5 w-4 bg-white/40" />}
               </li>
@@ -259,9 +257,9 @@ function Tile({ href, label, value, hint, tone }: { href: string; label: string;
   const t = { amber: "text-amber-700", emerald: "text-emerald-700", rose: "text-rose-700" };
   return (
     <Link href={href} className="press rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 transition hover:ring-brand-300">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className={`text-xl font-bold tabular-nums ${tone ? t[tone] : "text-ink"}`}>{value}</p>
-      <p className="truncate text-[11px] text-slate-400">{hint}</p>
+      <p className="truncate text-xs text-slate-400">{hint}</p>
     </Link>
   );
 }
@@ -272,7 +270,7 @@ function Shortcut({ href, Icon, label, hint, primary, tone }: { href: string; Ic
     <Link href={href} className={`press flex flex-col items-center gap-1 rounded-2xl p-3 text-center shadow-card ring-1 transition ${primary ? solid : "bg-white text-ink ring-slate-900/10 hover:ring-brand-300"}`}>
       <span className={`grid h-10 w-10 place-items-center rounded-xl ${primary ? "bg-white/20" : "bg-brand-50 text-brand-700"}`}><Icon size={22} /></span>
       <span className="text-sm font-bold">{label}</span>
-      <span className={`text-[11px] ${primary ? "text-white/80" : "text-slate-500"}`}>{hint}</span>
+      <span className={`text-xs ${primary ? "text-white/80" : "text-slate-500"}`}>{hint}</span>
     </Link>
   );
 }

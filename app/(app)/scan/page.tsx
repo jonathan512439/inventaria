@@ -482,7 +482,7 @@ export default function ScanPage() {
                       </button>
                     ))}
                   </div>
-                  {!result.variant && <p className="mt-1 text-[11px] text-violet-800">El código quedará guardado en la variante que elijas.</p>}
+                  {!result.variant && <p className="mt-1 text-xs text-violet-800">El código quedará guardado en la variante que elijas.</p>}
                 </div>
               ) : (
                 <p className="text-xs text-slate-500">Stock actual: <b className="text-ink">{String(getValue(result.product.data, "stock") ?? "—")}</b></p>

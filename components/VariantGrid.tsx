@@ -85,7 +85,7 @@ export default function VariantGrid({ axes, chosen, onChosen, getCell, onStockIn
     return (
       <button type="button" onClick={() => onCell?.(values)} className={`h-11 w-full rounded-xl border-2 text-center text-base font-bold tabular-nums transition active:scale-95 ${cls}`} title={st.hint}>
         {st.exists ? (n ?? "–") : "+"}
-        {st.hint && <span className="block text-[9px] font-normal leading-none opacity-70">{st.hint}</span>}
+        {st.hint && <span className="block text-xs font-normal leading-none opacity-70">{st.hint}</span>}
       </button>
     );
   };
@@ -158,7 +158,7 @@ export default function VariantGrid({ axes, chosen, onChosen, getCell, onStockIn
               {colsAxis && (
                 <thead>
                   <tr>
-                    <th className="w-16 text-left text-[10px] font-semibold uppercase text-slate-400">{rowsAxis.label} \ {colsAxis.label}</th>
+                    <th className="w-16 text-left text-xs font-semibold uppercase text-slate-400">{rowsAxis.label} \ {colsAxis.label}</th>
                     {(chosen[colsAxis.key] ?? []).map((c) => (
                       <th key={c} className="min-w-[56px] truncate px-1 text-center text-xs font-bold text-slate-700">
                         <span className="inline-flex items-center gap-0.5">
@@ -192,7 +192,7 @@ export default function VariantGrid({ axes, chosen, onChosen, getCell, onStockIn
             </table>
           </div>
           {!compact && (
-            <p className="mt-1 text-[11px] text-slate-500">
+            <p className="mt-1 text-xs text-slate-500">
               {onStockInput ? "Escribe cuántas tienes en cada casilla; las vacías no se crean." : "Toca una casilla para sumar, vender o retirar. «+» crea esa variante."}
             </p>
           )}

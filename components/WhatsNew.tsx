@@ -50,7 +50,7 @@ export default function WhatsNew({ force, onClose }: Props) {
       <div className="animate-in relative w-full max-w-md overflow-hidden rounded-t-3xl bg-white shadow-2xl md:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="bg-gradient-to-br from-brand-600 via-violet-600 to-fuchsia-600 px-5 pb-5 pt-4 text-white">
           <div className="flex items-center justify-between">
-            <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">Cómo usar la herramienta · {i + 1}/{SLIDES.length}</span>
+            <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide">Cómo usar la herramienta · {i + 1}/{SLIDES.length}</span>
             <button onClick={close} className="rounded-full p-1.5 text-white/80 hover:bg-white/20" aria-label="Cerrar"><IconX size={18} /></button>
           </div>
           <div className="mt-3 h-36"><s.Art /></div>
@@ -82,7 +82,7 @@ function ArtSteps() {
       <div className="flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold">
         <span className="flex items-center gap-1 rounded-full bg-emerald-400 px-2 py-0.5 text-emerald-950"><IconCheck size={11} /> Agregar</span>
         <span className="h-0.5 w-5 bg-white/50" />
-        <span className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-brand-700">● Revisar <span className="rounded-full bg-amber-400 px-1 text-[10px] text-amber-950">4</span></span>
+        <span className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-brand-700">● Revisar <span className="rounded-full bg-amber-400 px-1 text-xs text-amber-950">4</span></span>
         <span className="h-0.5 w-5 bg-white/50" />
         <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-white/70">○ Inventario</span>
       </div>
@@ -105,12 +105,12 @@ function ArtMenu() {
   ];
   return (
     <div className="flex h-full flex-col items-center justify-end gap-3">
-      <div className="flex flex-wrap justify-center gap-1 text-[10px] font-semibold">
+      <div className="flex flex-wrap justify-center gap-1 text-xs font-semibold">
         {["Escanear", "Ventas", "Excel", "Mi tienda", "Guía", "Limpiar", "Ajustes"].map((t) => (
           <span key={t} className="rounded-full bg-white/20 px-2 py-0.5">{t}</span>
         ))}
       </div>
-      <div className="flex w-64 items-end justify-around rounded-2xl bg-white px-3 pb-2 pt-1 text-[10px] font-semibold text-slate-600">
+      <div className="flex w-64 items-end justify-around rounded-2xl bg-white px-3 pb-2 pt-1 text-xs font-semibold text-slate-600">
         {items.map(({ Icon, t, primary }) => (
           <span key={t} className={`flex flex-col items-center gap-0.5 ${primary ? "-mt-4" : ""}`}>
             <span className={primary ? "grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-white shadow-lg" : "text-slate-500"}><Icon size={primary ? 20 : 18} /></span>
@@ -128,7 +128,7 @@ function ArtVariants() {
   return (
     <div className="flex h-full items-center justify-center">
       <div className="rounded-2xl bg-white/15 p-2.5">
-        <div className="grid grid-cols-4 gap-1 text-center text-[11px] font-bold">
+        <div className="grid grid-cols-4 gap-1 text-center text-xs font-bold">
           <span className="text-white/70">Polera</span>
           {["Rojo", "Azul", "Negro"].map((c) => <span key={c}>{c}</span>)}
           {rows.map(([t, ...ns]) => (
@@ -138,7 +138,7 @@ function ArtVariants() {
             </Fragment>
           ))}
         </div>
-        <p className="mt-1.5 text-center text-[10px] text-white/80">● agotado: S · Negro, L · Azul</p>
+        <p className="mt-1.5 text-center text-xs text-white/80">● agotado: S · Negro, L · Azul</p>
       </div>
       <IconCheckCircle className="ml-3 hidden text-emerald-300 sm:block" size={34} />
     </div>

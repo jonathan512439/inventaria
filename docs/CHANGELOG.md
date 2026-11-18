@@ -3,6 +3,20 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-18 · Fase 6.9 · C7.1 — Nueva estructura: cinco lugares y «Vender» al centro
+
+Primer paso de la reconstrucción visual ([RECONSTRUCCION_VISUAL.md](RECONSTRUCCION_VISUAL.md)). Por pedido del usuario, C7 va antes que C6.
+
+### 17.8 Sistema visual y armazón
+- **Qué**:
+  - **Barra inferior nueva**: Inicio · Productos · **Vender** (botón grande al centro) · Clientes · Más. Antes el centro era «Agregar» y Vender estaba escondido en «Más».
+  - **En computadora**, una barra a la izquierda con los mismos lugares y todas las secciones a la vista.
+  - **Cabecera** con el nombre del negocio, el estado de la conexión (sin conexión, enviando, cambios sin guardar) y «¿Quién atiende?» (antes solo en Inicio).
+  - **«Más» ordenado por tarea** (Productos · Vender y cobrar · Números · Ajustes · Ayuda), con un ícono propio para cada cosa y «Cerrar sesión».
+  - **Se quitó la barra de pasos** «Agregar → Revisar → Inventario», que aparecía incluso al vender.
+  - **Letra más legible**: ningún texto de la app es menor a 12 px (había 121 textos de 9 a 11 px).
+- **Validar**: en el celular, el botón central abre Vender; Productos muestra un número cuando hay pendientes por revisar; «Más» se abre como hoja y se desplaza; en computadora, la barra lateral lleva a todas las secciones; sin internet, la cabecera dice «Sin conexión».
+
 ## 2026-11-18 · Fase 6.9 · C5.3 — Las fotos de los productos son privadas
 
 Migración `026_fotos_privadas.sql` aplicada después de publicar el código. `npm run test:access` 35/35 contra producción; las 27 fotos existentes siguen visibles para su negocio.

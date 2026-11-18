@@ -536,9 +536,9 @@ function Review() {
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-5 pb-3 pt-10 text-white">
             <p className="truncate text-lg font-bold">{title || "Sin nombre"}</p>
           </div>
-          <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">Toca para ampliar</span>
+          <span className="absolute right-3 top-3 rounded-full bg-black/45 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">Toca para ampliar</span>
           {catOfCurrent && (
-            <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${catColor.bg} ${catColor.text} ${catColor.ring}`}>
+            <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${catColor.bg} ${catColor.text} ${catColor.ring}`}>
               {catOfCurrent.icon ? `${catOfCurrent.icon} ` : ""}{catOfCurrent.name}
             </span>
           )}
@@ -572,7 +572,7 @@ function Review() {
             <div className="space-y-2">
               <div className="row-action">
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Categoría</span>
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Categoría</span>
                   <span className="block truncate font-semibold text-ink">
                     {topOfCurrent ? `${topOfCurrent.icon ? topOfCurrent.icon + " " : ""}${topOfCurrent.name}` : "— sin asignar —"}
                   </span>
@@ -584,7 +584,7 @@ function Review() {
 
               <div className="row-action">
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Subcategoría</span>
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">Subcategoría</span>
                   <span className={`block truncate font-semibold ${catOfCurrent?.parent_id ? "text-ink" : "text-amber-700"}`}>
                     {catOfCurrent?.parent_id ? catOfCurrent.name : topOfCurrent ? "— falta elegir —" : "—"}
                   </span>
@@ -658,7 +658,7 @@ function Review() {
                   {settingUp ? <Spinner size={18} /> : <IconSparkles size={20} />}
                   {settingUp ? "Creando y asignando…" : "Crear categoría y subcategoría con IA"}
                 </button>
-                <p className="text-center text-[11px] text-amber-800">Consume 1 análisis · o toca <b>Cambiar</b> arriba para elegir una existente</p>
+                <p className="text-center text-xs text-amber-800">Consume 1 análisis · o toca <b>Cambiar</b> arriba para elegir una existente</p>
               </div>
             )}
           </section>
@@ -724,7 +724,7 @@ function Review() {
                     <div key={f.id} className="rounded-2xl bg-violet-50 p-3 ring-1 ring-violet-200">
                       <label className="label mb-1">{fieldLabel(f.name)}</label>
                       <p className="text-2xl font-bold tabular-nums text-violet-900">{variantTotal}</p>
-                      <p className="text-[11px] text-violet-700">suma de las variantes</p>
+                      <p className="text-xs text-violet-700">suma de las variantes</p>
                     </div>
                   ) : (
                     <div key={f.id} className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
@@ -741,12 +741,12 @@ function Review() {
           <section className={`rounded-2xl border-2 p-3 ${expiresAt ? "border-amber-200 bg-amber-50/50" : "border-slate-200"}`}>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-ink">¿Vence?</span>
-              {current.expires_at && expiresAt === current.expires_at && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-800">✨ leído del empaque</span>}
+              {current.expires_at && expiresAt === current.expires_at && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-800">✨ leído del empaque</span>}
               <span className="flex-1" />
               <input type="date" className="input w-auto py-1.5 text-sm" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
               <button type="button" onClick={() => setExpiresAt("")} className={`chip ${expiresAt === "" ? "chip-active" : ""}`}>Sin fecha</button>
             </div>
-            <p className="mt-1 text-[11px] text-slate-500">{expiresAt ? `Se avisará antes del ${new Date(expiresAt + "T00:00:00").toLocaleDateString("es")}.` : "No perecedero: no se avisará de vencimiento."}</p>
+            <p className="mt-1 text-xs text-slate-500">{expiresAt ? `Se avisará antes del ${new Date(expiresAt + "T00:00:00").toLocaleDateString("es")}.` : "No perecedero: no se avisará de vencimiento."}</p>
           </section>
 
           {/* Resto de datos, plegado */}

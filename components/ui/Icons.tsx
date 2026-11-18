@@ -101,3 +101,50 @@ export const Spinner = ({ size = 18, className = "" }: { size?: number; classNam
     <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
   </svg>
 );
+
+// ---- Íconos por destino (C7.1): uno propio para cada lugar de la app ----
+export const IconCart = (p: P) => (
+  <svg {...base(p)}><circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" /><path d="M2.5 3h2.6l2.4 12h11.2l2.1-8.5H6.3" /></svg>
+);
+export const IconRegister = (p: P) => (
+  <svg {...base(p)}><rect x="3" y="11" width="18" height="10" rx="2" /><path d="M7 11V5h10v6M10 8h4M7 15h2M11 15h2M15 15h2M7 18h10" /></svg>
+);
+export const IconUsers = (p: P) => (
+  <svg {...base(p)}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6" /></svg>
+);
+export const IconChart = (p: P) => (
+  <svg {...base(p)}><path d="M3 21h18" /><rect x="5" y="11" width="3" height="7" rx="1" /><rect x="10.5" y="6" width="3" height="12" rx="1" /><rect x="16" y="13" width="3" height="5" rx="1" /></svg>
+);
+export const IconTruck = (p: P) => (
+  <svg {...base(p)}><path d="M2 6h11v10H2zM13 9h4.5L21 12.5V16h-8z" /><circle cx="6" cy="18" r="1.8" /><circle cx="17" cy="18" r="1.8" /></svg>
+);
+export const IconClipboard = (p: P) => (
+  <svg {...base(p)}><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6" /></svg>
+);
+export const IconPrinter = (p: P) => (
+  <svg {...base(p)}><path d="M7 9V3h10v6M7 17H4v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6h-3" /><rect x="7" y="14" width="10" height="7" rx="1" /></svg>
+);
+export const IconCloud = (p: P) => (
+  <svg {...base(p)}><path d="M7 18a4.5 4.5 0 1 1 .9-8.9A6 6 0 0 1 19 10.5a3.8 3.8 0 0 1-.5 7.5z" /><path d="M12 11v5m0 0-2-2m2 2 2-2" /></svg>
+);
+export const IconHelp = (p: P) => (
+  <svg {...base(p)}><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.6v.6M12 17h.01" /></svg>
+);
+export const IconStore = (p: P) => (
+  <svg {...base(p)}><path d="M4 10v10h16V10M3 5l1.5-2h15L21 5v3a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z" /><path d="M10 20v-5h4v5" /></svg>
+);
+export const IconBell = (p: P) => (
+  <svg {...base(p)}><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z" /><path d="M10 20a2 2 0 0 0 4 0" /></svg>
+);
+export const IconScan = (p: P) => (
+  <svg {...base(p)}><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M7 9v6M10 9v6M13 9v6M16.5 9v6" /></svg>
+);
+export const IconWifiOff = (p: P) => (
+  <svg {...base(p)}><path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 4.6-2.5M14.4 10.5A10 10 0 0 1 19 13M2 9.5a15 15 0 0 1 4.3-2.7M10.8 6.1A15 15 0 0 1 22 9.5" /><circle cx="12" cy="20" r=".8" /></svg>
+);
+export const IconUser = (p: P) => (
+  <svg {...base(p)}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+);
+export const IconMore = (p: P) => (
+  <svg {...base(p)}><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+);

@@ -157,7 +157,7 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
         ) : (
           <span className="truncate">{emptyLabel ?? "Elegir categoría"}</span>
         )}
-        <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-semibold text-brand-700">cambiar</span>
+        <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 text-xs font-semibold text-brand-700">cambiar</span>
       </button>
 
       {open && typeof document !== "undefined" && createPortal(

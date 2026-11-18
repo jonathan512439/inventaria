@@ -2,9 +2,13 @@
 
 import { discardFailedMoves, useOffline } from "@/lib/offline";
 import { useConfirm } from "./ui/Confirm";
+import { IconRefresh, IconWifiOff, IconAlert } from "./ui/Icons";
 
-/** Aviso fijo: sin conexión, cambios guardados en el celular pendientes de enviar y cambios que el servidor rechazó. */
-export default function OfflineBar() {
+/**
+ * Indicador único de conexión en la cabecera (C7.1 · F41): sin conexión, cambios por enviar y cambios que el
+ * servidor rechazó (con «Ver y descartar»). Con todo al día no ocupa lugar.
+ */
+export default function ConnectionChip() {
   const { online, pending, failed } = useOffline();
   const confirm = useConfirm();
   if (online && pending === 0 && failed.length === 0) return null;
@@ -20,21 +24,23 @@ export default function OfflineBar() {
     if (ok) await discardFailedMoves();
   }
 
+  if (failed.length) {
+    return (
+      <button type="button" onClick={discard} className="flex min-h-[36px] items-center gap-1.5 rounded-full bg-danger-100 px-3 text-xs font-bold text-danger-800" title="Cambios hechos sin conexión que no se pudieron guardar">
+        <IconAlert size={16} /> {failed.length} sin guardar
+      </button>
+    );
+  }
+  if (!online) {
+    return (
+      <span className="flex min-h-[36px] items-center gap-1.5 rounded-full bg-slate-800 px-3 text-xs font-bold text-white" title="Puedes consultar y mover stock; se envía al reconectar">
+        <IconWifiOff size={16} /> Sin conexión{pending ? ` · ${pending} por enviar` : ""}
+      </span>
+    );
+  }
   return (
-    <div className="space-y-1">
-      {(!online || pending > 0) && (
-        <div className={`-mx-4 mb-3 rounded-b-2xl px-4 py-2 text-center text-xs font-semibold md:mx-0 md:rounded-2xl ${online ? "bg-amber-100 text-amber-900" : "bg-slate-800 text-white"}`}>
-          {online
-            ? `Enviando ${pending} cambio${pending === 1 ? "" : "s"} guardado${pending === 1 ? "" : "s"} sin conexión…`
-            : `Sin conexión · puedes consultar y mover stock; ${pending ? `${pending} cambio${pending === 1 ? "" : "s"} se enviará${pending === 1 ? "" : "n"} al reconectar` : "los cambios se guardan en el celular"}`}
-        </div>
-      )}
-      {failed.length > 0 && (
-        <div className="-mx-4 mb-3 flex items-center justify-between gap-2 rounded-b-2xl bg-rose-100 px-4 py-2 text-xs font-semibold text-rose-900 md:mx-0 md:rounded-2xl">
-          <span>{failed.length} cambio{failed.length === 1 ? "" : "s"} hecho{failed.length === 1 ? "" : "s"} sin conexión no se pudo guardar.</span>
-          <button onClick={discard} className="btn-ghost btn-sm text-rose-900 underline">Ver y descartar</button>
-        </div>
-      )}
-    </div>
+    <span className="flex min-h-[36px] items-center gap-1.5 rounded-full bg-warn-100 px-3 text-xs font-bold text-warn-900">
+      <IconRefresh size={16} className="animate-spin" /> Enviando {pending}
+    </span>
   );
 }

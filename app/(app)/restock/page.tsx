@@ -208,7 +208,7 @@ function Restock() {
                 </ul>
               </section>
             ))}
-            <p className="text-center text-[11px] text-slate-500">La cantidad sugerida alcanza para el doble del mínimo; cámbiala antes de compartir.</p>
+            <p className="text-center text-xs text-slate-500">La cantidad sugerida alcanza para el doble del mínimo; cámbiala antes de compartir.</p>
           </>
         )
       ) : expiring.length === 0 ? (

@@ -74,7 +74,7 @@ export default function PresetPicker({ existingNames = [], businessName, submitL
             >
               <span className="text-2xl">{p.icon}</span>
               <span className="mt-1 block text-sm font-semibold leading-tight text-ink">{p.name}</span>
-              <span className="mt-0.5 block text-[11px] leading-tight text-slate-500">{p.description}</span>
+              <span className="mt-0.5 block text-xs leading-tight text-slate-500">{p.description}</span>
               {(on || has) && (
                 <span className={`absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full text-white ${has ? "bg-emerald-500" : "bg-brand-600"}`}>
                   <IconCheck size={12} />
@@ -90,7 +90,7 @@ export default function PresetPicker({ existingNames = [], businessName, submitL
         >
           <IconSparkles size={24} className="text-brand-600" />
           <span className="mt-1 block text-sm font-semibold leading-tight text-ink">Otro</span>
-          <span className="mt-0.5 block text-[11px] leading-tight text-slate-500">Descríbelo y la IA lo arma</span>
+          <span className="mt-0.5 block text-xs leading-tight text-slate-500">Descríbelo y la IA lo arma</span>
         </button>
       </div>
 

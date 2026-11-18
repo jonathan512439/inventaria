@@ -255,8 +255,8 @@ function Templates() {
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="flex flex-col">
-                      <button className="btn-ghost h-5 px-1 py-0 text-[10px]" disabled={i === 0} onClick={() => move(t, -1)}>▲</button>
-                      <button className="btn-ghost h-5 px-1 py-0 text-[10px]" disabled={i === ownFields.length - 1} onClick={() => move(t, 1)}>▼</button>
+                      <button className="btn-ghost h-5 px-1 py-0 text-xs" disabled={i === 0} onClick={() => move(t, -1)}>▲</button>
+                      <button className="btn-ghost h-5 px-1 py-0 text-xs" disabled={i === ownFields.length - 1} onClick={() => move(t, 1)}>▼</button>
                     </div>
                     <span className="flex-1 text-sm font-medium">{fieldLabel(t.name)}</span>
                     <span className="badge bg-slate-100 text-slate-600">{TYPE_LABEL[t.field_type]}</span>

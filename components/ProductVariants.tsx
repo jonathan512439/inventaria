@@ -152,7 +152,7 @@ export default function ProductVariants({ product, categories, axes, variants, o
                   </div>
                 );
               })}
-              <p className="text-[11px] text-slate-500">Precio vacío = usa el del producto. El código de barras permite que el escáner sume stock directo a esa variante.</p>
+              <p className="text-xs text-slate-500">Precio vacío = usa el del producto. El código de barras permite que el escáner sume stock directo a esa variante.</p>
               {Object.keys(edits).length > 0 && (
                 <button type="button" onClick={saveDetails} disabled={saving} className="btn-primary btn-sm">{saving ? <Spinner size={14} /> : null} Guardar variantes</button>
               )}

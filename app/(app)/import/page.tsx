@@ -217,7 +217,7 @@ export default function ImportPage() {
                 <li key={h} className="grid grid-cols-1 items-center gap-1 py-2 sm:grid-cols-2 sm:gap-3">
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-ink">{h}</span>
-                    <span className="block truncate text-[11px] text-slate-400">ej.: {String(sheet.rows[0]?.[h] ?? "")}{sheet.rows[1] ? ` · ${String(sheet.rows[1]?.[h] ?? "")}` : ""}</span>
+                    <span className="block truncate text-xs text-slate-400">ej.: {String(sheet.rows[0]?.[h] ?? "")}{sheet.rows[1] ? ` · ${String(sheet.rows[1]?.[h] ?? "")}` : ""}</span>
                   </span>
                   <select className={`input py-1.5 text-sm ${mapping[h] === "ignorar" ? "text-slate-400" : ""}`} value={mapping[h] ?? "otro"} onChange={(e) => setMapping({ ...mapping, [h]: e.target.value as Target })}>
                     {TARGETS.map((t) => <option key={t.key} value={t.key} disabled={t.key !== "otro" && t.key !== "ignorar" && mapping[h] !== t.key && Object.values(mapping).includes(t.key)}>{t.label}</option>)}
@@ -244,7 +244,7 @@ export default function ImportPage() {
                 <p className="mb-1 text-xs font-semibold uppercase text-slate-500">Con los que ya existen</p>
                 <label className="flex items-center gap-2"><input type="radio" checked={existing === "update"} onChange={() => setExisting("update")} /> Actualizar precio, costo, código y stock con lo de la planilla</label>
                 <label className="flex items-center gap-2"><input type="radio" checked={existing === "skip"} onChange={() => setExisting("skip")} /> Dejarlos como están (solo agregar los nuevos)</label>
-                <p className="mt-1 text-[11px] text-slate-500">Los productos con variantes (tallas, colores…) no cambian de stock desde la planilla.</p>
+                <p className="mt-1 text-xs text-slate-500">Los productos con variantes (tallas, colores…) no cambian de stock desde la planilla.</p>
               </div>
             )}
             {plan.skipped.length > 0 && (
@@ -257,7 +257,7 @@ export default function ImportPage() {
             )}
             <div className="overflow-x-auto rounded-xl ring-1 ring-slate-200">
               <table className="w-full text-xs">
-                <thead className="bg-slate-50 text-left text-[11px] uppercase text-slate-500">
+                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                   <tr><th className="px-2 py-1.5">Producto</th><th className="px-2 py-1.5">Categoría</th><th className="px-2 py-1.5 text-right">Precio</th><th className="px-2 py-1.5 text-right">Stock</th><th className="px-2 py-1.5">Qué pasa</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -272,7 +272,7 @@ export default function ImportPage() {
                   ))}
                 </tbody>
               </table>
-              {toDo > 30 && <p className="px-2 py-1 text-[11px] text-slate-400">…y {toDo - 30} más</p>}
+              {toDo > 30 && <p className="px-2 py-1 text-xs text-slate-400">…y {toDo - 30} más</p>}
             </div>
           </section>
         )}
@@ -306,7 +306,7 @@ function Stat({ n, label, tone }: { n: number; label: string; tone?: "emerald" |
   return (
     <div className="rounded-xl bg-slate-50 py-2">
       <p className={`text-xl font-bold tabular-nums ${c}`}>{n}</p>
-      <p className="text-[11px] text-slate-500">{label}</p>
+      <p className="text-xs text-slate-500">{label}</p>
     </div>
   );
 }

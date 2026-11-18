@@ -115,7 +115,7 @@ export default function BackupPage() {
         <section className="animate-in card grid gap-2 p-4 sm:grid-cols-2">
           <button onClick={saveNow} disabled={!!busy} className="btn-primary btn-lg">{busy === "save" ? <Spinner /> : <IconCheck size={18} />} Guardar respaldo ahora</button>
           <button onClick={downloadNow} disabled={!!busy} className="btn-secondary btn-lg">{busy === "download" ? <Spinner /> : <IconDownload size={18} />} Descargar copia completa</button>
-          <p className="text-[11px] text-slate-500 sm:col-span-2">El envío automático por correo llega en la fase de lanzamiento.</p>
+          <p className="text-xs text-slate-500 sm:col-span-2">El envío automático por correo llega en la fase de lanzamiento.</p>
         </section>
 
         <section className="animate-in card p-4">
