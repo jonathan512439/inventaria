@@ -3,6 +3,16 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-18 · Fase 6.9 · C7.2 — Inicio con lo que hay que hacer hoy y un Vender más rápido
+
+### 17.9 Inicio y Vender
+- **Qué**:
+  - **Inicio** muestra un botón grande para **Vender** con lo vendido hoy, los **primeros pasos** si estás empezando, y hasta **4 avisos** de lo que pide atención (por revisar, caja sin cerrar, clientes que deben hace más de un mes, por vencer, por reponer, sin precio), cada uno con su botón.
+  - **Corrección**: «por reponer» en Inicio ahora coincide con la lista de reposición (antes usaba un mínimo fijo de 3 y no respetaba los avisos silenciados).
+  - **Vender**: buscar o escanear arriba, los más vendidos a mano, el carrito con botones − + grandes y el botón **Cobrar**. Al cobrar se abre una hoja: cómo paga (efectivo, QR, transferencia o varios), si paga todo, una parte o queda a cuenta, y en efectivo un **teclado grande** para escribir con cuánto paga: la app muestra el **vuelto**. Los avisos (límite de fiado, poco stock) aparecen ahí mismo, sin otro cuadro de confirmación.
+  - **La caja está dentro de Vender** (botón «Caja»). La dirección antigua sigue funcionando.
+- **Validar**: Inicio → tocar «Vender» → agregar 2 productos (uno escaneado) → Cobrar → Efectivo → tocar un monto redondo → se ve el vuelto → Cobrar → el ticket muestra el vuelto. Vender → «Caja» abre la caja del día. Inicio con productos pendientes muestra «N productos por revisar → Revisar».
+
 ## 2026-11-18 · Fase 6.9 · C7.1 — Nueva estructura: cinco lugares y «Vender» al centro
 
 Primer paso de la reconstrucción visual ([RECONSTRUCCION_VISUAL.md](RECONSTRUCCION_VISUAL.md)). Por pedido del usuario, C7 va antes que C6.

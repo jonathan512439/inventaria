@@ -5,91 +5,96 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { queueSummary, useQueue } from "@/lib/queue";
-import { daysToExpiry, DEFAULT_MIN_STOCK, EXPIRY_SOON_DAYS, money } from "@/lib/inventory";
-import { StepByStep, computeStates, type GuideProgress } from "@/components/guide/Guide";
+import { expiringSoon, fromSummary, money, needsRestock, priceOf, stockOf, SUMMARY_COLS } from "@/lib/inventory";
+import { businessDayKey, businessDayStart } from "@/lib/dates";
+import { StepByStep, type GuideProgress } from "@/components/guide/Guide";
 import AiUsageCard from "@/components/AiUsageCard";
 import CleanupCard from "@/components/CleanupCard";
 import { useFlow } from "@/components/FlowProvider";
-import { IconAlert, IconBox, IconCamera, IconCheck, IconCheckCircle, IconChevronRight, IconDownload, IconList, IconSettings, IconSparkles, IconTag, Spinner } from "@/components/ui/Icons";
-import { businessDayStart } from "@/lib/dates";
+import { Stat, TaskCard } from "@/components/ui/Screen";
+import type { Category } from "@/types/database";
+import { IconAlert, IconBell, IconCamera, IconCart, IconCheck, IconCheckCircle, IconChevronRight, IconRegister, IconSettings, IconStore, IconTag, IconUsers, Spinner } from "@/components/ui/Icons";
 
 interface Stats {
-  pending: number;
-  confirmed: number;
   types: number;
   onboarded: boolean;
-  agotados: number;
-  sinPrecio: number;
   porReponer: number;
+  agotados: number;
   porVencer: number;
-  salesToday: { total: number; count: number };
+  sinPrecio: number;
+  salesToday: { total: number; profit: number; count: number };
+  salesEver: number;
+  closedToday: boolean;
   owed: number;
-  addedToday: number;
+  oldDebtors: number;
 }
 
-/** Inicio «Hoy»: una sola pregunta (¿qué hay que hacer hoy?), una acción principal y lo demás plegado en «Más». */
+/**
+ * Inicio «Hoy» (C7.2 · RECONSTRUCCION_VISUAL.md §3.2): botón grande para Vender, lo vendido hoy y hasta 4 tareas
+ * que piden atención, cada una con el botón que la resuelve. En el primer uso, los primeros pasos.
+ */
 export default function DashboardPage() {
   const router = useRouter();
   const flow = useFlow();
   const [stats, setStats] = useState<Stats | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const queue = useQueue();
   const q = queueSummary(queue.items);
+  const { alerts } = flow;
+  const { minStock, expiryDays } = alerts;
 
   useEffect(() => {
     const supabase = createClient();
     (async () => {
       const dayStart = businessDayStart();
-      const [d, c, t, p, prods, sales, owedRows, added] = await Promise.all([
-        supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "draft").is("deleted_at", null),
-        supabase.from("products").select("id", { count: "exact", head: true }).eq("status", "confirmed").is("deleted_at", null),
-        supabase.from("categories").select("id,parent_id,min_stock_default"),
+      const month = new Date(Date.now() - 30 * 86400000).toISOString();
+      const [cats, prof, prods, sales, open, ever, closing] = await Promise.all([
+        supabase.from("categories").select("*"),
         supabase.from("profiles").select("onboarded_at").maybeSingle(),
-        supabase.from("product_summaries").select("stock,precio,min_stock,expires_at,category_id").eq("status", "confirmed"),
+        supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed"),
         supabase.from("sales_v").select("total,cost_total").gte("created_at", dayStart.toISOString()),
-        supabase.from("sales").select("total,paid").neq("status", "pagado"),
-        supabase.from("products").select("id", { count: "exact", head: true }).gte("created_at", dayStart.toISOString()).is("deleted_at", null),
+        supabase.from("sales").select("total,paid,customer_id,created_at").neq("status", "pagado"),
+        supabase.from("sales").select("id", { count: "exact", head: true }),
+        supabase.from("cash_closings").select("id").eq("day", businessDayKey()).limit(1),
       ]);
-      const list = prods.data ?? [];
-      const cats = t.data ?? [];
-      const minOf = (r: { min_stock?: number | null; category_id: string | null }) => {
-        void 0;
-        if (typeof r.min_stock === "number") return r.min_stock;
-        const cat = cats.find((c) => c.id === r.category_id);
-        const top = cat?.parent_id ? cats.find((c) => c.id === cat.parent_id) : cat;
-        return typeof top?.min_stock_default === "number" ? top.min_stock_default : DEFAULT_MIN_STOCK;
-      };
+      const categories = (cats.data ?? []) as Category[];
+      const list = (prods.data ?? []).map(fromSummary);
+      const todays = sales.data ?? [];
+      const openSales = open.data ?? [];
       const s: Stats = {
-        pending: d.count ?? 0,
-        confirmed: c.count ?? 0,
-        types: cats.filter((c) => !c.parent_id).length,
-        onboarded: !!p.data?.onboarded_at,
-        agotados: list.filter((x) => (x.stock ?? 0) <= 0).length,
-        sinPrecio: list.filter((x) => x.precio === null).length,
-        porReponer: list.filter((x) => (x.stock ?? 0) <= minOf(x)).length,
-        porVencer: list.filter((x) => {
-          const d = daysToExpiry(x.expires_at);
-          return d !== null && d <= EXPIRY_SOON_DAYS;
-        }).length,
-        salesToday: { total: (sales.data ?? []).reduce((a, r) => a + Number(r.total ?? 0), 0), count: (sales.data ?? []).length },
-        owed: (owedRows.data ?? []).reduce((a, r) => a + Number(r.total) - Number(r.paid), 0),
-        addedToday: added.count ?? 0,
+        types: categories.filter((c) => !c.parent_id).length,
+        onboarded: !!prof.data?.onboarded_at,
+        // Misma regla que la lista de reposición: mínimos del negocio/categoría/producto y avisos silenciados
+        porReponer: list.filter((p) => needsRestock(p, categories, alerts)).length,
+        agotados: list.filter((p) => (stockOf(p) ?? 0) <= 0 && needsRestock(p, categories, alerts)).length,
+        porVencer: list.filter((p) => expiringSoon(p, alerts, categories)).length,
+        sinPrecio: list.filter((p) => priceOf(p) === null).length,
+        salesToday: {
+          total: todays.reduce((a, r) => a + Number(r.total ?? 0), 0),
+          profit: todays.reduce((a, r) => a + Number(r.total ?? 0) - Number(r.cost_total ?? 0), 0),
+          count: todays.length,
+        },
+        salesEver: ever.count ?? 0,
+        closedToday: (closing.data ?? []).length > 0,
+        owed: openSales.reduce((a, r) => a + Number(r.total) - Number(r.paid), 0),
+        oldDebtors: new Set(openSales.filter((r) => r.customer_id && r.created_at < month).map((r) => r.customer_id)).size,
       };
       // Cuenta nueva sin nada configurado → asistente inicial
-      if (!s.onboarded && s.types === 0 && s.pending + s.confirmed === 0) {
+      if (!s.onboarded && s.types === 0 && flow.loaded && flow.pending + flow.confirmed === 0) {
         router.replace("/onboarding");
         return;
       }
       setStats(s);
     })();
-  }, [q.done, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.done, router, minStock, expiryDays, flow.loaded, flow.pending, flow.confirmed]);
 
-  // Enlaces «Más → Guía / Ordenar y limpiar» abren la sección plegada
+  // «Más → Ordenar y limpiar» abre las herramientas (transitorio hasta C7.8: pasan a Ajustes → Mis datos)
   useEffect(() => {
     const openFromHash = () => {
       const hash = window.location.hash;
       if (hash === "#guia" || hash === "#limpiar") {
-        setMoreOpen(true);
+        setToolsOpen(true);
         setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
       }
     };
@@ -109,168 +114,119 @@ export default function DashboardPage() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
   const working = q.queued + q.processing;
-  const pending = flow.loaded ? flow.pending : stats.pending;
-  const progress: GuideProgress = {
-    hasTypes: stats.types > 0,
-    hasPhotos: stats.pending + stats.confirmed + q.total > 0,
-    hasConfirmed: stats.confirmed > 0,
-    pending,
-  };
-  const states = computeStates(progress);
-  const allDone = states.every((s) => s === "done");
+  const pending = flow.pending;
+  const confirmed = flow.confirmed;
+  const progress: GuideProgress = { hasTypes: stats.types > 0, hasPhotos: pending + confirmed + q.total > 0, hasConfirmed: confirmed > 0, pending };
+  const plural = (n: number, s: string, p = s + "s") => `${n} ${n === 1 ? s : p}`;
 
-  // ¿Qué hay que hacer hoy? → una sola acción principal
-  const today =
-    working > 0
-      ? { title: `Analizando ${working} foto${working === 1 ? "" : "s"}…`, text: "Puedes seguir tomando fotos; te aviso cuando estén listas para revisar.", href: "/capture", cta: "Ver el avance", Icon: IconCamera, tone: "amber" as const }
-      : pending > 0
-        ? { title: `${pending} producto${pending === 1 ? "" : "s"} por revisar`, text: "Confirma nombre, precio y stock. Un toque por producto.", href: "/review", cta: "Revisar ahora", Icon: IconCheckCircle, tone: "brand" as const }
-        : stats.types === 0
-          ? { title: "Elige qué vendes", text: "Con eso la IA sabe cómo ordenar tus fotos.", href: "/store", cta: "Elegir mis categorías", Icon: IconSparkles, tone: "brand" as const }
-          : stats.confirmed === 0
-            ? { title: "Agrega tu primer producto", text: "Una foto basta: la IA lee la etiqueta y lo ordena.", href: "/capture", cta: "Tomar la primera foto", Icon: IconCamera, tone: "brand" as const }
-            : stats.porVencer > 0
-              ? { title: `${stats.porVencer} producto${stats.porVencer === 1 ? "" : "s"} por vencer`, text: "Vencen en 30 días o ya vencieron. Revisa qué hacer con ellos.", href: "/restock?tab=vencer", cta: "Ver por vencer", Icon: IconAlert, tone: "amber" as const }
-            : stats.porReponer > 0
-              ? { title: `${stats.porReponer} producto${stats.porReponer === 1 ? "" : "s"} por reponer`, text: stats.agotados ? `${stats.agotados} agotado${stats.agotados === 1 ? "" : "s"}; el resto está bajo el mínimo. La lista de reposición ya está armada.` : "Están bajo su stock mínimo. La lista de reposición ya está armada.", href: "/restock", cta: "Ver lista de reposición", Icon: IconAlert, tone: "rose" as const }
-              : { title: "Todo al día", text: "Sigue agregando productos o registra ventas desde el inventario.", href: "/capture", cta: "Agregar productos", Icon: IconCamera, tone: "emerald" as const };
+  // Primeros pasos (desaparecen al completarlos)
+  const steps = [
+    { done: stats.types > 0, title: "Crea tu tienda", body: "Elige qué vendes: la IA ordena tus productos con eso.", href: "/store", cta: "Elegir", Icon: IconStore },
+    { done: confirmed > 0, title: "Agrega productos", body: "Con una foto, el código de barras o a mano.", href: "/capture", cta: "Agregar", Icon: IconCamera },
+    { done: stats.salesEver > 0, title: "Haz tu primera venta", body: "El stock baja solo y queda el ticket.", href: "/sell", cta: "Vender", Icon: IconCart },
+  ];
+  const firstUse = steps.some((s) => !s.done);
 
-  const tones = {
-    brand: "from-brand-600 via-violet-600 to-fuchsia-600",
-    amber: "from-amber-500 via-orange-500 to-rose-500",
-    rose: "from-rose-500 via-pink-600 to-fuchsia-600",
-    emerald: "from-emerald-500 via-teal-500 to-cyan-600",
-  };
+  // Tareas: lo que pide atención hoy (máximo 4), cada una con su botón
+  type Task = { key: string; tone: "info" | "warn" | "danger" | "ok"; Icon: (p: { size?: number }) => JSX.Element; title: string; body?: string; href: string; cta: string };
+  const tasks: Task[] = [];
+  if (working > 0) tasks.push({ key: "fotos", tone: "info", Icon: IconCamera, title: `Analizando ${plural(working, "foto")}…`, body: "Te aviso cuando estén listas para revisar.", href: "/capture", cta: "Ver" });
+  if (pending > 0) tasks.push({ key: "revisar", tone: "info", Icon: IconCheckCircle, title: `${plural(pending, "producto")} por revisar`, body: "Confirma nombre, precio y stock.", href: "/review", cta: "Revisar" });
+  if (stats.salesToday.count > 0 && !stats.closedToday && hour >= 18) tasks.push({ key: "caja", tone: "warn", Icon: IconRegister, title: "Falta cerrar la caja de hoy", body: "Cuenta el efectivo y mira si cuadra.", href: "/sell/cash", cta: "Cerrar" });
+  if (stats.oldDebtors > 0) tasks.push({ key: "fiados", tone: "danger", Icon: IconUsers, title: `${plural(stats.oldDebtors, "cliente")} debe${stats.oldDebtors === 1 ? "" : "n"} hace más de 30 días`, body: `En total te deben ${money(stats.owed)}.`, href: "/customers?tab=deben", cta: "Cobrar" });
+  if (stats.porVencer > 0) tasks.push({ key: "vencer", tone: "warn", Icon: IconAlert, title: `${plural(stats.porVencer, "producto")} por vencer`, body: `Vencen en ${alerts.expiryDays} días o ya vencieron.`, href: "/restock?tab=vencer", cta: "Ver" });
+  if (stats.porReponer > 0) tasks.push({ key: "reponer", tone: stats.agotados ? "danger" : "warn", Icon: IconBell, title: `${plural(stats.porReponer, "producto")} por reponer`, body: stats.agotados ? `${plural(stats.agotados, "agotado")}; la lista para pedir ya está armada.` : "Están bajo su mínimo; la lista ya está armada.", href: "/restock", cta: "Ver lista" });
+  if (stats.sinPrecio > 0 && confirmed > 0) tasks.push({ key: "precio", tone: "info", Icon: IconTag, title: `${plural(stats.sinPrecio, "producto")} sin precio`, body: "No se pueden vender bien sin precio.", href: "/products", cta: "Completar" });
+  const shown = tasks.slice(0, 4);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <header className="animate-in flex items-end justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-slate-500">{greeting}</p>
-          <h1 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">{flow.business?.name || "Tu inventario"}</h1>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-card ring-1 ring-slate-900/10">
-            {new Date().toLocaleDateString("es", { weekday: "short", day: "numeric", month: "short" })}
-          </span>
-        </div>
+    <div className="mx-auto max-w-2xl space-y-4">
+      <header className="animate-in">
+        <p className="text-sm font-medium text-muted">{greeting} · {new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" })}</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">{flow.business?.name || "Tu negocio"}</h1>
       </header>
 
-      {/* HOY: una pregunta, una acción */}
-      <section className={`animate-in relative overflow-hidden rounded-3xl bg-gradient-to-br ${tones[today.tone]} p-5 text-white shadow-float`}>
-        <p className="text-xs font-bold uppercase tracking-wider text-white/75">¿Qué hay que hacer hoy?</p>
-        <div className="mt-2 flex items-start gap-4">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20"><today.Icon size={30} /></span>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-bold leading-tight">{today.title}</h2>
-            <p className="mt-1 text-sm text-white/85">{today.text}</p>
-          </div>
-        </div>
-        <Link href={today.href} className="btn mt-4 w-full bg-white py-3.5 text-base text-ink shadow-lg hover:bg-white/90">
-          {today.cta} <IconChevronRight size={18} />
-        </Link>
-        {/* Pasos del camino */}
-        <ol className="mt-4 flex items-center justify-center gap-1 text-xs font-semibold">
-          {[
-            { n: 1, t: "Agregar", href: "/capture" },
-            { n: 2, t: "Revisar", href: "/review" },
-            { n: 3, t: "Inventario", href: "/products" },
-          ].map((s, i) => {
-            const st = i === 0 ? (progress.hasPhotos ? "done" : states[1]) : i === 1 ? (pending === 0 && progress.hasConfirmed ? "done" : pending > 0 ? "current" : "todo") : progress.hasConfirmed ? "done" : "todo";
-            return (
-              <li key={s.n} className="flex items-center">
-                <Link href={s.href} className={`flex items-center gap-1 rounded-full px-2 py-0.5 ${st === "current" ? "bg-white text-brand-700" : st === "done" ? "bg-white/25" : "text-white/60"}`}>
-                  <span className="grid h-4 w-4 place-items-center rounded-full bg-white/30 text-xs">{st === "done" ? <IconCheck size={10} /> : s.n}</span>
-                  {s.t}
-                  {s.n === 2 && pending > 0 && <span className="rounded-full bg-amber-400 px-1 text-xs text-amber-950">{pending}</span>}
-                </Link>
-                {i < 2 && <span className="mx-0.5 h-0.5 w-4 bg-white/40" />}
-              </li>
-            );
-          })}
-        </ol>
-      </section>
-
-      {/* Números de hoy */}
-      <div className="animate-in grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Tile href="/products" label="En inventario" value={String(stats.confirmed)} hint={`${stats.types} categoría${stats.types === 1 ? "" : "s"}`} />
-        <Tile href="/review" label="Por revisar" value={String(pending)} hint={pending ? "toca para confirmar" : "nada pendiente"} tone={pending ? "amber" : undefined} />
-        <Tile href={stats.owed > 0 ? "/customers?tab=deben" : "/movements"} label="Ventas de hoy" value={`${money(stats.salesToday.total)}`} hint={stats.owed > 0 ? `te deben ${money(stats.owed)}` : `${stats.salesToday.count} venta${stats.salesToday.count === 1 ? "" : "s"}`} tone="emerald" />
-        <Tile href="/restock" label="Por reponer" value={String(stats.porReponer)} hint={stats.porVencer ? `${stats.porVencer} por vencer · ${stats.sinPrecio} sin precio` : stats.sinPrecio ? `${stats.sinPrecio} sin precio` : "todo en orden"} tone={stats.porReponer + stats.porVencer ? "rose" : undefined} />
-      </div>
-
-      {/* Accesos directos */}
-      <div className="animate-in grid grid-cols-3 gap-2">
-        <Shortcut href="/sell" Icon={IconTag} label="Vender" hint="cobrar y ticket" primary tone="emerald" />
-        <Shortcut href="/capture" Icon={IconCamera} label="Agregar" hint="foto o galería" primary />
-        {flow.isOwner ? <Shortcut href="/reports" Icon={IconList} label="Cómo va" hint="ventas y ganancia" /> : <Shortcut href="/cash" Icon={IconList} label="Caja" hint="cerrar el día" />}
-      </div>
-
-      {/* Más: guía, IA, limpieza, exportar, ajustes (plegado) */}
-      <section className="animate-in">
-        <button type="button" onClick={() => setMoreOpen((v) => !v)} className="btn-disclosure">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"><IconList size={18} /></span>
-          <span className="min-w-0 flex-1">
-            <span className="block">{moreOpen ? "Ocultar herramientas" : "Más herramientas"}</span>
-            <span className="block truncate text-xs font-normal text-slate-500">Resumen de hoy · pregúntale a tu inventario · guía · consumo de IA · limpiar · Excel</span>
+      {/* La acción del día: vender */}
+      <Link href="/sell" className="animate-in flex items-center gap-4 rounded-3xl p-5 text-white shadow-float transition active:scale-[0.99]" style={{ backgroundImage: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20"><IconCart size={30} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-2xl font-bold leading-tight">Vender</span>
+          <span className="block text-sm text-white/85">
+            Hoy: {money(stats.salesToday.total)} · {plural(stats.salesToday.count, "venta")}
+            {flow.isOwner && stats.salesToday.count > 0 ? ` · ganas ${money(stats.salesToday.profit)}` : ""}
           </span>
-          <IconChevronRight className={`shrink-0 text-brand-600 transition ${moreOpen ? "rotate-90" : ""}`} />
-        </button>
-        {moreOpen && (
-          <div className="stagger mt-3 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <Link href="/digest" className="press flex items-center gap-3 rounded-3xl border-2 border-brand-300 bg-white p-4 shadow-card transition hover:border-brand-500 hover:bg-brand-50">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-100 text-brand-700"><IconCheckCircle size={22} /></span>
-                <span className="min-w-0"><span className="block font-bold text-ink">Resumen de hoy</span><span className="block text-xs text-slate-500">para WhatsApp</span></span>
-              </Link>
-              <Link href="/ask" className="press flex items-center gap-3 rounded-3xl border-2 border-violet-300 bg-white p-4 shadow-card transition hover:border-violet-500 hover:bg-violet-50">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-100 text-violet-700"><IconSparkles size={22} /></span>
-                <span className="min-w-0"><span className="block font-bold text-ink">Pregúntale</span><span className="block text-xs text-slate-500">a tu inventario</span></span>
-              </Link>
-              <Link href="/export" className="press flex items-center gap-3 rounded-3xl border-2 border-emerald-300 bg-white p-4 shadow-card transition hover:border-emerald-500 hover:bg-emerald-50">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-emerald-700"><IconDownload size={22} /></span>
-                <span className="min-w-0"><span className="block font-bold text-ink">Exportar</span><span className="block text-xs text-slate-500">a Excel</span></span>
-              </Link>
-              <Link href="/settings" className="press flex items-center gap-3 rounded-3xl border-2 border-slate-300 bg-white p-4 shadow-card transition hover:border-brand-400 hover:bg-brand-50">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-700"><IconSettings size={22} /></span>
-                <span className="min-w-0"><span className="block font-bold text-ink">Ajustes</span><span className="block text-xs text-slate-500">mi tienda y datos</span></span>
-              </Link>
-            </div>
-            <AiUsageCard />
-            <CleanupCard />
-            <div id="guia" className="scroll-mt-24 pt-2">
-              <StepByStep progress={progress} />
-            </div>
+        </span>
+        <IconChevronRight size={22} />
+      </Link>
+
+      {/* Primeros pasos */}
+      {firstUse && (
+        <section className="animate-in card space-y-2 p-4">
+          <p className="text-sm font-bold text-ink">Primeros pasos</p>
+          <ol className="space-y-2">
+            {steps.map((s, i) => {
+              const current = !s.done && steps.slice(0, i).every((x) => x.done);
+              return (
+                <li key={s.title} className={`flex items-center gap-3 rounded-2xl p-2 ${current ? "bg-brand-50" : ""}`}>
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${s.done ? "bg-ok-100 text-ok-700" : current ? "bg-brand-600 text-white" : "bg-slate-100 text-muted"}`}>
+                    {s.done ? <IconCheck size={20} /> : <s.Icon size={20} />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-base font-semibold ${s.done ? "text-muted line-through" : "text-ink"}`}>{i + 1}. {s.title}</span>
+                    {!s.done && <span className="block text-xs text-muted">{s.body}</span>}
+                  </span>
+                  {current && <Link href={s.href} className="btn-primary btn-sm min-h-[44px]">{s.cta}</Link>}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+
+      {/* Tareas */}
+      {shown.length > 0 ? (
+        <section className="space-y-2" aria-label="Para hacer hoy">
+          <p className="text-xs font-bold uppercase tracking-wide text-muted">Para hacer hoy</p>
+          {shown.map((t) => (
+            <TaskCard key={t.key} tone={t.tone} icon={<t.Icon size={22} />} title={t.title} body={t.body} href={t.href} cta={t.cta} />
+          ))}
+          {tasks.length > shown.length && <p className="text-center text-xs text-muted">y {plural(tasks.length - shown.length, "aviso")} más en Productos</p>}
+        </section>
+      ) : (
+        !firstUse && (
+          <div className="animate-in flex items-center gap-3 rounded-3xl bg-ok-50 p-4 text-ok-800">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl bg-ok-100"><IconCheck size={22} /></span>
+            <span className="text-base font-semibold">Todo al día. Nada pendiente por ahora.</span>
           </div>
-        )}
-      </section>
-      {!allDone && !moreOpen && (
-        <p className="text-center text-xs text-slate-500">
-          ¿Primera vez? La <button onClick={() => setMoreOpen(true)} className="font-semibold text-brand-700 underline">guía paso a paso</button> te lleva de la mano.
-        </p>
+        )
+      )}
+
+      {/* Números rápidos */}
+      <div className="animate-in grid grid-cols-2 gap-2">
+        <Link href="/products"><Stat label="En inventario" value={String(confirmed)} hint={plural(stats.types, "categoría")} /></Link>
+        <Link href={stats.owed > 0 ? "/customers?tab=deben" : "/customers"}><Stat label="Te deben" value={money(stats.owed)} tone={stats.owed > 0 ? "warn" : undefined} hint={stats.owed > 0 ? "fiados por cobrar" : "nadie te debe"} /></Link>
+      </div>
+
+      {/* Herramientas del dueño (transitorio: en C7.8 pasan a Ajustes → Mis datos e Inteligencia artificial) */}
+      {flow.isOwner && (
+        <section className="animate-in">
+          <button type="button" onClick={() => setToolsOpen((v) => !v)} className="btn-disclosure min-h-[56px]" aria-expanded={toolsOpen}>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"><IconSettings size={18} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block">Herramientas</span>
+              <span className="block truncate text-xs font-normal text-muted">Consumo de IA · ordenar y limpiar · guía paso a paso</span>
+            </span>
+            <IconChevronRight className={`shrink-0 text-brand-600 transition ${toolsOpen ? "rotate-90" : ""}`} />
+          </button>
+          {toolsOpen && (
+            <div className="mt-3 space-y-4">
+              <AiUsageCard />
+              <div id="limpiar" className="scroll-mt-24"><CleanupCard /></div>
+              <div id="guia" className="scroll-mt-24 pt-2"><StepByStep progress={progress} /></div>
+            </div>
+          )}
+        </section>
       )}
     </div>
-  );
-}
-
-function Tile({ href, label, value, hint, tone }: { href: string; label: string; value: string; hint: string; tone?: "amber" | "emerald" | "rose" }) {
-  const t = { amber: "text-amber-700", emerald: "text-emerald-700", rose: "text-rose-700" };
-  return (
-    <Link href={href} className="press rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10 transition hover:ring-brand-300">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`text-xl font-bold tabular-nums ${tone ? t[tone] : "text-ink"}`}>{value}</p>
-      <p className="truncate text-xs text-slate-400">{hint}</p>
-    </Link>
-  );
-}
-
-function Shortcut({ href, Icon, label, hint, primary, tone }: { href: string; Icon: (p: { size?: number }) => JSX.Element; label: string; hint: string; primary?: boolean; tone?: "emerald" }) {
-  const solid = tone === "emerald" ? "bg-emerald-600 text-white ring-emerald-600 hover:bg-emerald-700" : "bg-brand-600 text-white ring-brand-600 hover:bg-brand-700";
-  return (
-    <Link href={href} className={`press flex flex-col items-center gap-1 rounded-2xl p-3 text-center shadow-card ring-1 transition ${primary ? solid : "bg-white text-ink ring-slate-900/10 hover:ring-brand-300"}`}>
-      <span className={`grid h-10 w-10 place-items-center rounded-xl ${primary ? "bg-white/20" : "bg-brand-50 text-brand-700"}`}><Icon size={22} /></span>
-      <span className="text-sm font-bold">{label}</span>
-      <span className={`text-xs ${primary ? "text-white/80" : "text-slate-500"}`}>{hint}</span>
-    </Link>
   );
 }

@@ -178,8 +178,8 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 | Paso | Estado | CHANGELOG |
 |---|---|---|
 | C7.1 · Sistema visual y armazón | ✅ 2026-11-18 | 17.8 |
-| C7.2 · Inicio y Vender | ⏳ siguiente | |
-| C7.3 · Productos | pendiente | |
+| C7.2 · Inicio y Vender | ✅ 2026-11-18 | 17.9 |
+| C7.3 · Productos | ⏳ siguiente | |
 | C7.4 · Agregar y Revisar | pendiente | |
 | C7.5 · Mercadería | pendiente | |
 | C7.6 · Clientes | pendiente | |
@@ -194,3 +194,10 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 - `components/AppShell.tsx` reemplaza a `Nav.tsx` y `StepBar.tsx` (borrados): barra inferior Inicio · Productos · **Vender** · Clientes · Más; barra lateral en escritorio; cabecera con nombre del negocio, `ConnectionChip` (antes `OfflineBar`) y «¿Quién atiende?» (salió de Inicio).
 - **Transitorio:** «Más» lleva también a Agregar, Revisar, Escanear, Compras, Contar, Reposición, Precios, Etiquetas y Caja, agrupados como en §3 (Productos · Vender y cobrar · Números · Ajustes · Ayuda), para que nada quede inaccesible mientras C7.2–C7.8 mueven cada función a su lugar. El 5.º botón del vendedor pasa a «Caja» en C7.9, cuando todo lo demás ya viva dentro de su área.
 - **Redirecciones (§3.3):** se agregan en el mismo paso que crea cada ruta nueva (en C7.1 no había destinos nuevos).
+
+**C7.2 (2026-11-18):**
+- **Inicio «Hoy»** (`app/(app)/dashboard/page.tsx`): botón grande **Vender** con lo vendido hoy (y la ganancia, solo dueño); **primeros pasos** (tienda → productos → primera venta) mientras falte alguno; hasta **4 tareas** con su botón (fotos analizándose, pendientes, caja sin cerrar después de las 18 h, clientes que deben hace más de 30 días, por vencer, por reponer, sin precio); «En inventario» y «Te deben». Se quitaron la tarjeta de colores con una sola acción y los pasos ①②③. **Corrección:** «por reponer» ahora usa la misma regla que la lista de reposición (mínimos del negocio, categoría y producto, y avisos silenciados); antes contaba con mínimo fijo 3.
+- **Transitorio:** «Herramientas» (consumo de IA, ordenar y limpiar, guía) queda plegado al final de Inicio, solo para el dueño, hasta C7.8 (Ajustes → Mis datos e Inteligencia artificial). Los enlaces `/dashboard#limpiar` y `#guia` siguen abriéndolo.
+- **Vender** (`app/(app)/sell/page.tsx`): `ProductFinder` (buscar o escanear; elige la variante en una hoja) + los más vendidos + carrito con `QtyStepper` y precio por línea (atajo a mayorista) + acción fija **Cobrar**. La hoja **Cobrar** reemplaza al diálogo de confirmación: total y descuento; Efectivo · QR · Transf. · Varios; «Paga todo / Paga una parte / A cuenta»; en efectivo, **teclado grande** con montos rápidos (exacto y billetes redondos) y **vuelto**; cliente (obligatorio si queda debiendo) con aviso de límite de fiado y de stock insuficiente dentro de la hoja. El ticket final muestra el vuelto. Sigue siendo una sola operación `register_sale` con id idempotente.
+- **Caja dentro de Vender:** la pantalla pasó a `/sell/cash` (botón «Caja» en Vender); `/cash` redirige (`next.config.mjs` → `redirects`, primera redirección de §3.3).
+- Componentes nuevos: `components/ProductFinder.tsx`, `components/ui/NumberPad.tsx` (`NumberPad`, `QtyStepper`, `padNumber`).

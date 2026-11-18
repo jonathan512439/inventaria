@@ -118,7 +118,7 @@ export default function CashPage() {
   return (
     <div className="has-action mx-auto max-w-2xl space-y-4">
       <header className="animate-in">
-        <Link href="/movements" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ventas y movimientos</Link>
+        <Link href="/sell" className="mb-2 inline-flex min-h-[44px] items-center gap-1 text-sm text-muted hover:text-brand-700"><IconArrowLeft size={16} /> Vender</Link>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Caja de hoy</h1>
         <p className="text-sm text-slate-500">Cuánto entró, cuánto salió y cuánto efectivo debería haber. Al final del día, cuenta y cierra.</p>
       </header>

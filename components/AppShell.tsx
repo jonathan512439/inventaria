@@ -30,7 +30,7 @@ type IconT = (p: { size?: number; className?: string; strokeWidth?: number }) =>
 const AREAS: { key: string; href: string; label: string; Icon: IconT; match: string[] }[] = [
   { key: "inicio", href: "/dashboard", label: "Inicio", Icon: IconHome, match: ["/dashboard", "/onboarding"] },
   { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/review", "/drafts", "/capture", "/scan", "/count", "/purchases", "/restock", "/prices", "/labels", "/trash", "/import", "/export"] },
-  { key: "vender", href: "/sell", label: "Vender", Icon: IconCart, match: ["/sell", "/cash"] },
+  { key: "vender", href: "/sell", label: "Vender", Icon: IconCart, match: ["/sell"] },
   { key: "clientes", href: "/customers", label: "Clientes", Icon: IconUsers, match: ["/customers", "/consign"] },
 ];
 
@@ -59,7 +59,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
   {
     title: "Vender y cobrar",
     items: [
-      { href: "/cash", label: "Caja de hoy", hint: "Cuánto entró y cerrar el día", Icon: IconRegister },
+      { href: "/sell/cash", label: "Caja de hoy", hint: "Cuánto entró y cerrar el día", Icon: IconRegister },
       { href: "/consign", label: "Mercadería entregada", hint: "Revendedores y rendir cuentas", Icon: IconTruck },
     ],
   },

@@ -101,7 +101,7 @@ export default function MovementsPage() {
           </div>
           <div className="flex gap-2">
             <Link href="/sell" className="btn-success btn-sm">Vender</Link>
-            <Link href="/cash" className="btn-secondary btn-sm">Caja de hoy</Link>
+            <Link href="/sell/cash" className="btn-secondary btn-sm">Caja de hoy</Link>
           </div>
         </div>
       </header>
