@@ -30,4 +30,5 @@
 - Importes siempre con `money(n)` (y `currencyLabel()` en etiquetas), nunca «Bs» escrito a mano; «hoy» / «este mes» con `lib/dates.ts` (zona del negocio), nunca `setHours(0,0,0,0)` ni `toISOString().slice(0,10)`. Nombre y ajustes del negocio desde `useFlow().business` (no del perfil).
 - Permisos (024): la base decide por rol de quien atiende (`is_owner()`); la interfaz solo oculta. Rutas /api que exigen rol: `requireMember(request, { owner })` de `lib/access.ts`, y el cliente las llama con `actorHeaders()`. Nada escribe el stock de un confirmado fuera de las funciones. Probar cada cambio de permisos con `npm run test:access`.
 - Costos (025): nunca en tablas que lee el vendedor. Leer costo/ganancia solo de `product_costs`, `sales_v`, `sale_items_v`, `cash_closings_v` o `product_summaries`; en pantallas del dueño que cargan `products` completos, pasar por `withCosts()`.
+- Fotos de productos (026): bucket privado; mostrarlas siempre con `Photo` o `StoredImg` (`components/ui/Photo.tsx`), nunca `<img src={image_url}>` directo.
 - Errores al usuario siempre con `friendlyError()` (`lib/errors.ts`), nunca `error.message` crudo.

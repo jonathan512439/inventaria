@@ -3,6 +3,16 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-18 · Fase 6.9 · C5.3 — Las fotos de los productos son privadas
+
+Migración `026_fotos_privadas.sql` aplicada después de publicar el código. `npm run test:access` 35/35 contra producción; las 27 fotos existentes siguen visibles para su negocio.
+
+### 17.7 Fotos privadas
+- **Qué**: antes cualquiera que tuviera la dirección de una foto podía verla. Ahora las fotos solo se muestran dentro de la app a las personas del negocio, con un enlace que vence en una hora (la app lo renueva sola).
+  - En la app todo se ve igual.
+  - El enlace de la foto que sale en el Excel exportado ya no abre fuera de la app.
+- **Validar**: Inventario, la ficha de un producto, Revisar y el escáner muestran las fotos como siempre; copiar la dirección de una foto desde un Excel exportado y abrirla en el navegador → no se ve.
+
 ## 2026-11-18 · Fase 6.9 · C5.2 — El costo y la ganancia, solo para el dueño
 
 Migración `025_costos.sql` aplicada (las sumas de costos se verificaron antes de quitar las columnas). `npm run test:access` 34/34 (también contra las rutas publicadas); `test:ops`, `test:team`, `test:fields`, `test:variants`, `test:import`, `test:backup` en verde; `test:e2e` 58/58.

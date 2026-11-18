@@ -17,8 +17,8 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 | C4 · Ajustes del negocio y zona horaria | ✅ 2026-11-18 | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
 | C5.1 · Permisos por rol y operación, negocio activo, firma | ✅ 2026-11-18 | `024_permisos.sql` | `npm run test:access` (24) + `test:team` | 17.5 |
 | C5.2 · Costos fuera del alcance del vendedor | ✅ 2026-11-18 | `025_costos.sql` | `npm run test:access` (ampliada) | 17.6 |
-| C5.3 · Fotos privadas | ⏳ siguiente | `026_fotos_privadas.sql` | `npm run test:access` (ampliada) | 17.7 |
-| C6 · Calidad continua | pendiente | `schema_migrations` | CI | 17.6 |
+| C5.3 · Fotos privadas | ✅ 2026-11-18 | `026_fotos_privadas.sql` | `npm run test:access` (ampliada) | 17.7 |
+| C6 · Calidad continua | ⏳ siguiente | `schema_migrations` | CI | 17.6 |
 | C7 · Reconstrucción visual completa (C7.1–C7.9) | pendiente (tras C5) | — | manual + `test:e2e` + prueba con 3 personas | 17.7–17.15 |
 
 ## Contexto para retomar (decisiones tomadas)
@@ -181,6 +181,10 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 - Vistas con los mismos nombres de columna: `product_summaries.precio_compra`, `sales_v.cost_total`, `sale_items_v.unit_cost`, `cash_closings_v.profit` (al vendedor le llegan vacías). Inicio, Resumen, Movimientos, Reportes, Caja, «Pregúntale» y el respaldo las usan.
 - Formularios del dueño (ficha, tabla, Revisar, categoría, exportar): `withCosts()` (`lib/data/costs.ts`) vuelve a poner el costo en `data.precio_compra`; al guardar, el disparador `products_cost_out/save` lo pasa a `product_costs`. El historial del costo se escribe desde `product_costs`.
 - Pendiente menor: el costo por variante solo se fija con compras (no hay campo en la ficha de la variante, igual que antes).
+
+**Resultado C5.3 (2026-11-18):** orden inverso a C5.2: primero se publicó el código (enlaces firmados, funciona también con el bucket público) y después se aplicó `026_fotos_privadas.sql`. `npm run test:access` **35/35** contra producción (sin enlace firmado la foto da 400; el equipo la ve con enlace; otro negocio no obtiene enlace). Las 27 fotos existentes quedan visibles para su negocio (la carpeta de cada una es de un miembro del negocio del producto).
+
+**Cómo quedó:** `lib/photos.ts` convierte `image_url` (dirección de siempre) en un enlace firmado de 1 h, juntando las fotos de una lista en una sola petición y guardándolas en memoria; `Photo` y `StoredImg` lo usan. Política `product_images_member_read`: se firman fotos de carpetas de personas del negocio activo. Limitaciones: el Excel exportado trae la dirección de la foto, que fuera de la app ya no abre; sin conexión solo se ven las fotos que el navegador tenga en caché.
 
 ## C6 · Calidad continua (cierra M3, M6, M7)
 
