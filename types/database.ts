@@ -20,7 +20,12 @@ export type Business = {
 export type SessionContext = {
   me: string;
   business: Business | null;
+  /** Rol de la cuenta de la sesión */
   role: MemberRole | null;
+  /** Quién atiende (024): el de la sesión, o quien entró con su PIN en este celular */
+  actor?: string;
+  /** Rol de quien atiende: el que vale para los permisos */
+  acting_role?: MemberRole | null;
   members: BusinessMember[];
   /** En cuántos negocios está la persona (para el selector de C5) */
   businesses: number;
@@ -762,6 +767,9 @@ export interface Database {
       set_my_name: { Args: { p_business: string; p_name: string }; Returns: undefined };
       current_business_id: { Args: Record<string, never>; Returns: string | null };
       session_context: { Args: Record<string, never>; Returns: SessionContext | null };
+      start_shift: { Args: { p_business: string; p_user: string; p_pin: string }; Returns: string | null };
+      switch_business: { Args: { p_business: string }; Returns: undefined };
+      my_businesses: { Args: Record<string, never>; Returns: { id: string; name: string; role: MemberRole; current: boolean }[] };
       // Operaciones atómicas (021 · Fase 6.9 C2). Se llaman solo desde lib/data/*.
       adjust_stock: {
         Args: { p_id: string; p_product: string; p_variant: string | null; p_delta: number; p_tipo: MovementType; p_motivo?: string | null; p_precio?: number | null; p_at?: string | null };

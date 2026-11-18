@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import CoachTip from "@/components/CoachTip";
-import { cacheGet, cacheSet, isNetworkError } from "@/lib/offline";
+import { bizKey, cacheGet, cacheSet, isNetworkError } from "@/lib/offline";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, Product } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
@@ -39,7 +39,7 @@ export default function ProductsPage() {
       ]);
       if ((c.error && isNetworkError(c.error)) || (p.error && isNetworkError(p.error))) {
         // Sin conexión: última copia guardada en el celular
-        const cached = await cacheGet<{ categories: Category[]; products: Product[] }>("inventory");
+        const cached = await cacheGet<{ categories: Category[]; products: Product[] }>(bizKey("inventory"));
         if (cached) {
           setCategories(cached.data.categories);
           setProducts(cached.data.products);
@@ -53,7 +53,7 @@ export default function ProductsPage() {
       setCategories(cats);
       setProducts(list);
       setLoading(false);
-      cacheSet("inventory", { categories: cats, products: list });
+      cacheSet(bizKey("inventory"), { categories: cats, products: list });
       const start = businessMonthStart();
       const [{ data: sales }, { data: vs }] = await Promise.all([
         supabase.from("sales").select("total").gte("created_at", start.toISOString()),

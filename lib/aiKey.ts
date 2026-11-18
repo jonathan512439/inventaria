@@ -35,7 +35,7 @@ export async function resolveAiKey(admin: SupabaseClient<Database>, userId: stri
   const { data } = await admin.from("ai_keys").select("key_ciphertext,iv").eq("user_id", userId).maybeSingle();
   if (data) {
     try {
-      return { apiKey: await decryptKey(data.key_ciphertext, data.iv), keyId: userId, own: true };
+      return { apiKey: await decryptKey(data.key_ciphertext, data.iv), keyId: userId, own: true, usage: [] };
     } catch {
       /* secreto cambiado o dato corrupto: se usa la del servicio */
     }

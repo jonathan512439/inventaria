@@ -14,7 +14,7 @@ import ProductTable from "@/components/ProductTable";
 import ProductRow from "@/components/ProductRow";
 import StockAdjust from "@/components/StockAdjust";
 import { ListSkeleton } from "@/components/ui/Skeleton";
-import { cacheGet, cacheSet, isNetworkError } from "@/lib/offline";
+import { bizKey, cacheGet, cacheSet, isNetworkError } from "@/lib/offline";
 import { IconArrowLeft, IconCamera, IconDownload, IconList, IconTable } from "@/components/ui/Icons";
 
 const FILTERS: { key: Filter; label: string }[] = [
@@ -61,7 +61,7 @@ export default function CategoryInventoryClient() {
         supabase.from("variant_axes").select("*").order("sort_order"),
       ]);
       if (c.error && isNetworkError(c.error)) {
-        const cached = await cacheGet<{ categories: Category[]; templates: FieldTemplate[]; axes: VariantAxis[]; products: Product[]; full: [string, Product][]; variants: ProductVariant[] }>(`category:${id}`);
+        const cached = await cacheGet<{ categories: Category[]; templates: FieldTemplate[]; axes: VariantAxis[]; products: Product[]; full: [string, Product][]; variants: ProductVariant[] }>(bizKey(`category:${id}`));
         if (cached) {
           setCategories(cached.data.categories);
           setTemplates(cached.data.templates);
@@ -139,7 +139,7 @@ export default function CategoryInventoryClient() {
   const rowOf = (p: Product) => full.get(p.id) ?? p;
   // Copia para consultar sin conexión (resúmenes + filas ya cargadas)
   useEffect(() => {
-    if (!loading && !cachedAt && products.length) cacheSet(`category:${id}`, { categories, templates, axes, products, full: Array.from(full.entries()), variants });
+    if (!loading && !cachedAt && products.length) cacheSet(bizKey(`category:${id}`), { categories, templates, axes, products, full: Array.from(full.entries()), variants });
   }, [loading, cachedAt, id, categories, templates, axes, products, full, variants]);
 
   async function exportVisible() {

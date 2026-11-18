@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     const key = await resolveAiKey(admin, user.id);
     try {
       const g = await generatePreset(body.description.trim(), key);
-      await logUsage(admin, user.id, "setup", key.own);
+      await logUsage(admin, user.id, "setup", key.own, key.usage);
       specs.push({
         name: g.name,
         icon: g.icon || "🏪",
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
         ],
       });
     } catch (e) {
-      await logUsage(admin, user.id, "setup", key.own);
+      await logUsage(admin, user.id, "setup", key.own, key.usage);
       const status = e instanceof GeminiError ? e.status : 500;
       return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo generar la categoría" }, { status });
     }

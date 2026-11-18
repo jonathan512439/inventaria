@@ -28,4 +28,5 @@
 - **Reconstrucción visual (C7, tras C5):** `docs/RECONSTRUCCION_VISUAL.md` (5 áreas, 38 → 16 pantallas, trazabilidad de funciones, sistema visual). Hasta entonces no se rediseñan pantallas: solo se cambian por dentro.
 - Stock y dinero solo por `lib/data/ops.ts` (funciones SQL de `021`, idempotentes con `newOpId()`); al guardar `data` de un producto, usar `withoutStock()` y `setStock()` si cambió el stock.
 - Importes siempre con `money(n)` (y `currencyLabel()` en etiquetas), nunca «Bs» escrito a mano; «hoy» / «este mes» con `lib/dates.ts` (zona del negocio), nunca `setHours(0,0,0,0)` ni `toISOString().slice(0,10)`. Nombre y ajustes del negocio desde `useFlow().business` (no del perfil).
+- Permisos (024): la base decide por rol de quien atiende (`is_owner()`); la interfaz solo oculta. Rutas /api que exigen rol: `requireMember(request, { owner })` de `lib/access.ts`, y el cliente las llama con `actorHeaders()`. Nada escribe el stock de un confirmado fuera de las funciones. Probar cada cambio de permisos con `npm run test:access`.
 - Errores al usuario siempre con `friendlyError()` (`lib/errors.ts`), nunca `error.message` crudo.

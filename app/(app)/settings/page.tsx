@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, setActor } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import { resetCoach, resetTour } from "@/lib/coach";
 import WhatsNew from "@/components/WhatsNew";
 import AiKeyCard from "@/components/AiKeyCard";
 import { useFlow } from "@/components/FlowProvider";
+import { clearDeviceData } from "@/lib/offline";
 import { DEFAULT_TZ } from "@/lib/dates";
 import { friendlyError } from "@/lib/errors";
 import { IconAlert, IconCheckCircle, IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconRefresh, IconSparkles, IconTable, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
@@ -53,6 +54,18 @@ export default function SettingsPage() {
     })();
   }, [supabase]);
 
+  // Negocios de la persona (solo si está en más de uno): se ve y se escribe SOLO en el activo (024)
+  const [myBiz, setMyBiz] = useState<{ id: string; name: string; role: string; current: boolean }[]>([]);
+  useEffect(() => {
+    if (flow.businesses > 1) supabase.rpc("my_businesses").then(({ data }) => setMyBiz(data ?? []));
+  }, [flow.businesses, supabase]);
+  async function switchTo(id: string) {
+    const { error } = await supabase.rpc("switch_business", { p_business: id });
+    if (error) return toast("error", friendlyError(error));
+    setActor(null); // el turno de «¿quién atiende?» era del otro negocio
+    window.location.href = "/dashboard"; // recarga completa: todo se vuelve a pedir del negocio nuevo
+  }
+
   const saved = flow.business;
   useEffect(() => {
     if (saved) setBiz({ name: saved.name ?? "", currency: saved.currency ?? "Bs", timezone: saved.timezone ?? DEFAULT_TZ });
@@ -71,9 +84,10 @@ export default function SettingsPage() {
   }
 
   async function signOut() {
+    await clearDeviceData();
     await supabase.auth.signOut();
-    router.replace("/login");
-    router.refresh();
+    // Recarga completa: borra también lo que quedó en memoria (cola de fotos, caché)
+    window.location.href = "/login";
   }
 
   return (
@@ -82,6 +96,23 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold tracking-tight text-ink">Ajustes</h1>
         <p className="text-sm text-slate-500">{email}</p>
       </header>
+
+      {myBiz.length > 1 && (
+        <section className="animate-in card space-y-2">
+          <p className="text-sm font-bold text-ink">Estás en {myBiz.length} negocios</p>
+          <p className="text-xs text-slate-500">Ves y anotas solo en el que está marcado. Toca otro para cambiar.</p>
+          <ul className="grid gap-1.5">
+            {myBiz.map((b) => (
+              <li key={b.id}>
+                <button onClick={() => !b.current && switchTo(b.id)} className={`flex w-full items-center justify-between rounded-2xl border-2 px-3 py-2 text-left ${b.current ? "border-brand-500 bg-brand-50" : "border-slate-200"}`}>
+                  <span className="font-semibold text-ink">{b.name}</span>
+                  <span className="text-xs text-slate-500">{b.role === "dueno" ? "Dueño" : "Vendedor"}{b.current ? " · activo" : ""}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="animate-in card space-y-3">
         <p className="text-sm font-bold text-ink">Tu negocio</p>

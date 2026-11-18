@@ -144,7 +144,7 @@ export async function POST(request: Request) {
     result = out.result;
     aiMeta.modelo = out.model;
   } catch (e) {
-    await logUsage(admin, user.id, "analyze", key.own);
+    await logUsage(admin, user.id, "analyze", key.own, key.usage);
     if (e instanceof QuotaError) {
       // Cupo diario agotado en todos los modelos: el cliente pausa hasta el reinicio.
       await admin.storage.from("product-images").remove([path]);
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error analizando la imagen" }, { status: e instanceof GeminiError ? e.status : 500 });
   }
 
-  await logUsage(admin, user.id, "analyze", key.own);
+  await logUsage(admin, user.id, "analyze", key.own, key.usage);
 
   // Subcategoría elegida por la IA
   if (!categoryId) {

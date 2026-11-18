@@ -24,18 +24,20 @@ export async function POST(request: Request) {
   const { model, used } = (await request.json().catch(() => ({}))) as { model?: string; used?: number };
   const admin = createAdminClient();
   const own = await hasOwnKey(admin, user.id);
-  const current = await usageToday(admin, own ? { userId: user.id } : undefined);
+  // El cupo del servicio lo comparten todos los negocios: solo se ajusta el consumo de la clave PROPIA (S8)
+  if (!own) return NextResponse.json({ error: "Solo puedes ajustar el consumo de tu propia clave de IA" }, { status: 403 });
+  const current = await usageToday(admin, { userId: user.id });
   const m = current.models.find((x) => x.model === model);
   if (!m || typeof used !== "number" || used < 0 || used > 1000) return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
   const delta = Math.round(used) - m.used;
   if (delta > 0) {
-    await admin.from("ai_usage").insert(Array.from({ length: delta }, () => ({ user_id: user.id, model: m.model, purpose: "adjust", status: "ok", own_key: own })));
+    await admin.from("ai_usage").insert(Array.from({ length: delta }, () => ({ user_id: user.id, model: m.model, purpose: "adjust", status: "ok", own_key: true })));
   } else if (delta < 0) {
     // quitar ajustes previos de hoy (solo los manuales) para no borrar consumo real
-    const { data: adj } = await admin.from("ai_usage").select("id").eq("model", m.model).eq("purpose", "adjust").eq("own_key", own).gte("created_at", new Date(new Date(current.resetAt).getTime() - 86400000).toISOString()).limit(-delta);
+    const { data: adj } = await admin.from("ai_usage").select("id").eq("user_id", user.id).eq("model", m.model).eq("purpose", "adjust").eq("own_key", true).gte("created_at", new Date(new Date(current.resetAt).getTime() - 86400000).toISOString()).limit(-delta);
     if (adj?.length) await admin.from("ai_usage").delete().in("id", adj.map((r) => r.id));
   }
-  return NextResponse.json({ ...(await usageToday(admin, own ? { userId: user.id } : undefined)), ownKey: own }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ...(await usageToday(admin, { userId: user.id })), ownKey: true }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /** GET /api/usage → consumo de IA de hoy por modelo (el cupo gratuito lo comparte toda la app). */

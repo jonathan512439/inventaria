@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { createClient, getActor, setActor } from "@/lib/supabase/client";
 import type { Business, BusinessMember, MemberRole, SessionContext } from "@/types/database";
 import { hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
-import { syncMoves } from "@/lib/offline";
+import { rememberBusiness, syncMoves } from "@/lib/offline";
 import { DEFAULT_ALERTS, setCurrency, type AlertSettings } from "@/lib/inventory";
 import { setBusinessTz } from "@/lib/dates";
 import { useToast } from "./ui/Toast";
@@ -18,22 +18,27 @@ export interface FlowState {
   loaded: boolean;
   /** Ajustes de avisos del negocio (mínimo por defecto y días de vencimiento) */
   alerts: AlertSettings;
-  /** Negocio activo, mi rol y el equipo */
+  /** Negocio activo, rol de quien atiende y el equipo */
   business: Business | null;
+  /** Ya se sabe el negocio y el rol (hasta entonces nada de dueño: falla cerrada) */
+  ready: boolean;
+  /** En cuántos negocios está la persona (selector en Ajustes si hay más de uno) */
+  businesses: number;
   role: MemberRole;
   members: BusinessMember[];
   /** Quién está atendiendo en este celular (tras el PIN); por defecto, el usuario con sesión */
   actorId: string | null;
   meId: string | null;
   isOwner: boolean;
-  /** Cambiar de persona (ya verificada con PIN) */
-  switchActor: (userId: string | null) => void;
+  /** Cambiar de persona: con el token de `start_shift` (024), o null para volver a la cuenta de la sesión */
+  switchActor: (userId: string | null, token?: string | null) => void;
   refresh: () => void;
   /** Paso actual según la ruta: 1 agregar, 2 revisar, 3 inventario, 0 otra */
   step: 0 | 1 | 2 | 3;
 }
 
-const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, alerts: DEFAULT_ALERTS, business: null, role: "dueno", members: [], actorId: null, meId: null, isOwner: true, switchActor: () => {}, refresh: () => {}, step: 0 });
+// Por defecto, rol mínimo: hasta saber quién es, nadie ve pantallas ni datos de dueño (S5)
+const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, alerts: DEFAULT_ALERTS, business: null, ready: false, businesses: 0, role: "vendedor", members: [], actorId: null, meId: null, isOwner: false, switchActor: () => {}, refresh: () => {}, step: 0 });
 
 export function stepOf(pathname: string): 0 | 1 | 2 | 3 {
   if (pathname.startsWith("/capture") || pathname.startsWith("/scan") || pathname.startsWith("/products/new")) return 1;
@@ -49,7 +54,7 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
   const q = queueSummary(queue.items);
   const [counts, setCounts] = useState({ pending: 0, confirmed: 0, loaded: false });
   const [alerts, setAlerts] = useState<AlertSettings>(DEFAULT_ALERTS);
-  const [team, setTeam] = useState<{ business: Business | null; role: MemberRole; members: BusinessMember[]; meId: string | null }>({ business: null, role: "dueno", members: [], meId: null });
+  const [team, setTeam] = useState<{ business: Business | null; role: MemberRole; members: BusinessMember[]; meId: string | null; businesses: number; ready: boolean }>({ business: null, role: "vendedor", members: [], meId: null, businesses: 0, ready: false });
   const [actorId, setActorId] = useState<string | null>(null);
 
   /**
@@ -64,6 +69,7 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
       if (error || !ctx) return;
       setCounts({ pending: ctx.counts?.pending ?? 0, confirmed: ctx.counts?.confirmed ?? 0, loaded: true });
       const biz = ctx.business;
+      rememberBusiness(biz?.id);
       setCurrency(biz?.currency);
       setBusinessTz(biz?.timezone);
       setAlerts({
@@ -71,12 +77,12 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
         expiryDays: typeof biz?.expiry_days === "number" ? biz.expiry_days : DEFAULT_ALERTS.expiryDays,
       });
       const members = ctx.members ?? [];
-      setTeam({ business: biz, role: ctx.role ?? "dueno", members, meId: ctx.me });
-      // Actor guardado en este celular: solo vale si sigue siendo miembro activo
-      const saved = getActor();
-      if (saved && members.some((m) => m.user_id === saved && m.active)) setActorId(saved);
+      // El rol que manda es el de quien ATIENDE según la base (con el token del turno, si lo hay)
+      setTeam({ business: biz, role: ctx.acting_role ?? "vendedor", members, meId: ctx.me, businesses: ctx.businesses ?? 1, ready: true });
+      if (ctx.actor && ctx.actor !== ctx.me) setActorId(ctx.actor);
       else {
-        setActor(null);
+        // Sin turno, o el token venció / ya no es válido: se vuelve a la cuenta de la sesión
+        if (getActor()) setActor(null);
         setActorId(null);
       }
     })();
@@ -106,22 +112,28 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
     refresh();
   }, [pathname, q.done, refresh]);
 
-  const switchActor = useCallback((userId: string | null) => {
-    setActor(userId);
-    setActorId(userId);
-  }, []);
+  const switchActor = useCallback(
+    (userId: string | null, token?: string | null) => {
+      setActor(userId, token ?? null);
+      setActorId(userId && token ? userId : null);
+      refresh(); // el rol efectivo lo confirma la base
+    },
+    [refresh]
+  );
   // El rol efectivo es el de quien atiende (si un vendedor tomó el celular del dueño, ve como vendedor)
-  const actorRole: MemberRole = actorId ? team.members.find((m) => m.user_id === actorId)?.role ?? team.role : team.role;
+  const actorRole: MemberRole = !team.ready ? "vendedor" : actorId ? team.members.find((m) => m.user_id === actorId)?.role ?? "vendedor" : team.role;
   const value = useMemo<FlowState>(
     () => ({
       ...counts,
       alerts,
       business: team.business,
+      ready: team.ready,
+      businesses: team.businesses,
       role: actorRole,
       members: team.members,
       actorId,
       meId: team.meId,
-      isOwner: actorRole === "dueno",
+      isOwner: team.ready && actorRole === "dueno",
       switchActor,
       working: q.queued + q.processing,
       refresh,

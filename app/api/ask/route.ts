@@ -106,10 +106,10 @@ export async function POST(request: Request) {
 
   try {
     const { text, model } = await generateContent([{ text: prompt }], { temperature: 0.2 }, key);
-    await logUsage(admin, user.id, "ask", key.own);
+    await logUsage(admin, user.id, "ask", key.own, key.usage);
     return NextResponse.json({ answer: text.trim(), model, products: snapshot.productos.length, days: DAYS });
   } catch (e) {
-    await logUsage(admin, user.id, "ask", key.own);
+    await logUsage(admin, user.id, "ask", key.own, key.usage);
     if (e instanceof QuotaError) return NextResponse.json({ error: e.message, daily: true }, { status: 429 });
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo responder" }, { status: e instanceof GeminiError ? e.status : 500 });
   }

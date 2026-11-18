@@ -43,6 +43,17 @@ async function backupBusiness(bid: string, name: string) {
   console.log(`OK  ${name} (${bid}) → ${path} · ${counts.products} productos, ${counts.sales} ventas · ${Math.round(buf.length / 1024)} KB${old.length ? ` · borrados ${old.length} antiguos` : ""}`);
 }
 
+/** Papelera: lo que lleva más de 30 días se borra definitivamente con su foto (antes lo hacía «Ordenar y limpiar» al abrirse). */
+async function purgeTrash(bid: string): Promise<number> {
+  const limit = new Date(Date.now() - 30 * 86400000).toISOString();
+  const { data: rows } = await admin.from("products").select("id,image_url").eq("business_id", bid).not("deleted_at", "is", null).lt("deleted_at", limit);
+  if (!rows?.length) return 0;
+  const paths = rows.map((r) => r.image_url?.split("/product-images/")[1]).filter(Boolean) as string[];
+  if (paths.length) await admin.storage.from("product-images").remove(paths);
+  await admin.from("products").delete().in("id", rows.map((r) => r.id));
+  return rows.length;
+}
+
 const only = process.argv[2];
 const { data: businesses, error } = only ? await admin.from("businesses").select("id,name").eq("id", only) : await admin.from("businesses").select("id,name").order("created_at");
 if (error) {
@@ -52,7 +63,9 @@ if (error) {
 let failed = 0;
 for (const b of businesses ?? []) {
   try {
-    await backupBusiness(b.id, b.name);
+    await backupBusiness(b.id, b.name); // primero el respaldo (incluye la papelera), después la purga
+    const purged = await purgeTrash(b.id);
+    if (purged) console.log(`    papelera: ${purged} producto(s) con más de 30 días borrados`);
   } catch (e) {
     failed++;
     console.error(`FAIL ${b.name} (${b.id}): ${e instanceof Error ? e.message : e}`);

@@ -40,6 +40,8 @@ export function friendlyError(e: unknown, fallback = "Algo salió mal. Intenta d
   // Base de datos (Postgres / PostgREST). P0001 = mensaje escrito por nuestras funciones SQL, ya pensado para la persona.
   if (code === "P0001" && message) return message;
   if (code === "23505" || /duplicate key/i.test(message)) return "Eso ya existe (hay otro registro igual).";
+  // 42501 con mensaje propio (reglas de 024: «Solo el dueño…», «El stock cambia solo…») se muestra tal cual
+  if (code === "42501" && /[áéíóúñ]|^(Solo |El |No |Esto )/.test(message)) return message;
   if (code === "42501" || /row-level security|permission denied/i.test(message)) return "No tienes permiso para hacer esto.";
   if (code === "23503") return "Está relacionado con otros datos y no se puede cambiar así.";
   if (code === "23514" || /violates check constraint/i.test(message)) return "Algún valor no es válido (revisa cantidades y precios).";

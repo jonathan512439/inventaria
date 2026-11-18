@@ -3,6 +3,23 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-18 · Fase 6.9 · C5.1 — Cada quien puede solo lo que le toca (y la base lo hace cumplir)
+
+Migración `024_permisos.sql` aplicada. Prueba nueva `npm run test:access` 24/24 (intenta cada acción como dueño, vendedor, otro negocio y alguien con dos negocios, directo contra la base); `test:team` 22/22; `test:ops`, `test:fields`, `test:variants`, `test:import`, `test:backup` en verde.
+
+### 17.5 Permisos por rol y operación
+- **Qué**: hasta ahora la app escondía botones, pero cualquier miembro podía hacer casi todo si se saltaba la pantalla. Ahora lo decide la base:
+  - **Vendedor**: vende, cobra, cuenta, repone, agrega y edita productos y clientes, crea categorías. **No** borra ni manda a la papelera productos confirmados (sí descarta pendientes), no quita clientes, no cambia categorías ni datos, no ve compras ni proveedores, no anota compras ni cambia precios en lote, no descarga respaldos.
+  - **El stock** de un producto en inventario solo cambia con una venta, una entrada, un ajuste o un conteo (también para el dueño): nadie lo puede «pisar» a mano.
+  - **Firma confiable**: quién hizo cada cosa lo pone la base y no se puede cambiar después.
+  - **Celular compartido**: al pasar a otra persona con su PIN, el celular actúa con los permisos de ESA persona (un vendedor en el celular del dueño es vendedor). **Volver a la cuenta del dueño pide su PIN**; para pasar el celular, la cuenta debe tener PIN.
+  - **Varios negocios**: quien está en más de uno ve y anota solo en el negocio activo; en Ajustes aparece para cambiar de negocio.
+  - **Nadie** cambia el plan del negocio desde la app y el negocio no puede quedarse sin dueño.
+  - **Cerrar sesión** borra todo lo guardado en el celular (inventario sin conexión, cambios pendientes, fotos en cola).
+  - **Ordenar y limpiar** es solo del dueño y solo de su negocio activo; abrirlo ya no borra nada. La papelera de más de 30 días se vacía con el respaldo semanal.
+  - Ajustar el consumo de IA solo con clave propia.
+- **Validar**: con la cuenta de un vendedor → en la ficha de un producto no aparece «Enviar a la papelera»; en Clientes no aparece «Quitar»; Compras no se abre. En el celular del dueño → «¿Quién atiende?» → pasar al vendedor con su PIN → hacer una venta (queda a su nombre) → «Volver a mi cuenta» pide el PIN del dueño. Cerrar sesión y entrar con otra cuenta → no se ve nada del inventario anterior.
+
 ## 2026-11-18 · Fase 6.9 · C4 — El nombre, la moneda y «hoy» son del negocio
 
 Migración `023_ajustes_negocio.sql` aplicada. `npm run test:ops` 50/50; `test:fields`, `test:variants`, `test:team`, `test:import`, `test:backup` en verde.

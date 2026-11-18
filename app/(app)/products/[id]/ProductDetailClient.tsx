@@ -417,10 +417,12 @@ export default function ProductDetailClient() {
                     <span className="ml-auto text-xs font-normal text-slate-500">vuelve a pendientes</span>
                   </button>
                 )}
-                <button className="btn-destructive w-full justify-start" onClick={remove} disabled={saving}>
-                  <IconTrash size={16} /> {isDraft ? "Eliminar este pendiente" : "Enviar a la papelera"}
-                  <span className="ml-auto text-xs font-normal">{isDraft ? "y su foto" : "recuperable 30 días"}</span>
-                </button>
+                {(isDraft || isOwner) && (
+                  <button className="btn-destructive w-full justify-start" onClick={remove} disabled={saving}>
+                    <IconTrash size={16} /> {isDraft ? "Eliminar este pendiente" : "Enviar a la papelera"}
+                    <span className="ml-auto text-xs font-normal">{isDraft ? "y su foto" : "recuperable 30 días"}</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

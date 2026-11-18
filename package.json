@@ -17,6 +17,7 @@
     "test:variants": "node scripts/test-variants.mjs",
     "test:fields": "node scripts/test-fields.mjs",
     "test:ops": "node scripts/test-ops.mjs",
+    "test:access": "node scripts/test-access.mjs",
     "test:team": "node scripts/test-team.mjs",
     "ai:probe": "node scripts/gemini-probe.mjs",
     "storage:clean": "node scripts/cleanup-orphans.mjs",

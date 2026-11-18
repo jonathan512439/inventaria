@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEffectiveFields, getValue, normalizeFieldName } from "@/lib/fields";
 import type { ProductData } from "@/types/database";
-import { businessIdsOf } from "@/lib/business";
+import { requireMember } from "@/lib/access";
 
 export const runtime = "edge";
 
@@ -19,10 +18,9 @@ function descendants(cats: { id: string; parent_id: string | null }[], id: strin
   return out;
 }
 
-/** Borra definitivamente (con su foto) lo que lleva más de 30 días en la papelera. */
-async function purgeTrash(userId: string) {
+/** Borra definitivamente (con su foto) lo que lleva más de 30 días en la papelera del negocio. */
+async function purgeTrash(bids: string[]) {
   const admin = createAdminClient();
-  const bids = await businessIdsOf(admin, userId);
   if (!bids.length) return 0;
   const limit = new Date(Date.now() - TRASH_DAYS * 86400000).toISOString();
   const { data: rows } = await admin.from("products").select("id,image_url").in("business_id", bids).not("deleted_at", "is", null).lt("deleted_at", limit);
@@ -33,11 +31,9 @@ async function purgeTrash(userId: string) {
   return rows.length;
 }
 
-/** Resumen de "cosas por ordenar" del usuario. */
-async function summary(userId: string) {
+/** Resumen de "cosas por ordenar" del negocio activo (sin borrar nada: solo cuenta). */
+async function summary(bids: string[], userId: string) {
   const admin = createAdminClient();
-  await purgeTrash(userId);
-  const bids = await businessIdsOf(admin, userId);
   const [{ data: allProducts }, { data: categories }, { data: templates }] = await Promise.all([
     admin.from("products").select("id,status,category_id,data,image_url,created_at,deleted_at").in("business_id", bids),
     admin.from("categories").select("*").in("business_id", bids),
@@ -108,7 +104,10 @@ async function summary(userId: string) {
   });
 
   // Fotos del bucket sin producto (con margen de 10 min)
-  const referenced = new Set(prods.map((p) => p.image_url?.split("/product-images/")[1]).filter(Boolean) as string[]);
+  // La carpeta es de la persona que subió las fotos y puede usarse en OTRO negocio suyo: se cuentan las referencias
+  // de todos los productos (cualquier negocio, también en la papelera) antes de llamar «sin producto» a una foto
+  const { data: allRefs } = await admin.from("products").select("image_url").ilike("image_url", `%/product-images/${userId}/%`);
+  const referenced = new Set((allRefs ?? []).map((p) => p.image_url?.split("/product-images/")[1]).filter(Boolean) as string[]);
   const { data: files } = await admin.storage.from("product-images").list(userId, { limit: 1000 });
   const orphanPhotos = (files ?? [])
     .filter((f) => {
@@ -150,13 +149,11 @@ async function summary(userId: string) {
   };
 }
 
-export async function GET() {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  const s = await summary(user.id);
+export async function GET(request: Request) {
+  // Solo el dueño y solo su negocio activo (antes: cualquier miembro, en todos sus negocios: S7)
+  const acc = await requireMember(request, { owner: true });
+  if (acc instanceof NextResponse) return acc;
+  const s = await summary([acc.businessId], acc.userId);
   return NextResponse.json({ counts: s.counts, detail: s.detail, oldDays: s.oldDays, trashDays: s.trashDays }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -165,16 +162,16 @@ export async function GET() {
  * Ejecuta solo lo marcado. Los productos sin categoría o sin precio NO se borran nunca (se listan para resolver).
  */
 export async function POST(request: Request) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const acc = await requireMember(request, { owner: true });
+  if (acc instanceof NextResponse) return acc;
+  const bids = [acc.businessId];
 
   const { actions } = (await request.json().catch(() => ({}))) as { actions?: string[] };
   const set = new Set(actions ?? []);
   const admin = createAdminClient();
-  const s = await summary(user.id);
+  // Lo que lleva más de 30 días en la papelera se borra al ordenar (y cada semana con el respaldo)
+  await purgeTrash(bids);
+  const s = await summary(bids, acc.userId);
   const done: Record<string, number> = {};
 
   if (set.has("oldDrafts") && s.ids.oldDrafts.length) {
@@ -210,7 +207,7 @@ export async function POST(request: Request) {
     // Limpia dentro de cada producto: valores vacíos y/o datos sueltos que ya no pertenecen a su categoría
     const ids = Array.from(new Set([...(set.has("emptyValues") ? s.ids.emptyValueIds : []), ...(set.has("orphanValues") ? s.ids.orphanIds : [])]));
     const { data: rows } = await admin.from("products").select("id,category_id,data").in("id", ids);
-    const bids2 = await businessIdsOf(admin, user.id);
+    const bids2 = bids;
     const [{ data: cats2 }, { data: tpls2 }] = await Promise.all([
       admin.from("categories").select("*").in("business_id", bids2),
       admin.from("field_templates").select("*").in("business_id", bids2),
@@ -244,13 +241,13 @@ export async function POST(request: Request) {
   }
   if (set.has("emptyTrash")) {
     // Vaciar la papelera: borrado definitivo con fotos
-    const { data: rows } = await admin.from("products").select("id,image_url").in("business_id", await businessIdsOf(admin, user.id)).not("deleted_at", "is", null);
+    const { data: rows } = await admin.from("products").select("id,image_url").in("business_id", bids).not("deleted_at", "is", null);
     const paths = (rows ?? []).map((r) => r.image_url?.split("/product-images/")[1]).filter(Boolean) as string[];
     if (paths.length) await admin.storage.from("product-images").remove(paths);
     if (rows?.length) await admin.from("products").delete().in("id", rows.map((r) => r.id));
     done.emptyTrash = rows?.length ?? 0;
   }
 
-  const after = await summary(user.id);
+  const after = await summary(bids, acc.userId);
   return NextResponse.json({ done, counts: after.counts, oldDays: after.oldDays });
 }

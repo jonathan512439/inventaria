@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import { drainUsage, modelChain } from "@/lib/gemini";
+import { drainUsage, modelChain, type UsageAttempt } from "@/lib/gemini";
 
 /** Nombres amigables por modelo (sin exponer nombres de API) y orden de uso. */
 export const MODEL_LABELS: Record<string, { name: string; hint: string }> = {
@@ -18,9 +18,13 @@ export function labelFor(model: string) {
   return MODEL_LABELS[model] ?? { name: `Modelo ${model.replace(/^gemini-/, "").replace(/-/g, " ")}`, hint: "Respaldo" };
 }
 
-/** Guarda en la BD los intentos de IA acumulados (llamar al final de cada ruta que use Gemini). */
-export async function logUsage(admin: SupabaseClient<Database>, userId: string | null, purpose: string, ownKey = false) {
-  const attempts = drainUsage();
+/**
+ * Guarda en la BD los intentos de IA de una petición (llamar al final de cada ruta que use Gemini).
+ * `attempts` = `key.usage` de la petición; sin él se usa el registro global antiguo (solo scripts).
+ */
+export async function logUsage(admin: SupabaseClient<Database>, userId: string | null, purpose: string, ownKey = false, attempts?: UsageAttempt[]) {
+  if (!attempts) attempts = drainUsage();
+  else attempts = attempts.splice(0, attempts.length);
   if (!attempts.length) return;
   await admin.from("ai_usage").insert(
     attempts.map((a) => ({ user_id: userId, model: a.model, purpose, status: a.status, quota_limit: a.quota_limit ?? null, own_key: ownKey }))

@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     } catch {
       /* si la IA falla, queda en la categoría general */
     }
-    await logUsage(admin, user.id, "classify", key.own);
+    await logUsage(admin, user.id, "classify", key.own, key.usage);
   }
 
   const target = chosen?.id ?? category_id;

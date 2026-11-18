@@ -15,7 +15,9 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 | C2 · Operaciones atómicas | ✅ 2026-11-17 | `021_operaciones.sql` | `npm run test:ops` | 17.2 |
 | C3 · El dinero como pagos | ✅ 2026-11-18 | `022_pagos.sql` | `npm run test:ops` (ampliada) | 17.3 |
 | C4 · Ajustes del negocio y zona horaria | ✅ 2026-11-18 | `023_ajustes_negocio.sql` | `npm run test:ops` + manual | 17.4 |
-| C5 · Permisos en la base | ⏳ siguiente | `024_permisos.sql` (+ `025_fotos_privadas.sql`) | `npm run test:access` | 17.5 |
+| C5.1 · Permisos por rol y operación, negocio activo, firma | ✅ 2026-11-18 | `024_permisos.sql` | `npm run test:access` (24) + `test:team` | 17.5 |
+| C5.2 · Costos fuera del alcance del vendedor | ⏳ siguiente | `025_costos.sql` | `npm run test:access` (ampliada) | 17.6 |
+| C5.3 · Fotos privadas | pendiente | `026_fotos_privadas.sql` | `npm run test:access` (ampliada) | 17.7 |
 | C6 · Calidad continua | pendiente | `schema_migrations` | CI | 17.6 |
 | C7 · Reconstrucción visual completa (C7.1–C7.9) | pendiente (tras C5) | — | manual + `test:e2e` + prueba con 3 personas | 17.7–17.15 |
 
@@ -138,6 +140,8 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 
 ## C5 · Permisos en la base (cierra S1–S10, S12; adelanta la Fase 7)
 
+**División (2026-11-18):** por tamaño y riesgo, C5 se publica en tres pasos, cada uno con su migración y su prueba: **C5.1** permisos por rol y operación, negocio activo, firma, guardas, rutas API e interfaz (`024`); **C5.2** costos y ganancia en tablas solo del dueño (`025_costos.sql`); **C5.3** fotos privadas con enlaces firmados (`026_fotos_privadas.sql`). La numeración de migraciones de abajo se corre en consecuencia.
+
 **Migración `024_permisos.sql`:**
 - `is_owner(bid)`; políticas separadas por operación en lugar de `for all`:
   - catálogo (`categories`, `field_templates`, `variant_axes`, `suppliers`, `purchases*`): lectura miembros (proveedores/compras solo dueño), escritura dueño.
@@ -156,6 +160,18 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 **`025_fotos_privadas.sql` (A3/S12):** bucket `product-images` privado; `lib/photos.ts` firma URLs por lote (1 h) y las guarda en memoria; `Photo` las usa.
 
 **Prueba `scripts/test-access.mjs`:** con la clave anónima, un vendedor no lee `precio_compra`/`unit_cost`/ganancia, no borra productos ni ventas, no cambia `user_id`, no cambia el plan; un usuario en dos negocios solo ve el activo; `x-actor` sin token se ignora.
+
+**Resultado C5.1 (2026-11-18):** `024_permisos.sql` aplicada antes de publicar el código (compatible: la versión publicada ya no escribía stock ni ventas directo; durante el despliegue el celular compartido firmó como la cuenta de la sesión). `npm run test:access` 24/24 contra la base: lectura del negocio activo y no de otro; sin sesión nada; proveedores y compras solo dueño; el vendedor no borra ni manda a la papelera confirmados pero sí descarta pendientes; **nadie** cambia el stock de un confirmado sin operación (ni el dueño); firma y negocio de una fila inmutables y puestos por la base; ventas/cobros/movimientos sin escritura directa; compras y precios en lote solo dueño; catálogo: el vendedor crea categorías pero no las cambia ni borra; clientes: no los quita; nadie cambia el plan; el único dueño no se quita el rol; negocio activo con dos negocios y `switch_business`; respaldos solo dueño. `test:team` ampliado a 22 (token de turno: firma, permisos de vendedor en el celular del dueño, uuid suelto y token alterado ignorados). `test:ops`, `test:fields`, `test:variants`, `test:import`, `test:backup` en verde.
+
+**Cómo quedó:**
+- Rol efectivo = el de quien **atiende**: `start_shift` (PIN) devuelve un token HMAC de 12 h; la app lo manda en `x-actor-token` (Supabase y rutas /api con `actorHeaders()`); `is_owner()` / `acting_role()` lo usan en RLS, funciones y `lib/access.ts`.
+- «Volver a mi cuenta» pide el PIN de la cuenta mientras atiende otra persona; para pasar el celular, la cuenta debe tener PIN.
+- Interfaz con falla cerrada: `useFlow().ready`; rol `vendedor` hasta saberlo; `OwnerOnly` espera.
+- Cerrar sesión borra IndexedDB (inventario, cambios sin conexión, cola de fotos), el turno y el negocio recordado; la caché va por negocio (`bizKey`).
+- `/api/cleanup`: solo dueño, solo negocio activo; el GET ya no borra; las fotos «sin producto» se cuentan contra todos los negocios de quien las subió; la purga de 30 días pasó al respaldo semanal (`scripts/backup.mts`).
+- `/api/usage` POST: solo con clave propia y solo filas propias. Consumo de IA por petición (`key.usage`), sin arreglo global.
+- Selector de negocio en Ajustes (si la persona está en más de uno).
+- Pendiente para C5.2: el vendedor todavía puede leer el costo con la clave anónima (en `products.data`, `products.precio_compra`, `product_variants.costo`, `sale_items.unit_cost`, `sales.cost_total`, `cash_closings.profit`, historial de precios del costo y `precio_unitario` de las entradas por compra). Las rutas API de IA siguen validando solo la sesión (RLS hace el resto).
 
 ## C6 · Calidad continua (cierra M3, M6, M7)
 

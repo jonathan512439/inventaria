@@ -1,5 +1,6 @@
 "use client";
 
+import { actorHeaders } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useToast } from "./ui/Toast";
@@ -39,7 +40,7 @@ export default function CleanupCard() {
   const [open, setOpen] = useState(false);
 
   async function load() {
-    const res = await fetch("/api/cleanup", { cache: "no-store" });
+    const res = await fetch("/api/cleanup", { cache: "no-store", headers: actorHeaders() });
     if (!res.ok) return;
     const j = (await res.json()) as { counts: Counts; detail?: Detail; oldDays: number };
     setCounts(j.counts);
@@ -95,7 +96,7 @@ export default function CleanupCard() {
     });
     if (!ok) return;
     setBusy(true);
-    const res = await fetch("/api/cleanup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actions }) });
+    const res = await fetch("/api/cleanup", { method: "POST", headers: { "Content-Type": "application/json", ...actorHeaders() }, body: JSON.stringify({ actions }) });
     const j = (await res.json().catch(() => ({}))) as { counts?: Counts; error?: string };
     setBusy(false);
     if (!res.ok) return toast("error", j.error || "No se pudo limpiar");

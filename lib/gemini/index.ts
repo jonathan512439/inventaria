@@ -13,11 +13,13 @@ export interface KeyContext {
   /** Identificador para llevar el cupo agotado por clave ("service" o el id del usuario) */
   keyId: string;
   own: boolean;
+  /** Intentos de ESTA petición (C5.1 · S12): antes iban a un arreglo global compartido entre peticiones simultáneas */
+  usage?: UsageAttempt[];
 }
 export function serviceKey(): KeyContext {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new GeminiError(500, "Falta GEMINI_API_KEY en el entorno del servidor");
-  return { apiKey, keyId: "service", own: false };
+  return { apiKey, keyId: "service", own: false, usage: [] };
 }
 const DEFAULT_MODEL = "gemini-3.6-flash";
 
@@ -277,6 +279,7 @@ export function drainUsage(): UsageAttempt[] {
 
 export async function generateContent(parts: unknown[], generationConfig: Record<string, unknown>, key: KeyContext = serviceKey()): Promise<{ text: string; model: string }> {
   const apiKey = key.apiKey;
+  const log = key.usage ?? usageLog;
   const now = Date.now();
   const chain = modelChain().filter((m) => (exhaustedUntil.get(exKey(key.keyId, m)) ?? 0) < now);
   if (chain.length === 0) {
@@ -299,12 +302,12 @@ export async function generateContent(parts: unknown[], generationConfig: Record
           promptFeedback?: { blockReason?: string };
         };
         if (json.promptFeedback?.blockReason) throw new GeminiError(422, `La imagen fue bloqueada por seguridad (${json.promptFeedback.blockReason}).`);
-        usageLog.push({ model, status: "ok" });
+        log.push({ model, status: "ok" });
         return { text: json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "", model };
       }
       const f = parseFailure(res.status, await res.text().catch(() => ""));
       last = f;
-      usageLog.push({ model, status: f.daily ? "quota" : res.status === 429 ? "limited" : "error", quota_limit: f.quotaLimit ?? null });
+      log.push({ model, status: f.daily ? "quota" : res.status === 429 ? "limited" : "error", quota_limit: f.quotaLimit ?? null });
       if (res.status === 404) break; // modelo inexistente → siguiente
       if (res.status === 429 && f.daily) {
         exhaustedUntil.set(exKey(key.keyId, model), nextQuotaReset().getTime());

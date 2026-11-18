@@ -54,7 +54,12 @@ try {
   check(Number(sumO.precio_compra) === 6, "el dueño sí ve el costo");
 
   // 6) Venta del vendedor: queda en el negocio y firmada por él
-  const { data: sale } = await seller.c.from("sales").insert({ user_id: seller.id, method: "efectivo", status: "pagado", total: 8, paid: 8, items: 1 }).select().single();
+  // Desde 021 la venta entra solo por register_sale; desde 024 la firma la pone la base
+  const { data: saleOut, error: saleErr } = await seller.c.rpc("register_sale", { p_id: crypto.randomUUID(), p_lines: [{ product_id: prod.id, variant_id: null, qty: 1, unit_price: 8 }] });
+  if (saleErr) console.error(saleErr.message);
+  const sale = saleOut?.sale ?? {};
+  const { error: directSale } = await seller.c.from("sales").insert({ user_id: seller.id, method: "efectivo", status: "pagado", total: 8, paid: 8, items: 1 });
+  check(!!directSale, "una venta no se puede escribir directo en la tabla (solo con register_sale)");
   check(sale.business_id === bid && sale.user_id === seller.id && sale.number === 1, `venta N.º ${sale.number} del negocio, firmada por el vendedor`);
   const { data: ownerSees } = await owner.c.from("sales").select("id").eq("id", sale.id);
   check(ownerSees.length === 1, "el dueño ve la venta del vendedor");
@@ -68,14 +73,26 @@ try {
   const { data: okPin } = await owner.c.rpc("verify_pin", { p_business: bid, p_user: seller.id, p_pin: "1234" });
   const { data: badPin } = await owner.c.rpc("verify_pin", { p_business: bid, p_user: seller.id, p_pin: "0000" });
   check(okPin === true && badPin === false, "PIN correcto pasa, PIN incorrecto no");
-  const asActor = createClient(url, anon, { auth: { persistSession: false }, global: { headers: { "x-actor": seller.id } } });
-  await asActor.auth.signInWithPassword({ email: owner.email, password: "Test123456!" });
-  const { data: signed } = await asActor.from("stock_movements").insert({ user_id: owner.id, product_id: prod.id, product_name: "Arroz", tipo: "entrada", cantidad: 1, stock_resultante: 11 }).select().single();
-  check(signed.user_id === seller.id, "con la cabecera x-actor la fila queda firmada por quien atiende");
-  const outsider = createClient(url, anon, { auth: { persistSession: false }, global: { headers: { "x-actor": "00000000-0000-0000-0000-000000000000" } } });
-  await outsider.auth.signInWithPassword({ email: owner.email, password: "Test123456!" });
-  const { data: notSigned } = await outsider.from("stock_movements").insert({ user_id: owner.id, product_id: prod.id, product_name: "Arroz", tipo: "entrada", cantidad: 1, stock_resultante: 12 }).select().single();
-  check(notSigned.user_id === owner.id, "un actor que no es miembro se ignora");
+  // 024: en el celular del dueño, el vendedor entra con su PIN → token firmado (x-actor-token)
+  const { data: token } = await owner.c.rpc("start_shift", { p_business: bid, p_user: seller.id, p_pin: "1234" });
+  const { data: noToken } = await owner.c.rpc("start_shift", { p_business: bid, p_user: seller.id, p_pin: "0000" });
+  check(typeof token === "string" && token.split(".").length === 4 && noToken === null, "PIN correcto da un token de turno; PIN incorrecto no");
+  const withHeader = async (h) => {
+    const c = createClient(url, anon, { auth: { persistSession: false }, global: { headers: h } });
+    await c.auth.signInWithPassword({ email: owner.email, password: "Test123456!" });
+    return c;
+  };
+  const asActor = await withHeader({ "x-actor-token": token });
+  const { data: signed } = await asActor.from("customers").insert({ user_id: owner.id, name: "Cliente del turno" }).select().single();
+  check(signed?.user_id === seller.id, "con el token la fila queda firmada por quien atiende");
+  const { error: delAsSeller } = await asActor.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", prod.id);
+  check(!!delAsSeller, "con el token el celular del dueño actúa como vendedor (no puede mandar a la papelera)");
+  const oldHeader = await withHeader({ "x-actor": seller.id });
+  const { data: notSigned } = await oldHeader.from("customers").insert({ user_id: seller.id, name: "Sin token" }).select().single();
+  check(notSigned?.user_id === owner.id, "la cabecera antigua x-actor (uuid suelto) se ignora");
+  const forged = await withHeader({ "x-actor-token": token.replace(/.$/, (c) => (c === "0" ? "1" : "0")) });
+  const { data: forgedRow } = await forged.from("customers").insert({ user_id: seller.id, name: "Token falso" }).select().single();
+  check(forgedRow?.user_id === owner.id, "un token alterado se ignora");
 
   // 8) Solo el dueño administra miembros
   const { error: se } = await seller.c.from("business_members").update({ role: "dueno" }).eq("business_id", bid).eq("user_id", seller.id);

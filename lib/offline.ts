@@ -39,6 +39,26 @@ function tx<T>(store: string, mode: IDBTransactionMode, fn: (s: IDBObjectStore) 
 }
 
 // ---------- caché de lectura ----------
+
+const BIZ_KEY = "inventaria.business";
+/** Recuerda el negocio activo (lo fija FlowProvider) para separar la caché por negocio aunque no haya red. */
+export function rememberBusiness(id: string | null | undefined) {
+  try {
+    if (id) localStorage.setItem(BIZ_KEY, id);
+  } catch {
+    /* sin almacenamiento */
+  }
+}
+/** Clave de caché del negocio activo: «inventory» → «inventory:<negocio>». */
+export function bizKey(key: string): string {
+  let b = "?";
+  try {
+    b = localStorage.getItem(BIZ_KEY) ?? "?";
+  } catch {
+    /* sin almacenamiento */
+  }
+  return `${key}:${b}`;
+}
 export interface Cached<T> {
   at: number;
   data: T;
@@ -106,6 +126,29 @@ export function isNetworkError(e: unknown): boolean {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
   const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e ?? "");
   return /fetch|network|Failed to|load failed|NetworkError|ECONN/i.test(msg);
+}
+
+/**
+ * Borra todo lo guardado en este celular (S10): caché del inventario, cambios sin conexión, cola de fotos y
+ * turno de «¿quién atiende?». Se llama al cerrar sesión: la próxima cuenta no ve nada de la anterior.
+ */
+export async function clearDeviceData(): Promise<void> {
+  const drop = (name: string) =>
+    new Promise<void>((resolve) => {
+      try {
+        const req = indexedDB.deleteDatabase(name);
+        req.onsuccess = req.onerror = req.onblocked = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  try {
+    sessionStorage.removeItem("inventaria.actor");
+    localStorage.removeItem(BIZ_KEY);
+  } catch {
+    /* sin almacenamiento */
+  }
+  await Promise.all([drop(DB), drop("inventaria")]);
 }
 
 /** Quita de la cola los cambios que el servidor rechazó definitivamente (la persona ya los vio). */

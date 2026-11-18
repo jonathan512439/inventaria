@@ -37,7 +37,8 @@ function CustomerDetail() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [consignments, setConsignments] = useState<Consignment[]>([]);
   const [consItems, setConsItems] = useState<ConsignmentItem[]>([]);
-  const business = useFlow().business?.name ?? null;
+  const flowCtx = useFlow();
+  const business = flowCtx.business?.name ?? null;
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState<{ amount: string; method: PayMethod; note: string } | null>(null);
   const [editing, setEditing] = useState<{ name: string; phone: string; note: string; credit_limit: string } | null>(null);
@@ -170,7 +171,7 @@ function CustomerDetail() {
           </div>
           <div className="flex gap-2">
             <button onClick={saveEdit} className="btn-primary flex-1">Guardar</button>
-            <button onClick={remove} className="btn-destructive btn-sm"><IconTrash size={14} /> Quitar</button>
+            {flowCtx.isOwner && <button onClick={remove} className="btn-destructive btn-sm"><IconTrash size={14} /> Quitar</button>}
           </div>
         </div>
       )}

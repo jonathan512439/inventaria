@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useFlow } from "./FlowProvider";
 import { useToast } from "./ui/Toast";
 import { IconCheck, IconX, Spinner } from "./ui/Icons";
+import { friendlyError } from "@/lib/errors";
 
 /** «¿Quién atiende?»: en un celular compartido, cada persona pasa a su nombre con su PIN. */
 export default function WhoIsServing() {
@@ -22,22 +23,29 @@ export default function WhoIsServing() {
   if (!flow.business || active.length < 2) return null;
   const current = active.find((m) => m.user_id === (flow.actorId ?? flow.meId));
 
+  const me = active.find((m) => m.user_id === flow.meId);
+  const serving = flow.actorId ?? flow.meId;
+  // Volver a la cuenta de la sesión mientras atiende otra persona también pide PIN (antes bastaba un toque: S4)
+  const needsPin = !!pick && pick !== serving && (pick !== flow.meId || !!flow.actorId);
+  // Para dejar atender a otra persona, la cuenta de la sesión necesita su PIN (si no, no podría volver)
+  const meWithoutPin = !flow.actorId && !!pick && pick !== flow.meId && !me?.has_pin;
+
   async function confirmPin() {
     if (!pick || !flow.business) return;
-    if (pick === flow.meId) {
-      flow.switchActor(null);
+    if (!needsPin) {
       setOpen(false);
       return;
     }
     setBusy(true);
-    const { data: ok, error } = await supabase.rpc("verify_pin", { p_business: flow.business.id, p_user: pick, p_pin: pin });
+    const { data: token, error } = await supabase.rpc("start_shift", { p_business: flow.business.id, p_user: pick, p_pin: pin });
     setBusy(false);
-    if (error) return toast("error", error.message);
-    if (!ok) {
+    if (error) return toast("error", friendlyError(error));
+    if (!token) {
       setPin("");
       return toast("error", "PIN incorrecto (o bloqueado por intentos). Prueba de nuevo.");
     }
-    flow.switchActor(pick);
+    if (pick === flow.meId) flow.switchActor(null);
+    else flow.switchActor(pick, token);
     navigator.vibrate?.(15);
     toast("success", `Ahora atiende ${active.find((m) => m.user_id === pick)?.display_name ?? "otra persona"}`);
     setOpen(false);
@@ -72,7 +80,10 @@ export default function WhoIsServing() {
                   </li>
                 ))}
               </ul>
-              {pick && pick !== flow.meId && (
+              {meWithoutPin && (
+                <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">Antes de pasar el celular, pon <b>tu</b> PIN en <Link href="/team" className="underline">Equipo</Link>: lo necesitarás para volver a tu cuenta.</p>
+              )}
+              {needsPin && !meWithoutPin && (
                 <div className="mt-3">
                   {active.find((m) => m.user_id === pick)?.has_pin ? (
                     <>
@@ -84,7 +95,7 @@ export default function WhoIsServing() {
                   )}
                 </div>
               )}
-              <button onClick={confirmPin} disabled={!pick || busy || (pick !== flow.meId && pin.length !== 4)} className="btn-primary btn-lg mt-4 w-full">{busy ? <Spinner /> : <IconCheck size={18} />} {pick === flow.meId ? "Volver a mi cuenta" : "Pasar a esta persona"}</button>
+              <button onClick={confirmPin} disabled={!pick || busy || meWithoutPin || (needsPin && pin.length !== 4)} className="btn-primary btn-lg mt-4 w-full">{busy ? <Spinner /> : <IconCheck size={18} />} {pick === flow.meId ? "Volver a mi cuenta" : "Pasar a esta persona"}</button>
             </div>
           </div>,
           document.body

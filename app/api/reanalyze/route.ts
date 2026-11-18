@@ -108,12 +108,12 @@ export async function POST(request: Request) {
     result = out.result;
     aiMeta.modelo = out.model;
   } catch (e) {
-    await logUsage(admin, user.id, "reanalyze", key.own);
+    await logUsage(admin, user.id, "reanalyze", key.own, key.usage);
     if (e instanceof QuotaError) return NextResponse.json({ error: e.message, retry_after: e.retryAfterSec, daily: true }, { status: 429 });
     const status = e instanceof GeminiError ? e.status : 500;
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error analizando la imagen" }, { status });
   }
-  await logUsage(admin, user.id, "reanalyze", key.own);
+  await logUsage(admin, user.id, "reanalyze", key.own, key.usage);
 
   // Categoría
   let categoryId: string | null = fixedCategoryId;

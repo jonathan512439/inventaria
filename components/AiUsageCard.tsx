@@ -114,9 +114,11 @@ export default function AiUsageCard() {
                     <span className="block truncate text-[11px] text-white/50">{m.hint}</span>
                   </span>
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip}`}>{state}</span>
-                  <button onClick={() => adjust(m.model, m.name, m.used)} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/70 hover:bg-white/20" title="Ajustar consumo manualmente">
-                    ajustar
-                  </button>
+                  {data?.ownKey && (
+                    <button onClick={() => adjust(m.model, m.name, m.used)} className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-white/70 hover:bg-white/20" title="Ajustar consumo manualmente">
+                      ajustar
+                    </button>
+                  )}
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
                   <div className="h-full rounded-full transition-all duration-700" style={{ width: `${m.exhausted ? 100 : p}%`, backgroundImage: bar }} />

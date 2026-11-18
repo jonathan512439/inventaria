@@ -44,10 +44,10 @@ export async function POST(request: Request) {
   const key = await resolveAiKey(admin, user.id);
   try {
     const out = await detectProducts(bytesToBase64(new Uint8Array(await file.arrayBuffer())), file.type, key);
-    await logUsage(admin, user.id, "detect", key.own);
+    await logUsage(admin, user.id, "detect", key.own, key.usage);
     return NextResponse.json(out);
   } catch (e) {
-    await logUsage(admin, user.id, "detect", key.own);
+    await logUsage(admin, user.id, "detect", key.own, key.usage);
     if (e instanceof QuotaError) return NextResponse.json({ error: e.message, retry_after: e.retryAfterSec, daily: true }, { status: 429 });
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo analizar la foto" }, { status: e instanceof GeminiError ? e.status : 500 });
   }

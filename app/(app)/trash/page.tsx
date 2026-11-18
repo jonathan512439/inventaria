@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, actorHeaders } from "@/lib/supabase/client";
 import type { Category, Product } from "@/types/database";
 import { categoryPath } from "@/lib/categories";
 import { productTitle } from "@/lib/fields";
@@ -64,7 +64,7 @@ export default function TrashPage() {
     });
     if (!ok) return;
     setBusy(true);
-    const res = await fetch("/api/cleanup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ actions: ["emptyTrash"] }) });
+    const res = await fetch("/api/cleanup", { method: "POST", headers: { "Content-Type": "application/json", ...actorHeaders() }, body: JSON.stringify({ actions: ["emptyTrash"] }) });
     setBusy(false);
     if (!res.ok) return toast("error", "No se pudo vaciar la papelera");
     toast("success", "Papelera vacía");

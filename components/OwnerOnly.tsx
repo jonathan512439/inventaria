@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useFlow } from "./FlowProvider";
 import { IconAlert } from "./ui/Icons";
+import { ListSkeleton } from "./ui/Skeleton";
 
 /** Pantallas del dueño: al vendedor se le explica y se le devuelve al Inicio. */
 export default function OwnerOnly({ children }: { children: React.ReactNode }) {
-  const { isOwner, business } = useFlow();
-  if (!business || isOwner) return <>{children}</>;
+  const { isOwner, ready } = useFlow();
+  // Falla cerrada (S5): mientras no se sabe el rol no se muestra (ni se carga) nada del dueño
+  if (!ready) return <ListSkeleton rows={4} />;
+  if (isOwner) return <>{children}</>;
   return (
     <div className="mx-auto max-w-md">
       <div className="animate-in card text-center">

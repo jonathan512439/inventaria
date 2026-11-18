@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { clearDeviceData } from "@/lib/offline";
 
 /**
  * Respaldo de seguridad en el navegador: el middleware ya valida la sesión en cada petición
@@ -17,7 +18,7 @@ export default function AuthGuard() {
       if (!data.session) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") router.replace("/login");
+      if (event === "SIGNED_OUT") clearDeviceData().finally(() => router.replace("/login"));
     });
     return () => sub.subscription.unsubscribe();
   }, [router, pathname]);
