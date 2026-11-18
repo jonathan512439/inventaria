@@ -200,10 +200,11 @@ try {
   check(mvs.some((m) => m.sale_id === v1.id), "movimiento de stock enlazado al ticket");
   const today = new Date(); const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   await admin.from("cash_movements").insert({ user_id: uid, ...B, tipo: "retiro", amount: 5, note: "bolsas" });
-  const { error: ce1 } = await admin.from("cash_closings").upsert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 20, difference: 0, profit: 17.5 }, { onConflict: "business_id,day" });
-  const { error: ce2 } = await admin.from("cash_closings").upsert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 18, difference: -2, profit: 17.5 }, { onConflict: "business_id,day" });
-  const { data: cls } = await admin.from("cash_closings").select("difference").eq("user_id", uid);
-  check(!ce1 && !ce2 && cls.length === 1 && Number(cls[0].difference) === -2, "cierre de caja: uno por día, se actualiza al volver a cerrar");
+  // Desde 022 cada cierre es una fila nueva (historial); el cálculo real lo prueba `npm run test:ops` con close_cash
+  const { error: ce1 } = await admin.from("cash_closings").insert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 20, difference: 0, profit: 17.5 });
+  const { error: ce2 } = await admin.from("cash_closings").insert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 18, difference: -2, profit: 17.5 });
+  const { data: cls } = await admin.from("cash_closings").select("difference").eq("user_id", uid).order("closed_at");
+  check(!ce1 && !ce2 && cls.length === 2 && Number(cls[1].difference) === -2, "cierre de caja: volver a cerrar guarda un cierre nuevo y conserva el anterior");
   for (const path of ["/sell", "/cash", "/movements"]) {
     const rp = await fetch(`${BASE}${path}`, { headers: { cookie: H.cookie } });
     check(rp.status === 200, `${path} → ${rp.status}`);

@@ -115,6 +115,8 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 - `sales.status` se deduce siempre de lo cobrado (`pagado` / `parcial` / `fiado`), también al vender: con «Varios medios» la pantalla no pregunta «¿paga todo?», lo calcula igual que el servidor.
 - La zona horaria de la caja es `America/La_Paz` fija en `lib/data/ops.ts` (`BUSINESS_TZ`) hasta C4, que la pasa a ajuste del negocio.
 - La lista de ingresos/retiros de la caja aún filtra «hoy» con la hora del celular (solo para mostrarla; los totales vienen del servidor). Se unifica en C4.
+- `test:e2e` contra producción tras el despliegue: dos corridas, 57/58 cada una; en cada corrida falló una ruta de IA distinta por **524 (tiempo de espera agotado) de Gemini**: «Pregúntale» (`/api/ask`) y «Foto de estante» (`/api/detect`). Toda comprobación pasó al menos una vez. La comprobación del cierre de caja se actualizó al modelo de historial.
+- **Pendiente detectado (IA):** las rutas de IA no tienen tiempo máximo propio ni pasan al siguiente modelo ante un 524/timeout; se cubre en B9 (`lib/ai` con respaldo) y A5 (monitoreo). Mientras tanto, si se repite en el uso real, adelantar: `AbortController` de 25 s por intento en `lib/gemini` y tratar 5xx/timeout como «probar el siguiente modelo».
 - Entre la aplicación de `022` y el despliegue del código, «Cerrar caja» de la versión anterior fallaba (usaba `upsert` sobre el índice único por día, que se quitó). Lección: desplegar el código **antes o junto** con una migración que cambia restricciones usadas por la pantalla.
 
 ## C4 · Ajustes del negocio y zona horaria (cierra N3, N5, E4, V6)
