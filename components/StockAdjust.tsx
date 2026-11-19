@@ -25,7 +25,7 @@ interface Props {
   onSaved: (updated: Product, variant?: ProductVariant) => void;
 }
 
-const MOTIVOS_SALIDA = ["Retiro personal", "Merma o rotura", "Regalo o muestra", "Devolución al proveedor", "Corrección de conteo"];
+const MOTIVOS_SALIDA = ["Retiro personal", "Merma o rotura", "Vencido", "Regalo o muestra", "Devolución al proveedor", "Corrección de conteo"];
 
 /**
  * Atajo para sumar o restar stock sin editar el producto.

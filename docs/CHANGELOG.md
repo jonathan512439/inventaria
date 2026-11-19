@@ -3,6 +3,24 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Ronda de validación 1 · R5
+
+### 17.22 Qué hacer con los productos por vencer
+- **Qué**:
+  - En Productos › **Por vencer**, el botón ± de cada producto pasa a ser **«Qué hacer»** y abre 4 opciones:
+    - **Ponerlo en oferta** (solo el dueño): precio nuevo con atajos −10 %, −20 %, −30 % y −50 %. Queda en el historial de precios como «oferta».
+    - **Retirar del stock**: salida con el motivo «Vencido». No es una venta. Si tiene tallas o colores, pregunta cuál.
+    - **Devolver al proveedor**: salida con ese motivo.
+    - **Cambiar la fecha**: llegó otro lote o la fecha estaba mal. Vacía, deja de avisar.
+  - El aviso de Inicio dice «oferta, retirar o devolver» y su botón «Qué hacer».
+  - En «± Stock › Restar», el motivo «Vencido» queda disponible.
+- **Validar**:
+  - Inicio → aviso «por vencer» → «Qué hacer» → Productos › Por vencer → «Qué hacer» en un producto:
+    - «Ponerlo en oferta» → −20 % → Guardar: el precio cambia y el historial de precios dice «oferta».
+    - «Retirar del stock» → 1 → Sacar: el stock baja y el Historial lo muestra como salida «Vencido».
+    - «Cambiar la fecha» → otra fecha: deja de aparecer en Por vencer si la fecha queda lejos.
+  - Como vendedor no aparece «Ponerlo en oferta».
+
 ## 2026-11-19 · Ronda de validación 1 · R3 y R4
 
 ### 17.21 Lista de productos por categorías en Vender y en Entrada de inventario

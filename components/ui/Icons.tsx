@@ -118,6 +118,9 @@ export const IconChart = (p: P) => (
 export const IconTruck = (p: P) => (
   <svg {...base(p)}><path d="M2 6h11v10H2zM13 9h4.5L21 12.5V16h-8z" /><circle cx="6" cy="18" r="1.8" /><circle cx="17" cy="18" r="1.8" /></svg>
 );
+export const IconCalendar = (p: P) => (
+  <svg {...base(p)}><rect x="3.5" y="5" width="17" height="15.5" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>
+);
 export const IconClipboard = (p: P) => (
   <svg {...base(p)}><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6" /></svg>
 );

@@ -26,6 +26,7 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 import { ChipFilter, EmptyState, ScreenHeader, TaskCard } from "@/components/ui/Screen";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
+import ExpirySheet from "@/components/products/ExpirySheet";
 import { IconAlert, IconBox, IconCamera, IconCheck, IconClipboard, IconDownload, IconFolder, IconList, IconPlus, IconPrinter, IconScan, IconSearch, IconTable, IconTag, IconTrash, IconTruck, IconX, Spinner } from "@/components/ui/Icons";
 
 /** Filtros de la lista (C7.3): reponer, vencer y papelera dejan de ser pantallas aparte. */
@@ -72,6 +73,7 @@ function Products() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sheet, setSheet] = useState<"category" | "restock" | "price" | "labels" | "move" | "scan" | null>(null);
   const [adjusting, setAdjusting] = useState<Product | null>(null);
+  const [expiring, setExpiring] = useState<Product | null>(null);
   const [busy, setBusy] = useState(false);
   const [moveTo, setMoveTo] = useState<string | null>(null);
   // Tabla (escritorio) y Excel: filas completas, campos y ejes, solo cuando se usan
@@ -447,6 +449,9 @@ function Products() {
         )
       ) : (
         <>
+          {view === "expiring" && visible.length > 0 && (
+            <p className="rounded-2xl bg-warn-50 px-3 py-2 text-sm text-warn-900">Toca <b>Qué hacer</b> en cada producto: ponerlo en oferta, retirarlo del stock, devolverlo al proveedor o cambiar la fecha.</p>
+          )}
           <ul className="stagger grid w-full grid-cols-1 gap-2 lg:grid-cols-2">
             {visible.slice(0, limit).map((p) => (
               <ProductLine
@@ -460,6 +465,7 @@ function Products() {
                 selected={selected.has(p.id)}
                 onToggle={() => toggle(p.id)}
                 onAdjust={() => setAdjusting(p)}
+                onExpiry={view === "expiring" ? () => setExpiring(p) : undefined}
               />
             ))}
           </ul>
@@ -543,6 +549,8 @@ function Products() {
         onDismissed={(id, off) => setProducts((ps) => ps.map((p) => (p.id === id ? { ...p, alerts_off: off } : p)))}
       />
 
+      {expiring && <ExpirySheet product={expiring} variants={variantsOf.get(expiring.id)} onClose={() => setExpiring(null)} onDone={() => load()} />}
+
       {adjusting && (
         <StockAdjust
           product={adjusting}
@@ -579,6 +587,7 @@ function ProductLine({
   selected,
   onToggle,
   onAdjust,
+  onExpiry,
 }: {
   p: Product;
   categories: Category[];
@@ -589,6 +598,8 @@ function ProductLine({
   selected: boolean;
   onToggle: () => void;
   onAdjust: () => void;
+  /** Por vencer (R5): en vez de ±, «Qué hacer» abre oferta / retirar / devolver / cambiar fecha */
+  onExpiry?: () => void;
 }) {
   const price = priceOf(p);
   const stock = stockOf(p) ?? 0;
@@ -633,7 +644,10 @@ function ProductLine({
       ) : (
         <Link href={`/products/${p.id}`} className={cls}>{body}</Link>
       )}
-      {!selecting && !draft && (
+      {!selecting && !draft && onExpiry && (
+        <button type="button" onClick={onExpiry} className="w-20 shrink-0 border-l border-slate-100 px-1 text-xs font-bold leading-tight text-warn-800 hover:bg-warn-50" aria-label="Qué hacer con este producto por vencer">Qué hacer</button>
+      )}
+      {!selecting && !draft && !onExpiry && (
         <button type="button" onClick={onAdjust} className="w-12 shrink-0 border-l border-slate-100 text-lg font-bold text-brand-700 hover:bg-brand-50" aria-label="Sumar o restar stock">±</button>
       )}
     </li>
