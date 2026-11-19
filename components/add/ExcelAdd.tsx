@@ -8,18 +8,17 @@ import { findSibling } from "@/lib/categories";
 import { TARGETS, type ImportPlan, type ImportRow, type Target, buildRows, categoryFor, initialMapping, planImport } from "@/lib/import";
 import { stockOf } from "@/lib/inventory";
 import { productTitle } from "@/lib/fields";
-import CoachTip from "@/components/CoachTip";
 import OwnerOnly from "@/components/OwnerOnly";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import { newOpId, setStock, withoutStock } from "@/lib/data/ops";
-import { IconArrowLeft, IconCheck, IconTable, IconX, Spinner } from "@/components/ui/Icons";
+import { IconCheck, IconTable, IconX, Spinner } from "@/components/ui/Icons";
 
 type Sheet = { name: string; headers: string[]; rows: Record<string, unknown>[] };
 type Existing = "update" | "skip";
 
 /** Importar Excel: elegir archivo → decir qué es cada columna → ver qué pasará → importar por tandas. */
-export default function ImportPage() {
+export default function ExcelAdd() {
   const supabase = createClient();
   const toast = useToast();
   const confirm = useConfirm();
@@ -174,15 +173,8 @@ export default function ImportPage() {
 
   return (
     <OwnerOnly>
-      <div className={`mx-auto max-w-3xl space-y-4 ${sheet && !busy ? "has-action" : ""}`}>
-        <header className="animate-in">
-          <Link href="/settings" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ajustes</Link>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">Importar desde Excel</h1>
-          <p className="text-sm text-slate-500">Trae tu inventario desde una planilla (.xlsx o .csv). Tú dices qué es cada columna y ves qué pasará antes de importar.</p>
-        </header>
-        <CoachTip screen="import" title="Tres pasos">
-          <b>1.</b> Elige el archivo (la primera fila deben ser los títulos: Nombre, Precio, Stock…). <b>2.</b> Revisa a qué dato va cada columna. <b>3.</b> Mira la vista previa e importa. Si un producto ya existe (mismo código o mismo nombre) se actualiza en vez de duplicarse.
-        </CoachTip>
+      <div className={`space-y-4 ${sheet && !busy ? "has-action" : ""}`}>
+        <p className="text-sm text-muted">Trae tu inventario desde una planilla (.xlsx o .csv): <b>1.</b> elige el archivo (la primera fila con los títulos: Nombre, Precio, Stock…), <b>2.</b> revisa a qué dato va cada columna, <b>3.</b> mira la vista previa e importa. Si un producto ya existe (mismo código o nombre) se actualiza en vez de duplicarse.</p>
 
         {result && (
           <section className="animate-in rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-900 ring-1 ring-emerald-200">

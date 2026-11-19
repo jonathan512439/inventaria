@@ -44,11 +44,11 @@ const STEPS: Step[] = [
     n: 2,
     title: "Toma fotos de tus productos",
     goal: "La IA reconoce cada producto, lo describe y lo pone en su subcategoría.",
-    href: "/capture",
+    href: "/add",
     cta: "Agregar productos",
     Illustration: IllustrationCapture,
     instructions: [
-      "Toca el botón morado **Agregar** (abajo, al centro).",
+      "En **Productos**, toca **Agregar productos** (abajo) y elige **Foto**.",
       "Toca **Cámara** y fotografía un producto. La cámara se vuelve a abrir sola: sigue con el siguiente.",
       "¿Ya tienes fotos en el celular? Toca **Galería** y elige varias a la vez.",
       "Las fotos se procesan solas en segundo plano. Puedes seguir usando la app.",
@@ -59,11 +59,11 @@ const STEPS: Step[] = [
     n: 3,
     title: "Revisa y confirma",
     goal: "Corriges lo que haga falta y pones precio y stock. Un toque por producto.",
-    href: "/review",
+    href: "/add/review",
     cta: "Revisar pendientes",
     Illustration: IllustrationReview,
     instructions: [
-      "Toca **② Revisar** en la barra de pasos (o **Revisar ahora** en Inicio). Verás una tarjeta por producto con la foto grande.",
+      "Toca **Revisar** en Agregar (o el aviso «por revisar» en Inicio). Verás una tarjeta por producto con la foto grande.",
       "Arriba está lo que reconoció la IA (nombre, marca, color…). Corrige solo si se equivocó.",
       "Abajo escribe **precio** y **stock** (el stock viene en 1 por defecto).",
       "Toca el botón verde fijo abajo **✓ Confirmar y pasar al siguiente**. Si te equivocas, toca **Deshacer** en el aviso verde.",
@@ -86,7 +86,7 @@ const STEPS: Step[] = [
 
 /** Tareas frecuentes: "¿Qué quieres hacer?" → 3 líneas. */
 const TASKS: Array<{ q: string; href: string; steps: string[] }> = [
-  { q: "Agregar un producto nuevo", href: "/capture", steps: ["Toca **Agregar** (botón morado del centro).", "Toca **Cámara** y fotografía el producto.", "Toca **② Revisar** en la barra de pasos, pon precio y stock, **Confirmar**."] },
+  { q: "Agregar un producto nuevo", href: "/add", steps: ["En **Productos**, toca **Agregar productos** (abajo).", "Elige **Foto** y toca **Cámara**; fotografía el producto.", "Toca **Revisar**, pon precio y stock y **Confirmar**."] },
   { q: "Cambiar precio o stock", href: "/products", steps: ["Toca **Inventario**, entra a la categoría y busca el producto.", "Para stock: toca **+/− Stock** en la fila (pregunta si es venta). Para precio: abre el producto y cámbialo.", "Toca **Guardar cambios**."] },
   { q: "Corregir un nombre o subcategoría", href: "/products", steps: ["Toca **Inventario**, busca y abre el producto.", "Edita el nombre o elige otra **Subcategoría**.", "Toca **Guardar**."] },
   { q: "Agregar una subcategoría o categoría", href: "/store", steps: ["Toca **Más → Mi tienda**.", "Para una categoría nueva: **+ Agregar categoría**. Para una subcategoría: **+ Subcategoría** dentro de la categoría.", "Escribe el nombre y confirma."] },
@@ -95,7 +95,7 @@ const TASKS: Array<{ q: string; href: string; steps: string[] }> = [
   { q: "Manejar tallas o colores (variantes)", href: "/store", steps: ["Toca **Más → Mi tienda** y, en la categoría, agrega **Talla**, **Color**… en el bloque Variantes.", "Al revisar un producto de esa categoría, toca **Sí, tiene variantes** y escribe el stock en cada casilla.", "En la ficha, toca una casilla para vender o reponer esa variante."] },
   { q: "Eliminar un producto", href: "/products", steps: ["Toca **Inventario**, busca y abre el producto.", "Toca **Más opciones → Eliminar este producto**.", "Confirma. La foto también se borra."] },
   { q: "Trabajar en equipo (vendedores y PIN)", href: "/team", steps: ["Toca **Más → Equipo** y crea un **código para vendedor**; mándalo por WhatsApp. La persona se registra y abre el enlace.", "Si comparten un celular: cada uno pone su **PIN** en Equipo y, al atender, toca **«Atiende …»** en el Inicio.", "El vendedor vende, cobra y cuenta; no ve costos, ganancia ni reportes."] },
-  { q: "Cargar un inventario desde Excel", href: "/import", steps: ["Toca **Más → Traer desde Excel** y elige la planilla (la primera fila deben ser los títulos).", "Revisa a qué dato va cada columna (Nombre, Precio, Stock, Categoría…).", "Mira cuántos son nuevos y cuántos ya existen, y toca **Importar**."] },
+  { q: "Cargar un inventario desde Excel", href: "/add?mode=excel", steps: ["Toca **Productos → Agregar productos → Excel** y elige la planilla (la primera fila deben ser los títulos).", "Revisa a qué dato va cada columna (Nombre, Precio, Stock, Categoría…).", "Mira cuántos son nuevos y cuántos ya existen, y toca **Importar**."] },
   { q: "Imprimir etiquetas con código", href: "/products?select=1", steps: ["En **Productos**, toca **Seleccionar** y marca los productos.", "Toca **Etiquetas**. Si alguno no tiene código, toca **Crear códigos internos**.", "Elige **Hoja A4** o **Rollo** y toca **Imprimir**. La cámara de la app lee esas etiquetas."] },
   { q: "Guardar o descargar un respaldo", href: "/backup", steps: ["Toca **Más → Respaldos**.", "**Guardar respaldo ahora** deja una copia completa (inventario, ventas, clientes, caja) en la nube; **Descargar copia completa** la baja a tu celular.", "Cada sábado se guarda una copia automática; se conservan las últimas 8."] },
 ];

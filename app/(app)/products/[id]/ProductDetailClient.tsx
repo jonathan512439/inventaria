@@ -157,7 +157,7 @@ export default function ProductDetailClient() {
     setSaving(false);
     toast("success", "Cambios guardados");
     // Tras editar, se vuelve a la lista de donde vino el producto
-    router.push(status === "draft" || (!status && product.status === "draft") ? "/review" : "/products");
+    router.push(status === "draft" || (!status && product.status === "draft") ? "/add/review" : "/products");
   }
 
   async function remove() {
@@ -178,7 +178,7 @@ export default function ProductDetailClient() {
     if (error) return setError(friendlyError(error));
     const path = storagePath(product.image_url);
     if (path) await supabase.storage.from("product-images").remove([path]);
-    router.push("/review");
+    router.push("/add/review");
   }
 
   async function restore() {
@@ -202,7 +202,7 @@ export default function ProductDetailClient() {
   return (
     <div className={`${tab === "historial" ? "" : "has-action"} mx-auto w-full max-w-3xl space-y-4 overflow-x-hidden`}>
       <ScreenHeader
-        back={isDraft ? { href: "/review", label: "Pendientes" } : { href: "/products", label: "Productos" }}
+        back={isDraft ? { href: "/add/review", label: "Pendientes" } : { href: "/products", label: "Productos" }}
         title={<span className="break-words">{productTitle(data) || "Producto"}</span>}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">

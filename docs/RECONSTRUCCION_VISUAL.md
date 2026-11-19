@@ -180,8 +180,8 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 | C7.1 · Sistema visual y armazón | ✅ 2026-11-18 | 17.8 |
 | C7.2 · Inicio y Vender | ✅ 2026-11-18 | 17.9 |
 | C7.3 · Productos | ✅ 2026-11-18 | 17.10 |
-| C7.4 · Agregar y Revisar | ⏳ siguiente | |
-| C7.5 · Mercadería | pendiente | |
+| C7.4 · Agregar y Revisar | ✅ 2026-11-18 | 17.11 |
+| C7.5 · Mercadería | ⏳ siguiente | |
 | C7.6 · Clientes | pendiente | |
 | C7.7 · Números | pendiente | |
 | C7.8 · Ajustes | pendiente | |
@@ -210,3 +210,12 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 - **Vender** (`app/(app)/sell/page.tsx`): `ProductFinder` (buscar o escanear; elige la variante en una hoja) + los más vendidos + carrito con `QtyStepper` y precio por línea (atajo a mayorista) + acción fija **Cobrar**. La hoja **Cobrar** reemplaza al diálogo de confirmación: total y descuento; Efectivo · QR · Transf. · Varios; «Paga todo / Paga una parte / A cuenta»; en efectivo, **teclado grande** con montos rápidos (exacto y billetes redondos) y **vuelto**; cliente (obligatorio si queda debiendo) con aviso de límite de fiado y de stock insuficiente dentro de la hoja. El ticket final muestra el vuelto. Sigue siendo una sola operación `register_sale` con id idempotente.
 - **Caja dentro de Vender:** la pantalla pasó a `/sell/cash` (botón «Caja» en Vender); `/cash` redirige (`next.config.mjs` → `redirects`, primera redirección de §3.3).
 - Componentes nuevos: `components/ProductFinder.tsx`, `components/ui/NumberPad.tsx` (`NumberPad`, `QtyStepper`, `padNumber`).
+
+**C7.4 (2026-11-18):**
+- `app/(app)/add/page.tsx`: las 5 maneras como pestañas grandes (`?mode=photo|shelf|code|manual|excel`; Excel solo dueño). Cada manera se carga con `next/dynamic` (Código y Excel traen librerías pesadas). Tarea «N pendientes por revisar» arriba.
+- `components/add/`: `PhotoAdd` (antes /capture, sin la foto de estante ni el enlace a escanear, que ahora son pestañas), `QueueStatus` (cola compartida; en Foto recibe las fotos que se están preparando), `CodeAdd` (antes /scan, sin cambios de lógica), `ManualAdd` (antes /products/new), `ExcelAdd` (antes /import). Estante usa `components/ShelfDetect.tsx` tal cual (categoría la elige la IA).
+- **Decisión:** en Código, «ya lo tienes → +1/+5/+10» se queda por ahora; en C7.5 Entrada de mercadería será el lugar principal para sumar stock (F06 dividido por intención).
+- `app/(app)/add/review/page.tsx` (antes /review, 871 líneas) partida en `components/review/`: `useSwipe`, `DuplicateNotice`, `LocationSection` (categoría, subcategoría, IA), `VariantSection` (+ `cellKey`), `ExpirySection`, `MoreFields`, `PhotoZoom`. La página conserva el estado y las acciones.
+- **Error corregido:** `save()` guardaba las variantes *después* de pasar el producto a `confirmed`; `product_variants_guard` (024) rechaza stock ≠ 0 en variantes de un confirmado fuera de una operación, y el error se ignoraba → el stock por variante se perdía al confirmar. Ahora `saveVariants()` corre antes (producto aún `draft`) y devuelve el error. Caso agregado a `npm run test:variants` (también comprueba que el orden antiguo sigue rechazado).
+- Precarga de la foto siguiente con `signedPhotoUrl` (bucket privado desde 026); borrar pendiente usa `storagePath`; mensajes con `friendlyError`.
+- Redirecciones: `/capture`, `/scan`, `/products/new`, `/import` → `/add?mode=…`; `/review`, `/drafts` → `/add/review`. Las pantallas leen `mode`, `view` e `id` cortando en el primer «?» (ver nota de C7.3).

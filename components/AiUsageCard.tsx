@@ -135,7 +135,7 @@ export default function AiUsageCard() {
             );
           })}
           <li className="pt-1">
-            <a href="/scan" className="flex items-center gap-2 rounded-2xl bg-emerald-500/15 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25">
+            <a href="/add?mode=code" className="flex items-center gap-2 rounded-2xl bg-emerald-500/15 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25">
               💡 ¿Productos con código de barras? Escanéalos: no consumen cupo.
             </a>
           </li>

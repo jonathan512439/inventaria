@@ -3,6 +3,18 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-18 · Fase 6.9 · C7.4 — Agregar: las cinco maneras en un solo lugar
+
+### 17.11 Agregar y Revisar
+- **Qué**:
+  - **Agregar productos** (botón fijo de Productos) reúne las cinco maneras arriba: **Foto** · **Estante** (varios productos en una foto) · **Código** (sin gastar IA) · **A mano** · **Excel** (dueño). Antes eran cuatro pantallas separadas y la foto de estante estaba escondida dentro de la de fotos.
+  - **La cola de fotos** (analizando, listas, con error, pausa por cupo) se ve en Agregar sea cual sea la manera elegida, y **«N pendientes por revisar → Revisar»** está siempre arriba.
+  - **Revisar** cuelga de Agregar y queda igual por fuera (tarjeta por producto, deslizar para confirmar, «¿ya lo tienes? → sumar stock»), pero por dentro está partida en partes más simples.
+  - **Corrección importante:** al confirmar en Revisar un producto **con tallas o colores**, el stock de cada variante no se guardaba (la base lo rechazaba en silencio desde los permisos de C4). Ahora se guarda antes de confirmar y, si algo falla, se avisa.
+  - También en Revisar: los errores se muestran en palabras simples y la foto del siguiente producto se precarga otra vez (dejó de hacerlo cuando las fotos pasaron a ser privadas).
+  - Las direcciones antiguas (/capture, /scan, /products/new, /import, /review, /drafts) llevan a su lugar nuevo.
+- **Validar**: Productos → «Agregar productos» → aparecen Foto · Estante · Código · A mano · Excel. Foto → tomar 2 fotos → la cola muestra «analizando» y luego «Revisar 2». En Revisar, un producto de una categoría con tallas: marcar «Sí, tiene variantes», escribir stock en 2 casillas → Confirmar → abrir el producto → pestaña Stock: cada variante tiene su stock. Código → escanear un producto que ya tienes → +1. Como vendedor no aparece Excel.
+
 ## 2026-11-18 · Fase 6.9 · C7.3 — Productos: una sola lista para encontrar y cambiar todo
 
 ### 17.10 Productos y ficha

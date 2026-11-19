@@ -47,6 +47,23 @@ try {
   check(p2.data.stock === 3, `borrar variante recalcula → ${p2.data.stock}`);
   const { error: me } = await admin.from("stock_movements").insert({ user_id: uid, business_id: bid, product_id: p.id, variant_id: null, variant_label: "S · Rojo", tipo: "venta", cantidad: 1, total: 35, stock_resultante: 2 });
   check(!me, `movimiento con variante ${me?.message ?? ""}`);
+  // Revisar (C7.4): las variantes de un pendiente se guardan ANTES de confirmarlo; con el producto ya
+  // confirmado, la base (024) rechaza escribir stock fuera de una operación (así se perdía el stock al confirmar)
+  const user = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  await user.auth.signInWithPassword({ email: u.user.email, password: "Test123456!" });
+  const { data: d1 } = await user.from("products").insert({ user_id: uid, category_id: cat.id, status: "draft", data: { nombre: "Short", precio: 20 } }).select().single();
+  const { error: dv } = await user.from("product_variants").insert([
+    { user_id: uid, product_id: d1.id, values: { talla: "S", color: "Azul" }, label: "S · Azul", stock: 2 },
+    { user_id: uid, product_id: d1.id, values: { talla: "M", color: "Azul" }, label: "M · Azul", stock: 4 },
+  ]);
+  check(!dv, `variantes con stock en un pendiente ${dv?.message ?? ""}`);
+  const { error: dc } = await user.from("products").update({ status: "confirmed", data: { nombre: "Short", precio: 20, stock: 6 } }).eq("id", d1.id);
+  const { data: d1b } = await user.from("products").select("data,status").eq("id", d1.id).single();
+  check(!dc && d1b.status === "confirmed" && d1b.data.stock === 6, `confirmar después: queda en inventario con stock 6 → ${dc?.message ?? d1b.data.stock}`);
+  const { data: d2 } = await user.from("products").insert({ user_id: uid, category_id: cat.id, status: "draft", data: { nombre: "Gorra", precio: 15 } }).select().single();
+  await user.from("products").update({ status: "confirmed" }).eq("id", d2.id);
+  const { error: late } = await user.from("product_variants").insert({ user_id: uid, product_id: d2.id, values: { talla: "S", color: "Rojo" }, label: "S · Rojo", stock: 3 });
+  check(!!late, "el orden antiguo (confirmar y luego variantes con stock) lo rechaza la base");
   await admin.from("categories").delete().eq("id", cat.id);
   const { data: axesLeft } = await admin.from("variant_axes").select("id").eq("user_id", uid);
   check(axesLeft.length === 0, "borrar categoría borra sus ejes");

@@ -123,7 +123,7 @@ export default function ProductTable({ products, categories, templates, mode, on
     return (
       <div className="card text-sm text-slate-500">
         {mode === "draft" ? (
-          <>Nada pendiente. <Link href="/capture" className="text-brand-600 underline">Toma una foto</Link> para empezar.</>
+          <>Nada pendiente. <Link href="/add" className="text-brand-600 underline">Toma una foto</Link> para empezar.</>
         ) : (
           <>Tu inventario está vacío.</>
         )}

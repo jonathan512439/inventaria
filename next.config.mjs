@@ -15,6 +15,13 @@ const nextConfig = {
       { source: "/trash", destination: "/products?filter=trash", permanent: false },
       { source: "/prices", destination: "/products?select=1", permanent: false },
       { source: "/labels", destination: "/products?select=1", permanent: false },
+      // C7.4 · Agregar: un solo punto de entrada
+      { source: "/capture", destination: "/add?mode=photo", permanent: false },
+      { source: "/scan", destination: "/add?mode=code", permanent: false },
+      { source: "/products/new", destination: "/add?mode=manual", permanent: false },
+      { source: "/import", destination: "/add?mode=excel", permanent: false },
+      { source: "/review", destination: "/add/review", permanent: false },
+      { source: "/drafts", destination: "/add/review", permanent: false },
     ];
   },
 };

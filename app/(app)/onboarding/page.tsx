@@ -81,7 +81,7 @@ export default function OnboardingPage() {
               Tu inventario ya tiene {types.length === 1 ? "la categoría" : "las categorías"} <b>{types.join(", ")}</b> con sus subcategorías. Ahora toma la primera foto.
             </p>
           </div>
-          <button onClick={() => router.replace("/capture")} className="btn-primary btn-lg w-full">
+          <button onClick={() => router.replace("/add")} className="btn-primary btn-lg w-full">
             <IconCamera size={20} /> Tomar mi primera foto
           </button>
           <button onClick={() => router.replace("/dashboard")} className="btn-ghost w-full text-slate-500">Ir al inicio</button>

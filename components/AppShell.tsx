@@ -13,7 +13,7 @@ import Sheet from "./ui/Sheet";
 import { LogoMark, LogoWordmark } from "./ui/Logo";
 import {
   IconBell, IconBox, IconCamera, IconCart, IconChart, IconCheckCircle, IconClipboard, IconCloud, IconDownload, IconHelp, IconHome,
-  IconList, IconLogout, IconMore, IconPrinter, IconRegister, IconScan, IconSettings, IconSparkles, IconStore, IconTable,
+  IconList, IconLogout, IconMore, IconPrinter, IconRegister, IconSettings, IconSparkles, IconStore, IconTable,
   IconTrash, IconTruck, IconUsers,
 } from "./ui/Icons";
 
@@ -29,7 +29,7 @@ type IconT = (p: { size?: number; className?: string; strokeWidth?: number }) =>
 
 const AREAS: { key: string; href: string; label: string; Icon: IconT; match: string[] }[] = [
   { key: "inicio", href: "/dashboard", label: "Inicio", Icon: IconHome, match: ["/dashboard", "/onboarding"] },
-  { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/review", "/drafts", "/capture", "/scan", "/count", "/purchases", "/import", "/export"] },
+  { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/add", "/count", "/purchases", "/export"] },
   { key: "vender", href: "/sell", label: "Vender", Icon: IconCart, match: ["/sell"] },
   { key: "clientes", href: "/customers", label: "Clientes", Icon: IconUsers, match: ["/customers", "/consign"] },
 ];
@@ -46,9 +46,8 @@ const GROUPS: { title: string; items: Item[] }[] = [
   {
     title: "Productos",
     items: [
-      { href: "/capture", label: "Agregar productos", hint: "Con foto, código, a mano o Excel", Icon: IconCamera },
-      { href: "/review", label: "Revisar pendientes", hint: "Confirma lo que reconoció la IA", Icon: IconCheckCircle },
-      { href: "/scan", label: "Escanear un código", hint: "Buscar, sumar stock o dar de alta", Icon: IconScan },
+      { href: "/add", label: "Agregar productos", hint: "Foto, estante, código, a mano o Excel", Icon: IconCamera },
+      { href: "/add/review", label: "Revisar pendientes", hint: "Confirma lo que reconoció la IA", Icon: IconCheckCircle },
       { href: "/purchases", label: "Llegó mercadería", hint: "Anota una compra y su costo", Icon: IconTruck, ownerOnly: true },
       { href: "/count", label: "Contar", hint: "Revisa un estante y corrige", Icon: IconClipboard },
       { href: "/products?filter=restock", label: "Qué falta", hint: "Lista de pedido para WhatsApp", Icon: IconBell },
@@ -79,7 +78,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { href: "/alerts", label: "Avisos", hint: "Cuándo avisar que falta", Icon: IconBell, ownerOnly: true },
       { href: "/team", label: "Equipo", hint: "Personas, invitaciones y PIN", Icon: IconUsers },
       { href: "/export", label: "Descargar Excel", hint: "Tu inventario en planilla", Icon: IconDownload, ownerOnly: true },
-      { href: "/import", label: "Traer desde Excel", hint: "Cargar una planilla", Icon: IconTable, ownerOnly: true },
+      { href: "/add?mode=excel", label: "Traer desde Excel", hint: "Cargar una planilla", Icon: IconTable, ownerOnly: true },
       { href: "/backup", label: "Respaldos", hint: "Copia semanal completa", Icon: IconCloud, ownerOnly: true },
       { href: "/dashboard#limpiar", label: "Ordenar y limpiar", hint: "Quita lo que sobra", Icon: IconTrash, ownerOnly: true },
     ],
@@ -118,7 +117,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <span className="block text-base font-semibold leading-tight text-ink">{label}</span>
                     <span className="block truncate text-xs text-muted">{hint}</span>
                   </span>
-                  {href === "/review" && flow.pending > 0 && <Badge n={flow.pending} />}
+                  {href === "/add/review" && flow.pending > 0 && <Badge n={flow.pending} />}
                 </Link>
               </li>
             ))}

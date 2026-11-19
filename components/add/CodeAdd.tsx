@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import CoachTip from "@/components/CoachTip";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Category, FieldTemplate, Product, ProductVariant, ProductData } from "@/types/database";
@@ -14,7 +13,7 @@ import FieldInput from "@/components/FieldInput";
 import { useToast } from "@/components/ui/Toast";
 import { adjustStock, newOpId } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
-import { IconArrowLeft, IconBox, IconCamera, IconCheck, IconChevronRight, IconPlus, IconSearch, IconSparkles, IconTag, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
+import { IconBox, IconCamera, IconCheck, IconChevronRight, IconPlus, IconSearch, IconSparkles, IconTag, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
 import { StoredImg } from "@/components/ui/Photo";
 
 interface PublicInfo { nombre: string; marca: string; contenido: string; categorias: string[]; imagen: string | null; fuente: string }
@@ -39,8 +38,11 @@ interface Row {
   done?: "stock" | "created" | "error";
 }
 
-/** Escanear código de barras: repetidos, alta desde catálogo público y lotes — sin gastar IA. */
-export default function ScanPage() {
+/**
+ * Agregar › Código de barras (antes /scan): alta desde catálogo público, lote continuo y repetidos — sin gastar IA.
+ * Si el código ya es tuyo, suma stock (+1/+5/+10); en C7.5 eso vive también en Entrada de mercadería.
+ */
+export default function CodeAdd() {
   const supabase = createClient();
   const toast = useToast();
   const router = useRouter();
@@ -341,15 +343,7 @@ export default function ScanPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <header className="animate-in">
-        <Link href="/capture" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Agregar productos</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Escanear código de barras</h1>
-        <p className="text-sm text-slate-500">Repetidos, reposición y alta de productos conocidos <b>sin gastar análisis de IA</b>.</p>
-      </header>
-      <CoachTip screen="scan" title="Apunta al código y espera el beep">
-        Si el producto ya está en tu inventario, sumas stock con <b>+1 / +5 / +10</b>. Si no, lo buscamos en catálogos públicos y lo das de alta sin IA.
-      </CoachTip>
+    <div className="space-y-4">
 
       {/* Modo */}
       <div className="animate-in grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
@@ -540,7 +534,7 @@ export default function ScanPage() {
                 <button onClick={saveNew} disabled={saving || !categoryId} className="btn-success btn-lg w-full">
                   {saving ? <Spinner /> : <IconCheck size={20} />} Guardar sin usar IA
                 </button>
-                <Link href="/capture" className="btn-secondary w-full">
+                <Link href="/add?mode=photo" className="btn-secondary w-full">
                   <IconCamera size={18} /> Mejor tomar foto y analizar con IA
                   <span className="ml-auto text-xs font-normal text-slate-500">1 análisis</span>
                 </Link>

@@ -122,7 +122,7 @@ export default function DashboardPage() {
   // Primeros pasos (desaparecen al completarlos)
   const steps = [
     { done: stats.types > 0, title: "Crea tu tienda", body: "Elige qué vendes: la IA ordena tus productos con eso.", href: "/store", cta: "Elegir", Icon: IconStore },
-    { done: confirmed > 0, title: "Agrega productos", body: "Con una foto, el código de barras o a mano.", href: "/capture", cta: "Agregar", Icon: IconCamera },
+    { done: confirmed > 0, title: "Agrega productos", body: "Con una foto, el código de barras o a mano.", href: "/add", cta: "Agregar", Icon: IconCamera },
     { done: stats.salesEver > 0, title: "Haz tu primera venta", body: "El stock baja solo y queda el ticket.", href: "/sell", cta: "Vender", Icon: IconCart },
   ];
   const firstUse = steps.some((s) => !s.done);
@@ -130,8 +130,8 @@ export default function DashboardPage() {
   // Tareas: lo que pide atención hoy (máximo 4), cada una con su botón
   type Task = { key: string; tone: "info" | "warn" | "danger" | "ok"; Icon: (p: { size?: number }) => JSX.Element; title: string; body?: string; href: string; cta: string };
   const tasks: Task[] = [];
-  if (working > 0) tasks.push({ key: "fotos", tone: "info", Icon: IconCamera, title: `Analizando ${plural(working, "foto")}…`, body: "Te aviso cuando estén listas para revisar.", href: "/capture", cta: "Ver" });
-  if (pending > 0) tasks.push({ key: "revisar", tone: "info", Icon: IconCheckCircle, title: `${plural(pending, "producto")} por revisar`, body: "Confirma nombre, precio y stock.", href: "/review", cta: "Revisar" });
+  if (working > 0) tasks.push({ key: "fotos", tone: "info", Icon: IconCamera, title: `Analizando ${plural(working, "foto")}…`, body: "Te aviso cuando estén listas para revisar.", href: "/add", cta: "Ver" });
+  if (pending > 0) tasks.push({ key: "revisar", tone: "info", Icon: IconCheckCircle, title: `${plural(pending, "producto")} por revisar`, body: "Confirma nombre, precio y stock.", href: "/add/review", cta: "Revisar" });
   if (stats.salesToday.count > 0 && !stats.closedToday && hour >= 18) tasks.push({ key: "caja", tone: "warn", Icon: IconRegister, title: "Falta cerrar la caja de hoy", body: "Cuenta el efectivo y mira si cuadra.", href: "/sell/cash", cta: "Cerrar" });
   if (stats.oldDebtors > 0) tasks.push({ key: "fiados", tone: "danger", Icon: IconUsers, title: `${plural(stats.oldDebtors, "cliente")} debe${stats.oldDebtors === 1 ? "" : "n"} hace más de 30 días`, body: `En total te deben ${money(stats.owed)}.`, href: "/customers?tab=deben", cta: "Cobrar" });
   if (stats.porVencer > 0) tasks.push({ key: "vencer", tone: "warn", Icon: IconAlert, title: `${plural(stats.porVencer, "producto")} por vencer`, body: `Vencen en ${alerts.expiryDays} días o ya vencieron.`, href: "/products?filter=expiring", cta: "Ver" });

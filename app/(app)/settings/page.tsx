@@ -143,12 +143,12 @@ export default function SettingsPage() {
       <section className="animate-in card divide-y divide-slate-100 p-0">
         <Row href="/team" icon={<IconCheckCircle />} title="Equipo" subtitle={flow.members.length > 1 ? `${flow.members.filter((m) => m.active).length} personas · roles, invitaciones y PIN` : "Invita a alguien o pon tu PIN para atender por turnos"} />
         {flow.isOwner && <Row href="/store" icon={<IconFolder />} title="Mi tienda" subtitle={counts ? `${counts.types} categoría${counts.types === 1 ? "" : "s"} · ${counts.sections} subcategorías · qué vendes, datos y variantes` : ""} />}
-        <Row href="/review" icon={<IconCheckCircle />} title="Revisar pendientes" subtitle="Confirma lo que la IA reconoció" />
-        <Row href="/scan" icon={<IconTag />} title="Escanear código de barras" subtitle="Repetidos y reposición sin gastar IA" />
+        <Row href="/add/review" icon={<IconCheckCircle />} title="Revisar pendientes" subtitle="Confirma lo que la IA reconoció" />
+        <Row href="/add?mode=code" icon={<IconTag />} title="Escanear código de barras" subtitle="Repetidos y reposición sin gastar IA" />
         {flow.isOwner && <Row href="/alerts" icon={<IconAlert />} title="Avisos de reposición" subtitle="Desde cuántas unidades avisar y de qué categorías o productos" />}
         <Row href="/movements" icon={<IconList />} title="Ventas y movimientos" subtitle="Ingresos, entradas y retiros de stock" />
         {flow.isOwner && <Row href="/export" icon={<IconDownload />} title="Exportar a Excel" subtitle="Descarga tu inventario" />}
-        {flow.isOwner && <Row href="/import" icon={<IconTable />} title="Importar desde Excel" subtitle="Carga tu inventario desde una planilla" />}
+        {flow.isOwner && <Row href="/add?mode=excel" icon={<IconTable />} title="Importar desde Excel" subtitle="Carga tu inventario desde una planilla" />}
         {flow.isOwner && <Row href="/backup" icon={<IconRefresh />} title="Respaldos" subtitle="Copia completa cada semana; guarda o descarga una ahora" />}
         <Row href="/products?select=1" icon={<IconTag />} title="Etiquetas para imprimir" subtitle="En Productos: Seleccionar → Etiquetas" />
         <Row href="/dashboard#guia" icon={<IconList />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" />

@@ -380,10 +380,10 @@ function Products() {
 
       {/* Avisos y acciones del filtro */}
       {view === "all" && !q && counts.pending > 0 && (
-        <TaskCard icon={<IconAlert size={20} />} tone="info" title={`${plural(counts.pending, "pendiente")} por revisar`} body="Todavía no cuentan en el inventario." href="/review" cta="Revisar" />
+        <TaskCard icon={<IconAlert size={20} />} tone="info" title={`${plural(counts.pending, "pendiente")} por revisar`} body="Todavía no cuentan en el inventario." href="/add/review" cta="Revisar" />
       )}
       {view === "pending" && counts.pending > 0 && (
-        <Link href="/review" className="btn-success w-full">Revisarlos uno por uno</Link>
+        <Link href="/add/review" className="btn-success w-full">Revisarlos uno por uno</Link>
       )}
       {view === "restock" && counts.restock > 0 && (
         <button onClick={() => setSheet("restock")} className="btn-success w-full"><IconList size={18} /> Lista de pedido ({counts.restock})</button>
@@ -414,7 +414,7 @@ function Products() {
           icon={<IconBox size={24} />}
           title="Tu inventario está vacío"
           body={drafts.length ? `Tienes ${plural(drafts.length, "pendiente")} de revisar.` : "Empieza tomando una foto de un producto: la IA llena los datos."}
-          action={drafts.length ? <Link href="/review" className="btn-success">Revisar pendientes</Link> : <Link href="/capture" className="btn-primary"><IconCamera size={18} /> Agregar con foto</Link>}
+          action={drafts.length ? <Link href="/add/review" className="btn-success">Revisar pendientes</Link> : <Link href="/add" className="btn-primary"><IconCamera size={18} /> Agregar con foto</Link>}
         />
       ) : visible.length === 0 ? (
         <EmptyState
@@ -480,7 +480,7 @@ function Products() {
         </div>
       ) : (
         <div className="sticky-action">
-          <Link href="/capture" className="btn-primary btn-lg mx-auto flex w-full max-w-3xl"><IconPlus size={20} /> Agregar productos</Link>
+          <Link href="/add" className="btn-primary btn-lg mx-auto flex w-full max-w-3xl"><IconPlus size={20} /> Agregar productos</Link>
         </div>
       )}
 

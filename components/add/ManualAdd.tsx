@@ -10,13 +10,14 @@ import { resizeImage } from "@/lib/image";
 import CategoryPicker from "@/components/CategoryPicker";
 import FieldInput from "@/components/FieldInput";
 import { useToast } from "@/components/ui/Toast";
-import { IconArrowLeft, IconCamera, IconCheck, IconImages, IconSparkles, IconX, Spinner } from "@/components/ui/Icons";
+import { friendlyError } from "@/lib/errors";
+import { IconCamera, IconCheck, IconImages, IconSparkles, IconX, Spinner } from "@/components/ui/Icons";
 
 /**
  * Alta manual de producto (sin IA): categoría, foto opcional y datos.
  * Útil para productos sin foto, artículos conocidos o correcciones rápidas.
  */
-export default function NewProductPage() {
+export default function ManualAdd() {
   const supabase = createClient();
   const toast = useToast();
   const router = useRouter();
@@ -87,7 +88,7 @@ export default function NewProductPage() {
       const { error } = await supabase.storage.from("product-images").upload(path, photo, { contentType: "image/jpeg", upsert: true });
       if (error) {
         setSaving(false);
-        return toast("error", `No se pudo subir la foto: ${error.message}`);
+        return toast("error", `No se pudo subir la foto: ${friendlyError(error)}`);
       }
       image_url = supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
     }
@@ -95,21 +96,15 @@ export default function NewProductPage() {
     fields.forEach((f) => (clean[f.name] = coerceValue(f, data[f.name])));
     const { error } = await supabase.from("products").insert({ id, user_id: user!.id, category_id: categoryId, status, data: clean, image_url, ai_meta: { modelo: null } });
     setSaving(false);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     navigator.vibrate?.(15);
     toast("success", status === "confirmed" ? "Producto guardado en el inventario" : "Producto guardado como pendiente");
-    router.replace(status === "confirmed" ? `/products/${id}` : "/review");
+    router.replace(status === "confirmed" ? `/products/${id}` : "/add/review");
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <header className="animate-in">
-        <Link href="/products" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Inventario</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Nuevo producto</h1>
-        <p className="text-sm text-slate-500">
-          Lo escribes tú. Si prefieres que la IA lo reconozca, usa <Link href="/capture" className="font-semibold text-brand-700 underline">Agregar con foto</Link>.
-        </p>
-      </header>
+    <div className="space-y-4">
+      <p className="text-sm text-muted">Lo escribes tú, sin gastar IA. Si prefieres que la IA lo reconozca, usa <Link href="/add?mode=photo" className="font-semibold text-brand-700 underline">Foto</Link>.</p>
 
       {loading ? (
         <div className="flex justify-center py-10"><Spinner size={28} className="text-brand-500" /></div>
