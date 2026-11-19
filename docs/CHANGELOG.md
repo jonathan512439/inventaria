@@ -29,6 +29,7 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
     - Motivos: Vendido, Uso interno, Merma o rotura, Vencido, Devolución al proveedor y Regalo o muestra.
     - Cada línea es una salida sin dinero con su id: reintentar no resta dos veces.
   - El recorrido «Cómo usar la app» se actualizó y se muestra otra vez a todos.
+  - Corrección del despliegue: `.gitignore` ignoraba cualquier carpeta llamada «out», y la pantalla `/stock/out` no llegó a publicarse. Ahora solo ignora `/out` de la raíz. `test:e2e` contra producción: «Todo OK» con las 17 pantallas.
   - Usa la columna `mode` de la migración `030`, aplicada en 17.23.
 - **Validar**:
   - Celular: tocar «Gestionar» → aparecen las fichas → «Entrada de inventario». Volver, mantener apretado «Gestionar»: abre directo la Entrada de inventario.
