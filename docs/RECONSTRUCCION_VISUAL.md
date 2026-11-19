@@ -182,8 +182,8 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 | C7.3 · Productos | ✅ 2026-11-18 | 17.10 |
 | C7.4 · Agregar y Revisar | ✅ 2026-11-18 | 17.11 |
 | C7.5 · Mercadería | ✅ 2026-11-19 | 17.12 |
-| C7.6 · Clientes | ⏳ siguiente | |
-| C7.7 · Números | pendiente | |
+| C7.6 · Clientes | ✅ 2026-11-19 | 17.13 |
+| C7.7 · Números | ⏳ siguiente | |
 | C7.8 · Ajustes | pendiente | |
 | C7.9 · Limpieza y ayuda | pendiente | |
 
@@ -229,3 +229,11 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 - Productos: dos accesos «Llegó mercadería» y «Contar» bajo la cabecera (ocultos al seleccionar y en Papelera). «Más» los mantiene hasta C7.9; «Llegó mercadería» deja de ser solo del dueño.
 - Código (Agregar) conserva el atajo +1/+5/+10 y su ayuda remite a Llegó mercadería.
 - Redirecciones: `/purchases` → `/stock/in`, `/count` → `/stock/count`, `/stock` → `/stock/in`.
+
+**C7.6 (2026-11-19):**
+- `app/(app)/customers/page.tsx`: filtro en la dirección `?filter=debt|inactive|consign` (acepta el antiguo `?tab=deben|inactivos`; parámetros cortados en el primer «?»). `Stat` Te deben / Mercadería afuera (tocables → su filtro), buscador, `ChipFilter` de una sola elección, filas con insignia «N unid. entregadas». **Nuevo cliente** en `Sheet` → abre la ficha. Solo se traen los productos de las entregas **abiertas** (antes `consignment_items` completo).
+- **Transitorio:** «Mejores clientes del mes» plegado al final de la lista hasta Números (C7.7), para no perderlo entre pasos. La pestaña Resumen se eliminó.
+- `app/(app)/customers/detail/page.tsx`: saldo grande (Cobrar abono · Recordar por WhatsApp, o Venderle si está al día; enlace a la mercadería afuera) + `Tabs` Compras · Abonos · Mercadería entregada · Datos (`?tab=compras|abonos|entregas|datos`). Datos con `.sticky-action` **fuera** de la sección animada (`animate-in` usa `transform`, que rompe `position: fixed`; tenerlo en cuenta en las próximas pantallas).
+- `components/customers/PaySheet.tsx`: abono con `NumberPad`, atajos Todo / La mitad, medio, nota; `register_payment` (022) con id idempotente. La hoja reemplaza a la confirmación (igual que Cobrar en Vender).
+- `components/customers/ConsignSection.tsx` (antes /consign, borrada): entregas abiertas del cliente con **Rendir cuentas** (`Sheet`, `consign_settle`) y **Entregar mercadería** (`Sheet` con `ProductFinder` + `QtyStepper` + precio, `consign_out`); historial de cerradas. Ya no hace falta elegir el cliente: es el de la ficha.
+- Redirección `/consign` → `/customers?filter=consign`. Enlaces de Inicio y Resumen del día → `?filter=debt`. «Más › Mercadería entregada» → `/customers?filter=consign`.

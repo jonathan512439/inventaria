@@ -3,6 +3,19 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Fase 6.9 · C7.6 — Clientes: cuánto debe, por qué y su mercadería en una sola ficha
+
+### 17.13 Clientes y ficha
+- **Qué**:
+  - **Lista de clientes** con buscador y chips **Todos · Deben · Sin venir 30 días · Con mercadería entregada**, cada uno con su cantidad. Arriba, dos cifras que se tocan: **Te deben** (en rojo si hay deudas de más de 30 días) y **Mercadería afuera**. Botón fijo **Nuevo cliente**: se crea en una hoja y abre su ficha.
+  - La pestaña «Resumen» desaparece: sus cifras quedan arriba y **Mejores clientes del mes** va plegado al final (pasará a Números en C7.7).
+  - **Ficha del cliente**: el saldo grande arriba con **Cobrar abono** y **Recordar por WhatsApp** (o **Venderle** si está al día). Debajo, las pestañas **Compras** (primero lo que debe y qué se llevó) · **Abonos** · **Mercadería entregada** · **Datos**.
+  - **Cobrar abono** abre una hoja con **teclado grande**, atajos «Todo» y «La mitad», medio de pago y «le quedará debiendo» o «queda a su favor» al instante. Ya no pide confirmar otra vez.
+  - **Mercadería entregada deja de ser una pantalla suelta**: en la ficha se **entrega** (buscar o escanear, − + y precio) y se **rinden cuentas** (vendió / devuelve, paga ahora o queda debiendo) sin salir. La dirección antigua (/consign) abre la lista con el chip «Con mercadería entregada».
+  - **Datos** (nombre, teléfono, nota, límite de fiado) se edita en su pestaña con un botón fijo **Guardar datos**. **Quitar cliente**, solo el dueño.
+  - Los errores se muestran en palabras simples.
+- **Validar**: Clientes → chip «Deben» → aparecen ordenados por lo que deben. Abrir uno → el saldo y «desde hace N días» arriba → Compras muestra primero lo que debe con los productos → «Cobrar abono» → «La mitad» → «Le quedará debiendo …» → Cobrar → el saldo baja y aparece en Abonos. Pestaña «Mercadería entregada» → «Entregar mercadería» → escanear 2 productos → Entregar → «Rendir cuentas» → vendió 1, devuelve 1, «Sí, paga» → Registrar → la entrega se cierra. Abrir /consign → lista con «Con mercadería entregada». «Nuevo cliente» → nombre → Guardar → abre su ficha.
+
 ## 2026-11-19 · Fase 6.9 · C7.5 — Mercadería: lo que llega y lo que hay, dentro de Productos
 
 ### 17.12 Llegó mercadería y Contar

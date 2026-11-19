@@ -91,7 +91,7 @@ export default function DigestPage() {
             <Tile label="Vendido hoy" value={`${money(t.total)}`} hint={`ayer ${money(y.total)}`} tone="emerald" />
             {isOwner ? <Tile label="Ganancia de hoy" value={`${money(t.profit)}`} hint={`ayer ${money(y.profit)}`} /> : <Tile label="Ventas de hoy" value={String(salesToday.length)} hint={`ayer ${salesYesterday.length}`} />}
             <Tile label="Agotados" value={String(out.length)} hint={restock.length ? `+${restock.length} por reponer` : "nada por reponer"} tone={out.length ? "rose" : undefined} href="/products?filter=restock" />
-            <Tile label="Te deben" value={`${money(debts.reduce((a, d) => a + d.amount, 0))}`} hint={oldDebts.length ? `${oldDebts.length} con más de 30 días` : `${debts.length} cliente${debts.length === 1 ? "" : "s"}`} tone={oldDebts.length ? "amber" : undefined} href="/customers?tab=deben" />
+            <Tile label="Te deben" value={`${money(debts.reduce((a, d) => a + d.amount, 0))}`} hint={oldDebts.length ? `${oldDebts.length} con más de 30 días` : `${debts.length} cliente${debts.length === 1 ? "" : "s"}`} tone={oldDebts.length ? "amber" : undefined} href="/customers?filter=debt" />
           </div>
 
           {expiring.length > 0 && (
@@ -112,7 +112,7 @@ export default function DigestPage() {
                   <li key={d.name} className="flex items-center gap-2 py-1.5"><span className="min-w-0 flex-1 truncate font-medium text-ink">{d.name}</span><span className="text-xs text-slate-500">{d.days} d</span><span className="font-bold tabular-nums text-amber-700">{money(d.amount)}</span></li>
                 ))}
               </ul>
-              <Link href="/customers?tab=deben" className="mt-2 inline-block text-xs font-semibold text-brand-700 underline">Ir a cobrar →</Link>
+              <Link href="/customers?filter=debt" className="mt-2 inline-block text-xs font-semibold text-brand-700 underline">Ir a cobrar →</Link>
             </section>
           )}
 

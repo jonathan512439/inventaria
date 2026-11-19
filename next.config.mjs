@@ -26,6 +26,8 @@ const nextConfig = {
       { source: "/purchases", destination: "/stock/in", permanent: false },
       { source: "/count", destination: "/stock/count", permanent: false },
       { source: "/stock", destination: "/stock/in", permanent: false },
+      // C7.6 · Clientes: la mercadería entregada vive en la ficha de cada cliente
+      { source: "/consign", destination: "/customers?filter=consign", permanent: false },
     ];
   },
 };

@@ -31,7 +31,7 @@ const AREAS: { key: string; href: string; label: string; Icon: IconT; match: str
   { key: "inicio", href: "/dashboard", label: "Inicio", Icon: IconHome, match: ["/dashboard", "/onboarding"] },
   { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/add", "/stock", "/export"] },
   { key: "vender", href: "/sell", label: "Vender", Icon: IconCart, match: ["/sell"] },
-  { key: "clientes", href: "/customers", label: "Clientes", Icon: IconUsers, match: ["/customers", "/consign"] },
+  { key: "clientes", href: "/customers", label: "Clientes", Icon: IconUsers, match: ["/customers"] },
 ];
 
 interface Item {
@@ -58,7 +58,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
     title: "Vender y cobrar",
     items: [
       { href: "/sell/cash", label: "Caja de hoy", hint: "Cuánto entró y cerrar el día", Icon: IconRegister },
-      { href: "/consign", label: "Mercadería entregada", hint: "Revendedores y rendir cuentas", Icon: IconTruck },
+      { href: "/customers?filter=consign", label: "Mercadería entregada", hint: "Revendedores y rendir cuentas", Icon: IconTruck },
     ],
   },
   {
