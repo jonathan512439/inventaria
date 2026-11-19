@@ -28,6 +28,11 @@ const nextConfig = {
       { source: "/stock", destination: "/stock/in", permanent: false },
       // C7.6 · Clientes: la mercadería entregada vive en la ficha de cada cliente
       { source: "/consign", destination: "/customers?filter=consign", permanent: false },
+      // C7.7 · Números: Hoy · Ventas · Productos · Pregúntale + Historial
+      { source: "/digest", destination: "/insights?tab=hoy", permanent: false },
+      { source: "/reports", destination: "/insights?tab=ventas", permanent: false },
+      { source: "/ask", destination: "/insights?tab=ask", permanent: false },
+      { source: "/movements", destination: "/insights/history", permanent: false },
     ];
   },
 };

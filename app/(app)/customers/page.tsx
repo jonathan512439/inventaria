@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 import type { Consignment, ConsignmentItem, Customer, Sale } from "@/types/database";
 import { money } from "@/lib/inventory";
 import { debtOf, oldestDebtDays } from "@/lib/customers";
-import { businessMonthStart } from "@/lib/dates";
 import { friendlyError } from "@/lib/errors";
 import Sheet from "@/components/ui/Sheet";
 import { ChipFilter, EmptyState, ScreenHeader, Stat } from "@/components/ui/Screen";
@@ -31,7 +30,7 @@ export default function CustomersPage() {
 /**
  * Clientes (C7.6 · RECONSTRUCCION_VISUAL.md §3.2, F31): buscador y chips Todos · Deben · Sin venir 30 días ·
  * Con mercadería entregada (antes /consign); botón fijo **Nuevo cliente**. La mercadería entregada se maneja
- * en la ficha de cada cliente. «Mejores del mes» queda plegado aquí hasta que exista Números (C7.7).
+ * en la ficha de cada cliente. Los mejores clientes están en Números › Ventas (C7.7).
  */
 function Customers() {
   const params = useSearchParams();
@@ -51,7 +50,6 @@ function Customers() {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "" });
   const [saving, setSaving] = useState(false);
-  const [best, setBest] = useState(false);
 
   const load = useCallback(async () => {
     const [c, s, co] = await Promise.all([
@@ -102,13 +100,6 @@ function Customers() {
     .filter((r) => !term || r.c.name.toLowerCase().includes(term) || (r.c.phone ?? "").includes(term))
     .filter((r) => (filter === "debt" ? r.debt > 0 : filter === "inactive" ? r.last !== null && (r.inactiveDays ?? 0) >= 30 : filter === "consign" ? r.out > 0 : true))
     .sort((a, b) => (filter === "debt" ? b.debt - a.debt : filter === "inactive" ? (b.inactiveDays ?? 0) - (a.inactiveDays ?? 0) : filter === "consign" ? b.out - a.out : a.c.name.localeCompare(b.c.name, "es")));
-
-  const monthStart = businessMonthStart();
-  const topMonth = rows
-    .map((r) => ({ ...r, month: r.sales.filter((s) => new Date(s.created_at) >= monthStart).reduce((a, s) => a + Number(s.total), 0) }))
-    .filter((r) => r.month > 0)
-    .sort((a, b) => b.month - a.month)
-    .slice(0, 5);
 
   function setFilter(f: Filter) {
     const next = f === filter ? "all" : f;
@@ -204,31 +195,6 @@ function Customers() {
             </li>
           ))}
         </ul>
-      )}
-
-      {!loading && filter === "all" && !term && topMonth.length > 0 && (
-        <section>
-          <button type="button" onClick={() => setBest((v) => !v)} className="btn-disclosure">
-            <span className="min-w-0 flex-1">
-              <span className="block">Mejores clientes del mes</span>
-              <span className="block truncate text-xs font-normal text-muted">{topMonth.map((r) => r.c.name).join(", ")}</span>
-            </span>
-            <IconChevronRight className={`shrink-0 text-brand-600 transition ${best ? "rotate-90" : ""}`} />
-          </button>
-          {best && (
-            <ol className="mt-2 space-y-1 rounded-2xl border-2 border-slate-200 p-3">
-              {topMonth.map((r, i) => (
-                <li key={r.c.id}>
-                  <Link href={`/customers/detail?id=${r.c.id}`} className="flex min-h-[44px] items-center gap-3 text-sm">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ok-100 text-xs font-bold text-ok-800">{i + 1}</span>
-                    <span className="min-w-0 flex-1 truncate font-medium text-ink">{r.c.name}</span>
-                    <span className="font-bold tabular-nums text-ok-700">{money(r.month)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
       )}
 
       <div className="sticky-action">

@@ -450,7 +450,7 @@ export default function ProductDetailClient() {
               ))}
             </ul>
           )}
-          <Link href="/movements" className="mt-2 inline-flex min-h-[44px] items-center text-sm font-semibold text-brand-700 hover:underline">Ver todos los movimientos →</Link>
+          <Link href="/insights/history?tipo=todos" className="mt-2 inline-flex min-h-[44px] items-center text-sm font-semibold text-brand-700 hover:underline">Ver todos los movimientos →</Link>
         </section>
       )}
 

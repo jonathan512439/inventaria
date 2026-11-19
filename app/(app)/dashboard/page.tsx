@@ -5,14 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { queueSummary, useQueue } from "@/lib/queue";
-import { expiringSoon, fromSummary, money, needsRestock, priceOf, stockOf, SUMMARY_COLS } from "@/lib/inventory";
-import { businessDayKey, businessDayStart } from "@/lib/dates";
+import { money } from "@/lib/inventory";
+import { todaySummary } from "@/lib/data/insights";
 import { StepByStep, type GuideProgress } from "@/components/guide/Guide";
 import AiUsageCard from "@/components/AiUsageCard";
 import CleanupCard from "@/components/CleanupCard";
 import { useFlow } from "@/components/FlowProvider";
 import { Stat, TaskCard } from "@/components/ui/Screen";
-import type { Category } from "@/types/database";
 import { IconAlert, IconBell, IconCamera, IconCart, IconCheck, IconCheckCircle, IconChevronRight, IconRegister, IconSettings, IconStore, IconTag, IconUsers, Spinner } from "@/components/ui/Icons";
 
 interface Stats {
@@ -46,38 +45,25 @@ export default function DashboardPage() {
   useEffect(() => {
     const supabase = createClient();
     (async () => {
-      const dayStart = businessDayStart();
-      const month = new Date(Date.now() - 30 * 86400000).toISOString();
-      const [cats, prof, prods, sales, open, ever, closing] = await Promise.all([
-        supabase.from("categories").select("*"),
+      // Los números se calculan en la base (027 · today_summary): ya no se cargan todos los productos aquí.
+      // «Por reponer» usa la misma regla que la lista de pedido (por variante, mínimos, avisos silenciados).
+      const [cats, prof, sum] = await Promise.all([
+        supabase.from("categories").select("id", { count: "exact", head: true }).is("parent_id", null),
         supabase.from("profiles").select("onboarded_at").maybeSingle(),
-        supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed"),
-        supabase.from("sales_v").select("total,cost_total").gte("created_at", dayStart.toISOString()),
-        supabase.from("sales").select("total,paid,customer_id,created_at").neq("status", "pagado"),
-        supabase.from("sales").select("id", { count: "exact", head: true }),
-        supabase.from("cash_closings").select("id").eq("day", businessDayKey()).limit(1),
+        todaySummary(supabase).catch(() => null),
       ]);
-      const categories = (cats.data ?? []) as Category[];
-      const list = (prods.data ?? []).map(fromSummary);
-      const todays = sales.data ?? [];
-      const openSales = open.data ?? [];
       const s: Stats = {
-        types: categories.filter((c) => !c.parent_id).length,
+        types: cats.count ?? 0,
         onboarded: !!prof.data?.onboarded_at,
-        // Misma regla que la lista de reposición: mínimos del negocio/categoría/producto y avisos silenciados
-        porReponer: list.filter((p) => needsRestock(p, categories, alerts)).length,
-        agotados: list.filter((p) => (stockOf(p) ?? 0) <= 0 && needsRestock(p, categories, alerts)).length,
-        porVencer: list.filter((p) => expiringSoon(p, alerts, categories)).length,
-        sinPrecio: list.filter((p) => priceOf(p) === null).length,
-        salesToday: {
-          total: todays.reduce((a, r) => a + Number(r.total ?? 0), 0),
-          profit: todays.reduce((a, r) => a + Number(r.total ?? 0) - Number(r.cost_total ?? 0), 0),
-          count: todays.length,
-        },
-        salesEver: ever.count ?? 0,
-        closedToday: (closing.data ?? []).length > 0,
-        owed: openSales.reduce((a, r) => a + Number(r.total) - Number(r.paid), 0),
-        oldDebtors: new Set(openSales.filter((r) => r.customer_id && r.created_at < month).map((r) => r.customer_id)).size,
+        porReponer: sum?.restock.products ?? 0,
+        agotados: sum?.restock.out ?? 0,
+        porVencer: sum?.expiring.count ?? 0,
+        sinPrecio: sum?.no_price ?? 0,
+        salesToday: { total: Number(sum?.today.total ?? 0), profit: Number(sum?.today.profit ?? 0), count: Number(sum?.today.count ?? 0) },
+        salesEver: sum?.sales_ever ? 1 : 0,
+        closedToday: !!sum?.closed_today,
+        owed: Number(sum?.debts.total ?? 0),
+        oldDebtors: Number(sum?.debts.old ?? 0),
       };
       // Cuenta nueva sin nada configurado → asistente inicial
       if (!s.onboarded && s.types === 0 && flow.loaded && flow.pending + flow.confirmed === 0) {
@@ -136,7 +122,7 @@ export default function DashboardPage() {
   if (stats.oldDebtors > 0) tasks.push({ key: "fiados", tone: "danger", Icon: IconUsers, title: `${plural(stats.oldDebtors, "cliente")} debe${stats.oldDebtors === 1 ? "" : "n"} hace más de 30 días`, body: `En total te deben ${money(stats.owed)}.`, href: "/customers?filter=debt", cta: "Cobrar" });
   if (stats.porVencer > 0) tasks.push({ key: "vencer", tone: "warn", Icon: IconAlert, title: `${plural(stats.porVencer, "producto")} por vencer`, body: `Vencen en ${alerts.expiryDays} días o ya vencieron.`, href: "/products?filter=expiring", cta: "Ver" });
   if (stats.porReponer > 0) tasks.push({ key: "reponer", tone: stats.agotados ? "danger" : "warn", Icon: IconBell, title: `${plural(stats.porReponer, "producto")} por reponer`, body: stats.agotados ? `${plural(stats.agotados, "agotado")}; la lista para pedir ya está armada.` : "Están bajo su mínimo; la lista ya está armada.", href: "/products?filter=restock", cta: "Ver lista" });
-  if (stats.sinPrecio > 0 && confirmed > 0) tasks.push({ key: "precio", tone: "info", Icon: IconTag, title: `${plural(stats.sinPrecio, "producto")} sin precio`, body: "No se pueden vender bien sin precio.", href: "/products", cta: "Completar" });
+  if (stats.sinPrecio > 0 && confirmed > 0) tasks.push({ key: "precio", tone: "info", Icon: IconTag, title: `${plural(stats.sinPrecio, "producto")} sin precio`, body: "No se pueden vender bien sin precio.", href: "/products?filter=noprice", cta: "Completar" });
   const shown = tasks.slice(0, 4);
 
   return (

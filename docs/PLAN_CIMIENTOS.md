@@ -18,7 +18,7 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 | C5.1 · Permisos por rol y operación, negocio activo, firma | ✅ 2026-11-18 | `024_permisos.sql` | `npm run test:access` (24) + `test:team` | 17.5 |
 | C5.2 · Costos fuera del alcance del vendedor | ✅ 2026-11-18 | `025_costos.sql` | `npm run test:access` (ampliada) | 17.6 |
 | C5.3 · Fotos privadas | ✅ 2026-11-18 | `026_fotos_privadas.sql` | `npm run test:access` (ampliada) | 17.7 |
-| C7 · Reconstrucción visual completa (C7.1–C7.9) | ⏳ en curso (C7.1–C7.6 ✅ 2026-11-19) | — | manual + `test:e2e` + prueba con 3 personas | 17.8– |
+| C7 · Reconstrucción visual completa (C7.1–C7.9) | ⏳ en curso (C7.1–C7.7 ✅ 2026-11-19) | — | manual + `test:e2e` + prueba con 3 personas | 17.8– |
 | C6 · Calidad continua | pendiente (al final, a pedido del usuario 2026-11-18) | `schema_migrations` | CI | — |
 
 **Orden (2026-11-18):** el usuario pidió hacer **C7 antes que C6**; C6 queda al final. Avance de C7 y decisiones de cada paso: `RECONSTRUCCION_VISUAL.md` → §7.
@@ -134,7 +134,7 @@ Cada paso es un despliegue propio con su entrada en `CHANGELOG.md` (17.0 = C0, 1
 **Resultado (2026-11-18):** `023_ajustes_negocio.sql` aplicada (solo agrega: la versión publicada siguió funcionando). Los 2 negocios quedaron con zona `America/La_Paz` y moneda «Bs»; «Importadora Rios» ya tenía su nombre; el otro sigue «Mi negocio» porque su perfil no tenía nombre. `npm run test:ops` 50/50 (6 nuevas de C4: el vendedor recibe nombre y moneda del negocio y su rol; `session_context` trae equipo y conteos; el vendedor no puede cambiar el negocio; zona inválida rechazada; una venta a las 21:30 de Bolivia cae en su día en la caja y en otro si el negocio está en España). `test:fields`, `test:variants`, `test:team`, `test:import`, `test:backup` en verde. `test:e2e` contra producción tras el despliegue: **58/58** (incluye onboarding con nombre del negocio, «Pregúntale» y foto de estante: esta vez sin 524 de Gemini).
 
 **Cómo quedó (y diferencias con lo previsto):**
-- `lib/dates.ts`: «hoy», «hace N días» y «este mes» en la zona del negocio (`businessDayStart`, `businessMonthStart`, `businessDayKey`), usado en caja, inicio, resumen, movimientos, reportes, clientes, filtro «hoy» del inventario y nombres de archivos. **Los reportes siguen calculándose en el navegador** (con la zona correcta); pasarlos a SQL queda en E3 (C7 · Números).
+- `lib/dates.ts`: «hoy», «hace N días» y «este mes» en la zona del negocio (`businessDayStart`, `businessMonthStart`, `businessDayKey`), usado en caja, inicio, resumen, movimientos, reportes, clientes, filtro «hoy» del inventario y nombres de archivos. **Los reportes siguen calculándose en el navegador** (con la zona correcta); pasarlos a SQL queda en E3 (C7 · Números). **Hecho en C7.7 (027):** `today_summary()`, `insights_report()`, `restock_lines()`.
 - `money(n)` / `currencyLabel()` en `lib/inventory.ts`: 144 importes y 10 etiquetas dejaron de tener «Bs» escrito a mano.
 - `FlowProvider` sigue refrescando al cambiar de pantalla, pero con **1 llamada** (`session_context`) en lugar de ~7.
 - `profiles.business_name`, `profiles.min_stock_default` y `profiles.expiry_days` quedan en la tabla sin uso (no se borran; se pueden quitar en C6 con el registro de migraciones).

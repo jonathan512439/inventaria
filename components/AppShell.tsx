@@ -13,7 +13,7 @@ import Sheet from "./ui/Sheet";
 import { LogoMark, LogoWordmark } from "./ui/Logo";
 import {
   IconBell, IconBox, IconCamera, IconCart, IconChart, IconCheckCircle, IconClipboard, IconCloud, IconDownload, IconHelp, IconHome,
-  IconList, IconLogout, IconMore, IconPrinter, IconRegister, IconSettings, IconSparkles, IconStore, IconTable,
+  IconList, IconLogout, IconMore, IconPrinter, IconRegister, IconSettings, IconStore, IconTable,
   IconTrash, IconTruck, IconUsers,
 } from "./ui/Icons";
 
@@ -64,10 +64,8 @@ const GROUPS: { title: string; items: Item[] }[] = [
   {
     title: "Números",
     items: [
-      { href: "/reports", label: "Cómo va el negocio", hint: "Qué se vende y cuánto ganas", Icon: IconChart, ownerOnly: true },
-      { href: "/movements", label: "Historial", hint: "Ventas, entradas y retiros", Icon: IconList },
-      { href: "/digest", label: "Resumen de hoy", hint: "Listo para WhatsApp", Icon: IconCheckCircle },
-      { href: "/ask", label: "Pregúntale", hint: "Preguntas sobre tus datos", Icon: IconSparkles },
+      { href: "/insights", label: "Números", hint: "Hoy, ventas, productos y preguntas", Icon: IconChart },
+      { href: "/insights/history", label: "Historial", hint: "Ventas, entradas y retiros con quién los hizo", Icon: IconList },
     ],
   },
   {

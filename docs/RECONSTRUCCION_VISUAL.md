@@ -183,8 +183,8 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 | C7.4 · Agregar y Revisar | ✅ 2026-11-18 | 17.11 |
 | C7.5 · Mercadería | ✅ 2026-11-19 | 17.12 |
 | C7.6 · Clientes | ✅ 2026-11-19 | 17.13 |
-| C7.7 · Números | ⏳ siguiente | |
-| C7.8 · Ajustes | pendiente | |
+| C7.7 · Números | ✅ 2026-11-19 | 17.14 |
+| C7.8 · Ajustes | ⏳ siguiente | |
 | C7.9 · Limpieza y ayuda | pendiente | |
 
 **C7.1 (2026-11-18):**
@@ -237,3 +237,21 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 - `components/customers/PaySheet.tsx`: abono con `NumberPad`, atajos Todo / La mitad, medio, nota; `register_payment` (022) con id idempotente. La hoja reemplaza a la confirmación (igual que Cobrar en Vender).
 - `components/customers/ConsignSection.tsx` (antes /consign, borrada): entregas abiertas del cliente con **Rendir cuentas** (`Sheet`, `consign_settle`) y **Entregar mercadería** (`Sheet` con `ProductFinder` + `QtyStepper` + precio, `consign_out`); historial de cerradas. Ya no hace falta elegir el cliente: es el de la ficha.
 - Redirección `/consign` → `/customers?filter=consign`. Enlaces de Inicio y Resumen del día → `?filter=debt`. «Más › Mercadería entregada» → `/customers?filter=consign`.
+
+**C7.7 (2026-11-19):**
+- **E3 · números en SQL** (`supabase/027_numeros.sql`, solo agrega funciones; se aplicó antes de publicar):
+  - `_restock(b)` / `restock_lines()`: la regla de `restockLines()` (RestockSheet) en la base. Por variante si tiene; mínimo variante › producto › categoría principal › negocio (3 por defecto); fuera los silenciados (producto, su categoría o la principal).
+  - `today_summary()`: ventas de hoy y ayer (ganancia `null` al vendedor), `sales_ever`, `closed_today`, por reponer (productos, agotados, líneas), agotados (5 nombres), por vencer (`expiry_days` del negocio, 6 primeros), sin precio y fiados (total, clientes, +30 días con lista).
+  - `insights_report(p_period)`: solo dueño (`42501` al vendedor). Incluye:
+    - `now`/`prev`, igual que el antiguo `previousRange`: mes anterior completo, o el mismo largo justo antes;
+    - `per_day` 14 días en la zona del negocio;
+    - `top_units`, `top_profit`, `top_customers`;
+    - `margins` por categoría principal;
+    - `dead` (60 días, con la última venta de toda la historia, no de 180 días);
+    - `inventory` y `by_category`.
+  - Prueba nueva `npm run test:numbers` (19 comprobaciones: regla de reposición con variantes, subcategoría y silenciados; ganancia solo dueño; vendedor rechazado en el informe).
+- **Unificado:** Inicio usa `today_summary()` (ya no carga `product_summaries`), así que «por reponer» coincide con Productos y la lista de pedido. Productos sigue calculando en el teléfono con `restockLines()`, que es la misma regla y funciona sin conexión.
+- `app/(app)/insights/page.tsx`: `?tab=hoy|ventas|productos|ask` y `&period=7d|90d`. El vendedor solo ve Hoy y Pregúntale; si pide una pestaña del dueño, cae en Hoy. Piezas en `components/insights/`: `TodayTab` (con `digestText`), `SalesTab`, `ProductsTab`, `AskTab` (barra fija de pregunta).
+- `app/(app)/insights/history/page.tsx` (antes /movements): filtros **en la consulta** (`?tipo=venta|entrada|salida|ajuste|todos&rango=hoy|7d|mes|todo&quien=<user_id>`, máximo 300 filas, con aviso al llegar al tope). Quién lo hizo sale de `members` (firma 015).
+- Borrados `/reports`, `/digest`, `/ask`, `/movements` y `lib/reports.ts` (cálculos en el navegador). Las redirecciones llevan a su pestaña. «Mejores clientes del mes» salió de la lista de Clientes.
+- En «Más», el grupo Números queda en dos entradas: Números e Historial.

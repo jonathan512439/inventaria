@@ -3,6 +3,26 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Fase 6.9 · C7.7 — Números: hoy, ventas, productos y preguntas en un solo lugar
+
+### 17.14 Números e Historial
+- **Qué**:
+  - **Números** (en Más) reemplaza a «Cómo va el negocio», «Resumen de hoy» y «Pregúntale». Tiene cuatro pestañas:
+    - **Hoy:** el botón **Enviar resumen por WhatsApp** arriba, lo vendido contra ayer, la ganancia (solo el dueño), lo que hay por reponer, lo que te deben, lo que vence y quién debe hace más de 30 días.
+    - **Ventas** (dueño): comparación con el periodo anterior (7 días, este mes, 90 días), los últimos 14 días en barras, lo que más dinero deja y los **mejores clientes**, que salen de la lista de Clientes.
+    - **Productos** (dueño): los más vendidos (con aviso si están por reponer), lo **parado** hace 60 días, la ganancia por categoría y cuánto vale lo que tienes, también por categoría.
+    - **Pregúntale:** preguntas sobre tus datos.
+  - **Historial** (botón arriba en Números, antes «Ventas y movimientos») filtra por **tipo** (Ventas, Entradas, Retiros, Ajustes, Todo), **fecha** y **persona del equipo**, y cada fila dice **quién** lo hizo.
+  - **Más rápido:** Inicio y Números ya no descargan todos los productos ni miles de ventas al teléfono; la base hace las cuentas y manda solo el resultado.
+  - **Corrección:** «por reponer» ahora da **el mismo número** en Inicio, Números y Productos. Antes Inicio y Reportes no miraban las tallas o colores por separado: una polera con 6 unidades en total pero 1 en talla M no aparecía.
+  - Las direcciones antiguas (/reports, /digest, /ask, /movements) llevan a su pestaña.
+- **Validar**:
+  - Más → Números → Hoy → «Enviar resumen por WhatsApp» abre WhatsApp con el mensaje.
+  - Como dueño, en Ventas → «7 días»: cambian las cifras y aparecen los mejores clientes. En Productos, los totales por categoría llevan a la lista filtrada.
+  - El número «por reponer» es igual en Inicio, Números › Hoy y el chip de Productos.
+  - Números → Historial → «Entradas» → elegir una persona → solo sus entradas.
+  - Como vendedor: en Números solo aparecen Hoy y Pregúntale, sin ganancia.
+
 ## 2026-11-19 · Fase 6.9 · C7.6 — Clientes: cuánto debe, por qué y su mercadería en una sola ficha
 
 ### 17.13 Clientes y ficha
