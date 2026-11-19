@@ -26,7 +26,7 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 import { ChipFilter, EmptyState, ScreenHeader, TaskCard } from "@/components/ui/Screen";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
-import { IconAlert, IconBox, IconCamera, IconCheck, IconDownload, IconFolder, IconList, IconPlus, IconPrinter, IconScan, IconSearch, IconTable, IconTag, IconTrash, IconX, Spinner } from "@/components/ui/Icons";
+import { IconAlert, IconBox, IconCamera, IconCheck, IconClipboard, IconDownload, IconFolder, IconList, IconPlus, IconPrinter, IconScan, IconSearch, IconTable, IconTag, IconTrash, IconTruck, IconX, Spinner } from "@/components/ui/Icons";
 
 /** Filtros de la lista (C7.3): reponer, vencer y papelera dejan de ser pantallas aparte. */
 const VIEWS = ["all", "pending", "restock", "expiring", "out", "noprice", "nophoto", "trash"] as const;
@@ -336,9 +336,18 @@ function Products() {
             <p>Los botones de abajo del buscador filtran: <b>Por reponer</b> (con la lista de pedido para WhatsApp), <b>Por vencer</b>, <b>Agotados</b>, <b>Papelera</b>…</p>
             <p>Toca <b>Seleccionar</b> para cambiar el precio, imprimir etiquetas, mover de categoría, descargar en Excel o enviar a la papelera varios productos a la vez.</p>
             <p>El botón <b>±</b> de cada fila suma o resta stock sin abrir la ficha.</p>
+            <p><b>Llegó mercadería</b> suma al stock lo que te entregaron (escaneando). <b>Contar</b> revisa un estante y corrige las diferencias.</p>
           </>
         }
       />
+
+      {/* Mercadería (C7.5): entradas y conteo viven dentro de Productos */}
+      {!selecting && view !== "trash" && (
+        <div className="animate-in grid grid-cols-2 gap-2">
+          <Link href="/stock/in" className="btn-secondary min-h-[44px]"><IconTruck size={18} /> Llegó mercadería</Link>
+          <Link href="/stock/count" className="btn-secondary min-h-[44px]"><IconClipboard size={18} /> Contar</Link>
+        </div>
+      )}
 
       {cachedAt && (
         <p className="animate-in rounded-2xl bg-slate-800 px-3 py-2 text-center text-xs font-semibold text-white">

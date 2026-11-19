@@ -22,6 +22,10 @@ const nextConfig = {
       { source: "/import", destination: "/add?mode=excel", permanent: false },
       { source: "/review", destination: "/add/review", permanent: false },
       { source: "/drafts", destination: "/add/review", permanent: false },
+      // C7.5 · Mercadería: entrada y conteo dentro de Productos
+      { source: "/purchases", destination: "/stock/in", permanent: false },
+      { source: "/count", destination: "/stock/count", permanent: false },
+      { source: "/stock", destination: "/stock/in", permanent: false },
     ];
   },
 };

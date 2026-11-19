@@ -181,8 +181,8 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 | C7.2 · Inicio y Vender | ✅ 2026-11-18 | 17.9 |
 | C7.3 · Productos | ✅ 2026-11-18 | 17.10 |
 | C7.4 · Agregar y Revisar | ✅ 2026-11-18 | 17.11 |
-| C7.5 · Mercadería | ⏳ siguiente | |
-| C7.6 · Clientes | pendiente | |
+| C7.5 · Mercadería | ✅ 2026-11-19 | 17.12 |
+| C7.6 · Clientes | ⏳ siguiente | |
 | C7.7 · Números | pendiente | |
 | C7.8 · Ajustes | pendiente | |
 | C7.9 · Limpieza y ayuda | pendiente | |
@@ -219,3 +219,13 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 - **Error corregido:** `save()` guardaba las variantes *después* de pasar el producto a `confirmed`; `product_variants_guard` (024) rechaza stock ≠ 0 en variantes de un confirmado fuera de una operación, y el error se ignoraba → el stock por variante se perdía al confirmar. Ahora `saveVariants()` corre antes (producto aún `draft`) y devuelve el error. Caso agregado a `npm run test:variants` (también comprueba que el orden antiguo sigue rechazado).
 - Precarga de la foto siguiente con `signedPhotoUrl` (bucket privado desde 026); borrar pendiente usa `storagePath`; mensajes con `friendlyError`.
 - Redirecciones: `/capture`, `/scan`, `/products/new`, `/import` → `/add?mode=…`; `/review`, `/drafts` → `/add/review`. Las pantallas leen `mode`, `view` e `id` cortando en el primer «?» (ver nota de C7.3).
+
+**C7.5 (2026-11-19):**
+- `app/(app)/stock/in/page.tsx` (antes /purchases): `ProductFinder` arriba; cada lectura suma 1 y sube la línea a la cabeza; `QtyStepper` por línea con «tenías N → quedarán M». «Más datos (opcional)» plegado: proveedor (+ nuevo), factura y el interruptor «Anotar costo y vencimiento» que muestra esas casillas en cada línea. Dueño: pestañas Nueva entrada · Entradas · Proveedores.
+- **Decisión (permisos):** las compras siguen siendo solo del dueño (024: `purchases_owner`, lectura de `suppliers/purchases` solo dueño). La entrada se abre al vendedor porque `adjust_stock` ya le permitía sumar stock (ajuste rápido): guarda **una `adjust_stock('entrada')` por línea**, cada una con su `opId` guardado en la línea (reintentar no duplica), y el vencimiento con un `update` de `expires_at` en el producto o la variante. Si una línea falla, quedan solo las fallidas. Probado en `npm run test:access` («vendedor: llegó mercadería…»).
+- Borrador de la entrada en `localStorage` (`bizKey("stock-in-draft")`: líneas, id de la operación, proveedor, factura) con try/catch; se borra al guardar o vaciar.
+- **Error corregido:** el costo sugerido salía de `data.precio_compra` / `variant.costo`, vacíos desde 025. Ahora se lee de `product_costs` (variante › producto) solo si es dueño.
+- `app/(app)/stock/count/page.tsx` (antes /count): misma lógica (`apply_count`, asignar código desconocido al vuelo) con `ScreenHeader`, `Stat` ×3, buscador local, `ChipFilter` Todos · Faltan contar · No coinciden (reemplaza «Ocultar los que ya conté») y botón «✓ N» (contado = lo que dice la app). Colores semánticos.
+- Productos: dos accesos «Llegó mercadería» y «Contar» bajo la cabecera (ocultos al seleccionar y en Papelera). «Más» los mantiene hasta C7.9; «Llegó mercadería» deja de ser solo del dueño.
+- Código (Agregar) conserva el atajo +1/+5/+10 y su ayuda remite a Llegó mercadería.
+- Redirecciones: `/purchases` → `/stock/in`, `/count` → `/stock/count`, `/stock` → `/stock/in`.

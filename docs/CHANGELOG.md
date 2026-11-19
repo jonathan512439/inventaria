@@ -3,6 +3,19 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Fase 6.9 · C7.5 — Mercadería: lo que llega y lo que hay, dentro de Productos
+
+### 17.12 Llegó mercadería y Contar
+- **Qué**:
+  - **Llegó mercadería** (antes «Compras y proveedores», solo dueño) está en Productos y en Más, y ahora la puede usar **cualquiera del equipo**. Arriba se busca o se **escanea**: cada lectura suma 1 (el último leído sube a la cabeza de la lista y se marca en verde) y cada fila muestra «tenías N → quedarán M», con − y + grandes.
+  - **Proveedor, factura, costo y vencimiento son opcionales** y van plegados en «Más datos». El dueño guarda todo en una sola operación, como antes. El vendedor guarda solo la entrada de stock y el vencimiento (el costo y el proveedor siguen siendo del dueño); si algo falla, quedan en la lista solo los productos que faltaron y al reintentar no se suma dos veces.
+  - **La lista en curso queda guardada en el teléfono** hasta tocar «Guardar entrada»: salir sin querer ya no la pierde.
+  - **Corrección:** el costo ya no se completaba solo al agregar un producto (se perdió cuando el costo pasó a ser privado del dueño en C5). Ahora vuelve a aparecer el último costo de cada producto o variante.
+  - El dueño ve también las pestañas **Entradas** (historial con proveedor y total) y **Proveedores** (con WhatsApp).
+  - **Contar**: misma forma de antes (elegir categoría → escanear o escribir → diferencias → corregir con motivo), con tres cifras arriba (contados, no coinciden, diferencia), **buscador dentro de la categoría**, filtros **Todos · Faltan contar · No coinciden** y un botón **✓ N** para marcar de un toque que hay lo mismo que dice la app.
+  - Las direcciones antiguas (/purchases, /count) llevan a su lugar nuevo (/stock/in, /stock/count).
+- **Validar**: Productos → «Llegó mercadería» → escanear 3 veces el mismo producto → queda arriba con 3 → buscar otro y agregarlo → salir a Inicio y volver → la lista sigue ahí → «Guardar entrada» → el stock de ambos sube. Como dueño: «Más datos» → elegir proveedor y marcar «Anotar costo y vencimiento» → el costo viene completado → guardar → aparece en «Entradas». Como vendedor: la pantalla se abre (antes decía «Esto lo maneja el dueño»), no muestra costo ni proveedor y la entrada se guarda. Productos → «Contar» → elegir categoría → tocar «✓» en 2 productos y escribir otra cantidad en 1 → filtro «No coinciden» muestra 1 → «Terminar y corregir 1».
+
 ## 2026-11-18 · Fase 6.9 · C7.4 — Agregar: las cinco maneras en un solo lugar
 
 ### 17.11 Agregar y Revisar

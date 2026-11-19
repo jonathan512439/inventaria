@@ -93,6 +93,14 @@ try {
   check(!!vStock, "no se crea una variante con stock en un confirmado sin operación");
   const adj = await v.rpc("adjust_stock", { p_id: uuid(), p_product: P.id, p_variant: null, p_delta: 2, p_tipo: "entrada", p_motivo: "prueba" });
   check(!adj.error && Number(adj.data?.stock) === 7, `con la operación sí: entrada +2 → ${adj.data?.stock} ${adj.error?.message ?? ""}`);
+  // Llegó mercadería (C7.5) para el vendedor: entrada por operación (repetir el id no suma dos veces) + vencimiento en el producto
+  const entryId = uuid();
+  await v.rpc("adjust_stock", { p_id: entryId, p_product: P.id, p_variant: null, p_delta: 3, p_tipo: "entrada", p_motivo: "llegó mercadería" });
+  const again = await v.rpc("adjust_stock", { p_id: entryId, p_product: P.id, p_variant: null, p_delta: 3, p_tipo: "entrada", p_motivo: "llegó mercadería" });
+  const { error: expErr } = await v.from("products").update({ expires_at: "2030-01-31" }).eq("id", P.id);
+  const { data: pEntry } = await admin.from("products").select("stock,expires_at").eq("id", P.id).single();
+  check(again.data?.repeated === true && Number(pEntry.stock) === 10 && !expErr && String(pEntry.expires_at).startsWith("2030-01-31"), `vendedor: llegó mercadería suma una sola vez y anota el vencimiento → ${pEntry.stock} · ${pEntry.expires_at} ${expErr?.message ?? ""}`);
+  await v.rpc("adjust_stock", { p_id: uuid(), p_product: P.id, p_variant: null, p_delta: -3, p_tipo: "salida", p_motivo: "prueba" }); // vuelve a 7
 
   // --- Firma inmutable y negocio inmutable ---
   await a.from("products").update({ user_id: V.id, business_id: B.bid }).eq("id", P.id);

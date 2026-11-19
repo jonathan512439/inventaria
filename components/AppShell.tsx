@@ -24,12 +24,12 @@ type IconT = (p: { size?: number; className?: string; strokeWidth?: number }) =>
  *   Celular: Inicio · Productos · VENDER (botón central) · Clientes · Más
  *   Escritorio: barra lateral con las mismas áreas y sus secciones
  * Cabecera: nombre del negocio, estado de conexión y «¿quién atiende?».
- * Transitorio hasta C7.3–C7.5: «Más» también lleva a Agregar, Contar, Compras… (luego viven dentro de Productos).
+ * Transitorio hasta C7.9: «Más» también lleva a las secciones de cada área (Agregar, Llegó mercadería, Contar…).
  */
 
 const AREAS: { key: string; href: string; label: string; Icon: IconT; match: string[] }[] = [
   { key: "inicio", href: "/dashboard", label: "Inicio", Icon: IconHome, match: ["/dashboard", "/onboarding"] },
-  { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/add", "/count", "/purchases", "/export"] },
+  { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/add", "/stock", "/export"] },
   { key: "vender", href: "/sell", label: "Vender", Icon: IconCart, match: ["/sell"] },
   { key: "clientes", href: "/customers", label: "Clientes", Icon: IconUsers, match: ["/customers", "/consign"] },
 ];
@@ -48,8 +48,8 @@ const GROUPS: { title: string; items: Item[] }[] = [
     items: [
       { href: "/add", label: "Agregar productos", hint: "Foto, estante, código, a mano o Excel", Icon: IconCamera },
       { href: "/add/review", label: "Revisar pendientes", hint: "Confirma lo que reconoció la IA", Icon: IconCheckCircle },
-      { href: "/purchases", label: "Llegó mercadería", hint: "Anota una compra y su costo", Icon: IconTruck, ownerOnly: true },
-      { href: "/count", label: "Contar", hint: "Revisa un estante y corrige", Icon: IconClipboard },
+      { href: "/stock/in", label: "Llegó mercadería", hint: "Escanea lo que llegó y suma al stock", Icon: IconTruck },
+      { href: "/stock/count", label: "Contar", hint: "Revisa un estante y corrige", Icon: IconClipboard },
       { href: "/products?filter=restock", label: "Qué falta", hint: "Lista de pedido para WhatsApp", Icon: IconBell },
       { href: "/products?select=1", label: "Precios y etiquetas", hint: "Elige productos y cámbialos o imprímelos", Icon: IconPrinter },
     ],
