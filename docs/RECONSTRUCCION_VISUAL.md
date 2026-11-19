@@ -185,7 +185,7 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 | C7.6 · Clientes | ✅ 2026-11-19 | 17.13 |
 | C7.7 · Números | ✅ 2026-11-19 | 17.14 |
 | C7.8 · Ajustes | ✅ 2026-11-19 | 17.15 |
-| C7.9 · Limpieza y ayuda | ⏳ siguiente | |
+| C7.9 · Limpieza y ayuda | ✅ 2026-11-19 (prueba con 3 personas: pendiente del usuario) | 17.16 |
 
 **C7.1 (2026-11-18):**
 - Tokens en `tailwind.config.ts`: `ok`, `warn`, `danger`, `info`, `muted`, `canvas`. La escala de texto de Tailwind ya coincide con §5 (xs 12 · sm 14 · base 16…): se reemplazaron los 121 usos de 9–11 px por `text-xs` (12 px) en toda la app; queda solo el dibujo decorativo de la guía.
@@ -272,3 +272,24 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 - `app/(app)/settings/team/page.tsx` (antes /team): `ScreenHeader` con la ayuda en «?» en vez del consejo, toques de 44 px y `friendlyError`.
 - Inicio sin «Herramientas»: `/dashboard#limpiar` lleva a `/settings/data#limpiar` y `#guia` a `/settings`. El primer paso «Crea tu tienda» abre Mi catálogo.
 - Redirecciones `/store`, `/categories`, `/templates` → `/settings/catalog`; `/alerts` → `/settings#avisos`; `/team` → `/settings/team`; `/export`, `/backup` → `/settings/data`. Se cambiaron los enlaces en Revisar, Agregar (Foto, A mano, Excel), tabla, variantes, «¿quién atiende?», lista de pedido y guía.
+
+**C7.9 (2026-11-19):**
+- `components/AppShell.tsx`:
+  - El vendedor tiene `CAJA` (`/sell/cash`) como 5.º lugar en vez de «Más», y «Más» se abre con el botón de la cabecera (solo en celular). En escritorio, la barra lateral muestra sus 5 áreas y «Más» desplegado.
+  - El área activa es la coincidencia más larga: `/sell/cash` marca Caja para el vendedor y Vender para el dueño.
+  - «Más» quedó en Números (Números, Historial), Ajustes (Ajustes, Mi catálogo, Equipo, Mis datos), Cómo usar la app y Cerrar sesión: **8 entradas para el dueño**. Salieron los grupos transitorios de C7.1 (Productos, Vender y cobrar).
+- **Ayuda (F40):**
+  - Borrados `CoachTip.tsx`, `components/guide/` (Guide + Illustrations) y `lib/coach.ts`. Caja era la última pantalla con consejo; ahora usa el «?» de `ScreenHeader`.
+  - `components/WhatsNew.tsx` reescrito: 4 pantallas (5 lugares · Inicio · buscar/escanear · «?»), con toques de 44 px. La marca está en `lib/tour.ts` con la clave `inventaria.tour.v4`, así que todos lo ven una vez.
+  - Ajustes › Ayuda solo tiene «Cómo usar la app».
+- Borrado `components/CategorySelect.tsx` (lo usaban solo /categories y /templates).
+- Se corrigió el comentario de `FlowProvider`, que todavía describía la barra de pasos.
+- `scripts/test-e2e.mjs`: rutas nuevas, más un bloque que abre las 16 pantallas (deben responder 200) y comprueba 16 direcciones antiguas con `redirect: "manual"` y su `location`.
+- **Medidas de éxito (§6):**
+  - Pantallas de `(app)`: 38 → **16** (+ Equipo como subpantalla, y `/join` y `/onboarding`, que se conservan; ver §3.2).
+  - Entradas de «Más» del dueño: ~30 → **8**.
+  - Consejos: 20 → **0**.
+  - Toques de Inicio a cobrar: **2** (Vender → Cobrar).
+  - Textos de menos de 12 px: **0**.
+  - Las direcciones antiguas siguen funcionando con 29 redirecciones (`next.config.mjs`).
+- **Pendiente del usuario:** la prueba con 3 personas (dueño, vendedor y alguien nuevo). Criterios: la persona nueva hace su primera venta sin ayuda y el vendedor no ve nada del dueño. Las observaciones se anotan aquí y se corrigen antes de C6.

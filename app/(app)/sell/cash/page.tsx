@@ -1,19 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { CashClosing, CashMovement, CashSummary } from "@/types/database";
 import { cashSummary, closeCash, newOpId } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
 import { currencyLabel, fmtMoney, money } from "@/lib/inventory";
 import { METHOD_LABEL } from "@/lib/sales";
-import CoachTip from "@/components/CoachTip";
+import { ScreenHeader } from "@/components/ui/Screen";
 import { useFlow } from "@/components/FlowProvider";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
-import { IconArrowLeft, IconCheck, IconPlus, Spinner } from "@/components/ui/Icons";
+import { IconCheck, IconPlus, Spinner } from "@/components/ui/Icons";
 import { businessDayStart } from "@/lib/dates";
 
 /**
@@ -117,14 +116,12 @@ export default function CashPage() {
 
   return (
     <div className="has-action mx-auto max-w-2xl space-y-4">
-      <header className="animate-in">
-        <Link href="/sell" className="mb-2 inline-flex min-h-[44px] items-center gap-1 text-sm text-muted hover:text-brand-700"><IconArrowLeft size={16} /> Vender</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Caja de hoy</h1>
-        <p className="text-sm text-slate-500">Cuánto entró, cuánto salió y cuánto efectivo debería haber. Al final del día, cuenta y cierra.</p>
-      </header>
-      <CoachTip screen="cash" title="Cerrar la caja en 1 minuto">
-        Anota si sacaste dinero de la caja (gastos) o pusiste cambio. Al terminar el día, cuenta el efectivo, escríbelo y toca <b>Cerrar caja</b>: la app te dice si cuadra.
-      </CoachTip>
+      <ScreenHeader
+        title="Caja de hoy"
+        subtitle="Cuánto entró, cuánto salió y cuánto efectivo debería haber. Al final del día, cuenta y cierra."
+        back={{ href: "/sell", label: "Vender" }}
+        help={<p>Anota si sacaste dinero de la caja (gastos) o pusiste cambio. Al terminar el día, cuenta el efectivo, escríbelo y toca <b>Cerrar caja</b>: la app te dice si cuadra.</p>}
+      />
 
       {loading ? (
         <ListSkeleton rows={4} />

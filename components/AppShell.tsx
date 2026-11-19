@@ -12,27 +12,31 @@ import ConnectionChip from "./OfflineBar";
 import Sheet from "./ui/Sheet";
 import { LogoMark, LogoWordmark } from "./ui/Logo";
 import {
-  IconBell, IconBox, IconCamera, IconCart, IconChart, IconCheckCircle, IconClipboard, IconCloud, IconHelp, IconHome,
-  IconList, IconLogout, IconMore, IconPrinter, IconRegister, IconSettings, IconStore,
-  IconTruck, IconUsers,
+  IconBox, IconCart, IconChart, IconCloud, IconHelp, IconHome, IconList, IconLogout, IconMore, IconRegister, IconSettings,
+  IconStore, IconUsers,
 } from "./ui/Icons";
 
 type IconT = (p: { size?: number; className?: string; strokeWidth?: number }) => JSX.Element;
 
 /**
- * Armazón de la app (C7.1 · RECONSTRUCCION_VISUAL.md §3.1): cinco lugares, nunca más.
- *   Celular: Inicio · Productos · VENDER (botón central) · Clientes · Más
- *   Escritorio: barra lateral con las mismas áreas y sus secciones
+ * Armazón de la app (C7 · RECONSTRUCCION_VISUAL.md §3.1): cinco lugares, nunca más.
+ *   Celular, dueño:    Inicio · Productos · VENDER (botón central) · Clientes · Más
+ *   Celular, vendedor: Inicio · Productos · VENDER · Clientes · Caja  (lo demás, con «Más» en la cabecera)
+ *   Escritorio: barra lateral con las mismas áreas y «Más» desplegado
  * Cabecera: nombre del negocio, estado de conexión y «¿quién atiende?».
- * Transitorio hasta C7.9: «Más» también lleva a las secciones de cada área (Agregar, Llegó mercadería, Contar…).
+ * Cada sección vive dentro de su área (Agregar, Llegó mercadería y Contar en Productos; Caja en Vender;
+ * Mercadería entregada en Clientes): «Más» solo lleva Números, Ajustes, Ayuda y Cerrar sesión (8 entradas).
  */
 
-const AREAS: { key: string; href: string; label: string; Icon: IconT; match: string[] }[] = [
+type Area = { key: string; href: string; label: string; Icon: IconT; match: string[] };
+const AREAS: Area[] = [
   { key: "inicio", href: "/dashboard", label: "Inicio", Icon: IconHome, match: ["/dashboard", "/onboarding"] },
   { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/add", "/stock"] },
   { key: "vender", href: "/sell", label: "Vender", Icon: IconCart, match: ["/sell"] },
   { key: "clientes", href: "/customers", label: "Clientes", Icon: IconUsers, match: ["/customers"] },
 ];
+/** 5.º lugar del vendedor (en vez de «Más») */
+const CAJA: Area = { key: "caja", href: "/sell/cash", label: "Caja", Icon: IconRegister, match: ["/sell/cash"] };
 
 interface Item {
   href: string;
@@ -41,26 +45,7 @@ interface Item {
   Icon: IconT;
   ownerOnly?: boolean;
 }
-/** Secciones agrupadas por tarea (iconos propios, nombres cortos). */
 const GROUPS: { title: string; items: Item[] }[] = [
-  {
-    title: "Productos",
-    items: [
-      { href: "/add", label: "Agregar productos", hint: "Foto, estante, código, a mano o Excel", Icon: IconCamera },
-      { href: "/add/review", label: "Revisar pendientes", hint: "Confirma lo que reconoció la IA", Icon: IconCheckCircle },
-      { href: "/stock/in", label: "Llegó mercadería", hint: "Escanea lo que llegó y suma al stock", Icon: IconTruck },
-      { href: "/stock/count", label: "Contar", hint: "Revisa un estante y corrige", Icon: IconClipboard },
-      { href: "/products?filter=restock", label: "Qué falta", hint: "Lista de pedido para WhatsApp", Icon: IconBell },
-      { href: "/products?select=1", label: "Precios y etiquetas", hint: "Elige productos y cámbialos o imprímelos", Icon: IconPrinter },
-    ],
-  },
-  {
-    title: "Vender y cobrar",
-    items: [
-      { href: "/sell/cash", label: "Caja de hoy", hint: "Cuánto entró y cerrar el día", Icon: IconRegister },
-      { href: "/customers?filter=consign", label: "Mercadería entregada", hint: "Revendedores y rendir cuentas", Icon: IconTruck },
-    ],
-  },
   {
     title: "Números",
     items: [
@@ -86,8 +71,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [tour, setTour] = useState(false);
   useEffect(() => setMore(false), [pathname]);
 
-  const inArea = (match: string[]) => match.some((m) => pathname === m || pathname.startsWith(m + "/"));
-  const active = AREAS.find((a) => inArea(a.match))?.key ?? "mas";
+  // El vendedor tiene «Caja» como 5.º lugar; el dueño, «Más»
+  const areas = flow.isOwner ? AREAS : [...AREAS, CAJA];
+  // Gana la coincidencia más larga (/sell/cash es Caja para el vendedor, no Vender)
+  const hit = (m: string) => pathname === m || pathname.startsWith(m + "/");
+  const active =
+    areas
+      .flatMap((a) => a.match.filter(hit).map((m) => ({ key: a.key, len: m.length })))
+      .sort((x, y) => y.len - x.len)[0]?.key ?? "mas";
   const groups = GROUPS.map((g) => ({ ...g, items: g.items.filter((i) => flow.isOwner || !i.ownerOnly) })).filter((g) => g.items.length);
   const badgeOf = (key: string) => (key === "productos" ? flow.pending : 0);
 
@@ -111,7 +102,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <span className="block text-base font-semibold leading-tight text-ink">{label}</span>
                     <span className="block truncate text-xs text-muted">{hint}</span>
                   </span>
-                  {href === "/add/review" && flow.pending > 0 && <Badge n={flow.pending} />}
                 </Link>
               </li>
             ))}
@@ -139,7 +129,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Link href="/dashboard" className="flex h-16 shrink-0 items-center px-5"><LogoWordmark /></Link>
         <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4" aria-label="Principal">
           <ul className="grid gap-1">
-            {AREAS.map(({ key, href, label, Icon }) =>
+            {areas.map(({ key, href, label, Icon }) =>
               key === "vender" ? (
                 <li key={key}>
                   <Link href={href} className={`btn-primary my-1 w-full justify-start ${active === key ? "ring-4 ring-brand-200" : ""}`} style={{ backgroundImage: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
@@ -169,6 +159,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <span className="min-w-0 flex-1 truncate text-base font-bold text-ink">{flow.business?.name ?? ""}</span>
           <ConnectionChip />
           <WhoIsServing />
+          {!flow.isOwner && (
+            <button type="button" onClick={() => setMore(true)} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-slate-600 hover:bg-slate-100 md:hidden" aria-label="Más: Números, Ajustes, Ayuda">
+              <IconMore size={22} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -180,7 +175,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Celular: barra inferior de 5 lugares */}
       <nav aria-label="Principal" className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white md:hidden">
         <div className="grid grid-cols-5 items-end">
-          {AREAS.map(({ key, href, label, Icon }) =>
+          {areas.map(({ key, href, label, Icon }) =>
             key === "vender" ? (
               <Link key={key} href={href} className="relative -mt-6 flex flex-col items-center pb-1.5" aria-label="Vender">
                 <span className={`grid h-16 w-16 place-items-center rounded-full text-white shadow-float transition active:scale-95 ${active === key ? "ring-4 ring-brand-200" : ""}`} style={{ backgroundImage: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
@@ -197,10 +192,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             )
           )}
-          <button type="button" onClick={() => setMore(true)} className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-xs font-semibold ${active === "mas" || more ? "text-brand-700" : "text-muted"}`}>
-            <IconMore size={24} />
-            Más
-          </button>
+          {flow.isOwner && (
+            <button type="button" onClick={() => setMore(true)} className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-xs font-semibold ${active === "mas" || more ? "text-brand-700" : "text-muted"}`}>
+              <IconMore size={24} />
+              Más
+            </button>
+          )}
         </div>
       </nav>
 

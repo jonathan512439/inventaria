@@ -10,7 +10,7 @@ import { DEFAULT_ALERTS, setCurrency, type AlertSettings } from "@/lib/inventory
 import { setBusinessTz } from "@/lib/dates";
 import { useToast } from "./ui/Toast";
 
-/** Estado del flujo ① Agregar → ② Revisar → ③ Inventario, compartido por la barra de pasos, el menú y el Inicio. */
+/** Estado compartido de la app: conteos (pendientes, en inventario, fotos en cola), negocio, rol y equipo, y quién atiende. */
 export interface FlowState {
   pending: number; // pendientes de revisar
   confirmed: number; // en inventario

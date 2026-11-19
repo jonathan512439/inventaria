@@ -3,7 +3,8 @@
  *   → variantes (ejes del catálogo, stock derivado) → escáner por variante → venta por variante
  *   → duplicado detectado → foto de estante (detect) → clave de IA propia (BYOK)
  *   → control de stock (mínimo, papelera, compra, conteo) → ventas (tickets, ganancia, caja)
- *   → clientes (fiado, abono, consignación) → información (reportes, resumen, preguntar a la IA).
+ *   → clientes (fiado, abono, consignación) → Números (hoy, ventas, preguntar a la IA)
+ *   → las 16 pantallas de la reconstrucción (C7) y las redirecciones de las direcciones antiguas.
  *   npm run test:e2e                 (contra http://localhost:3000)
  *   BASE_URL=https://inventaria.pages.dev npm run test:e2e
  * Crea un usuario temporal y lo elimina al terminar. Consume 1-2 peticiones de IA.
@@ -208,7 +209,7 @@ try {
   const { error: ce2 } = await admin.from("cash_closings").insert({ user_id: uid, ...B, day, sales_count: 2, total_sales: 37.5, by_method: { efectivo: 25, qr: 5 }, cash_out: 5, expected_cash: 20, counted_cash: 18, difference: -2 });
   const { data: cls } = await admin.from("cash_closings").select("difference").eq("user_id", uid).order("closed_at");
   check(!ce1 && !ce2 && cls.length === 2 && Number(cls[1].difference) === -2, "cierre de caja: volver a cerrar guarda un cierre nuevo y conserva el anterior");
-  for (const path of ["/sell", "/cash", "/movements"]) {
+  for (const path of ["/sell", "/sell/cash", "/insights/history"]) {
     const rp = await fetch(`${BASE}${path}`, { headers: { cookie: H.cookie } });
     check(rp.status === 200, `${path} → ${rp.status}`);
   }
@@ -243,13 +244,13 @@ try {
   await admin.from("stock_movements").insert({ user_id: uid, ...B, product_id: taza.id, product_name: "Taza", tipo: "salida", cantidad: 5, motivo: "entregado a Juanito Pérez", stock_resultante: 3, consignment_id: con.id });
   const { data: cm } = await admin.from("stock_movements").select("consignment_id").eq("consignment_id", con.id);
   check(cm.length === 1, "movimiento de stock enlazado a la entrega");
-  for (const path of ["/customers", `/customers/detail?id=${cli.id}`, "/consign"]) {
+  for (const path of ["/customers", `/customers/detail?id=${cli.id}`, "/customers?filter=consign"]) {
     const rp = await fetch(`${BASE}${path}`, { headers: { cookie: H.cookie } });
     check(rp.status === 200, `${path.split("?")[0]} → ${rp.status}`);
   }
 
   // 15. Información: reportes, resumen y «pregúntale a tu inventario» (solo lectura, 1 análisis)
-  for (const path of ["/reports", "/digest", "/ask"]) {
+  for (const path of ["/insights", "/insights?tab=ventas", "/insights?tab=ask"]) {
     const rp = await fetch(`${BASE}${path}`, { headers: { cookie: H.cookie } });
     check(rp.status === 200, `${path} → ${rp.status}`);
   }
@@ -261,7 +262,24 @@ try {
   const { count: afterAsk } = await admin.from("products").select("id", { count: "exact", head: true }).eq("user_id", uid);
   check(beforeAsk === afterAsk, "preguntar no cambia nada");
 
-  // 16. Medidor
+  // 16. Reconstrucción (C7): las 16 pantallas abren y las direcciones antiguas llevan a su lugar nuevo
+  const SCREENS = ["/dashboard", "/sell", "/sell/cash", "/products", `/products/${taza.id}`, "/add", "/add/review", "/stock/in", "/stock/count", "/customers", "/insights", "/insights/history", "/settings", "/settings/catalog", "/settings/data", "/settings/team"];
+  const bad = [];
+  for (const p of SCREENS) {
+    const rp = await fetch(`${BASE}${p}`, { headers: { cookie: H.cookie }, redirect: "manual" });
+    if (rp.status !== 200) bad.push(`${p} ${rp.status}`);
+  }
+  check(!bad.length, `las ${SCREENS.length} pantallas responden 200 ${bad.join(", ")}`);
+  const OLD = { "/capture": "/add?mode=photo", "/scan": "/add?mode=code", "/review": "/add/review", "/restock": "/products?filter=restock", "/trash": "/products?filter=trash", "/purchases": "/stock/in", "/count": "/stock/count", "/cash": "/sell/cash", "/consign": "/customers?filter=consign", "/movements": "/insights/history", "/reports": "/insights?tab=ventas", "/digest": "/insights?tab=hoy", "/store": "/settings/catalog", "/team": "/settings/team", "/export": "/settings/data", "/alerts": "/settings#avisos" };
+  const wrong = [];
+  for (const [from, to] of Object.entries(OLD)) {
+    const rp = await fetch(`${BASE}${from}`, { headers: { cookie: H.cookie }, redirect: "manual" });
+    const loc = rp.headers.get("location") ?? "";
+    if (!(rp.status >= 300 && rp.status < 400 && loc.endsWith(to))) wrong.push(`${from} → ${rp.status} ${loc}`);
+  }
+  check(!wrong.length, `${Object.keys(OLD).length} direcciones antiguas redirigen ${wrong.join(", ")}`);
+
+  // 17. Medidor
   r = await fetch(`${BASE}/api/usage`, { headers: H });
   const u = await r.json();
   check(r.status === 200 && Array.isArray(u.models) && u.models.length >= 3, `usage: ${u.models?.length} modelos, ${u.totalToday} análisis hoy`);

@@ -3,12 +3,10 @@
 import { useEffect, useState } from "react";
 import { createClient, setActor } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
-import { resetCoach, resetTour } from "@/lib/coach";
 import WhatsNew from "@/components/WhatsNew";
 import AiKeyCard from "@/components/AiKeyCard";
 import AiUsageCard from "@/components/AiUsageCard";
 import AlertsSection from "@/components/settings/AlertsSection";
-import { StepByStep } from "@/components/guide/Guide";
 import { useFlow } from "@/components/FlowProvider";
 import { clearDeviceData } from "@/lib/offline";
 import { DEFAULT_TZ } from "@/lib/dates";
@@ -45,7 +43,7 @@ function Section({ id, title, children }: { id?: string; title: string; children
 
 /**
  * Ajustes (C7.8 · RECONSTRUCCION_VISUAL.md §3.2): Negocio · Avisos · Equipo · Mi catálogo · Mis datos ·
- * Inteligencia artificial · Mi cuenta · Ayuda y novedades. Lo ocasional vive aquí; el vendedor solo ve lo suyo
+ * Inteligencia artificial · Ayuda · Mi cuenta. Lo ocasional vive aquí; el vendedor solo ve lo suyo
  * (negocio en lectura, equipo/PIN, IA, cuenta y ayuda). `#avisos` abre directamente la sección de avisos.
  */
 export default function SettingsPage() {
@@ -58,7 +56,6 @@ export default function SettingsPage() {
   const [counts, setCounts] = useState<{ types: number; sections: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [tour, setTour] = useState(false);
-  const [guide, setGuide] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -182,26 +179,11 @@ export default function SettingsPage() {
         <AiKeyCard />
       </Section>
 
-      <Section title="Ayuda y novedades">
+      <Section title="Ayuda">
         <div className="card p-1">
-          <ListRow onClick={() => setTour(true)} icon={<IconSparkles size={20} />} title="Cómo usar la app" subtitle="Un recorrido corto por las 5 áreas" end={<Chevron />} />
-          <ListRow onClick={() => setGuide((v) => !v)} icon={<IconStore size={20} />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" end={<IconChevronRight className={`shrink-0 text-slate-400 transition ${guide ? "rotate-90" : ""}`} />} />
-          <ListRow
-            onClick={() => {
-              resetCoach();
-              resetTour();
-              toast("success", "Las burbujas de ayuda volverán a aparecer");
-            }}
-            icon={<IconSparkles size={20} />}
-            title="Reactivar burbujas de ayuda"
-            subtitle="Aparecen las primeras veces que abres cada pantalla"
-          />
+          <ListRow onClick={() => setTour(true)} icon={<IconSparkles size={20} />} title="Cómo usar la app" subtitle="Un recorrido corto por los 5 lugares" end={<Chevron />} />
         </div>
-        {guide && (
-          <StepByStep
-            progress={{ hasTypes: (counts?.types ?? 0) > 0, hasPhotos: flow.pending + flow.confirmed > 0, hasConfirmed: flow.confirmed > 0, pending: flow.pending }}
-          />
-        )}
+        <p className="px-1 text-xs text-muted">En cada pantalla, el botón «?» de arriba explica cómo se usa.</p>
       </Section>
 
       <Section title="Mi cuenta">

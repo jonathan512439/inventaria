@@ -3,6 +3,26 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Fase 6.9 · C7.9 — Limpieza y ayuda: la reconstrucción queda completa
+
+### 17.16 Menú final, ayuda «?» y limpieza
+- **Qué**:
+  - **El vendedor** tiene abajo **Inicio · Productos · Vender · Clientes · Caja**. Lo demás (Números de hoy, Historial, Ajustes, Equipo, ayuda y cerrar sesión) está en el botón **Más** de la cabecera.
+  - **«Más» del dueño** queda en 8 entradas: Números, Historial, Ajustes, Mi catálogo, Equipo, Mis datos, Cómo usar la app y Cerrar sesión. Ya no repite lo que vive dentro de cada lugar:
+    - Agregar, Revisar, Llegó mercadería, Contar, Qué falta y Precios/etiquetas están en **Productos**;
+    - la Caja está en **Vender**;
+    - la mercadería entregada está en **Clientes**.
+  - **Ayuda nueva:**
+    - Se quitaron las burbujas violetas de consejos y la guía larga.
+    - Cada pantalla tiene un **«?»** arriba que explica cómo se usa, y las listas vacías dicen qué hacer.
+    - **«Cómo usar la app»** es un recorrido nuevo de 4 pantallas: los 5 lugares, Inicio, buscar o escanear y el «?». Se muestra una vez a todos y se reabre desde Ajustes › Ayuda o Más.
+  - La prueba automática de extremo a extremo ahora recorre las 16 pantallas nuevas y las direcciones antiguas.
+- **Validar**:
+  - Como vendedor en el celular: abajo aparece «Caja» en vez de «Más», y Caja se marca al estar en la caja. El botón de la cabecera abre Números, Ajustes y Cerrar sesión.
+  - Como dueño: «Más» muestra solo las 8 entradas.
+  - Al entrar por primera vez después de esta versión aparece «Cómo usar la app».
+  - En Caja, el «?» de arriba explica cómo cerrar.
+
 ## 2026-11-19 · Fase 6.9 · C7.8 — Ajustes ordenado: lo ocasional en un solo lugar
 
 ### 17.15 Ajustes, Mi catálogo y Mis datos
