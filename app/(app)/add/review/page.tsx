@@ -555,7 +555,7 @@ function Review() {
             {axesHere.length === 0 && draft.categoryId && meta.variantes_propuestas && Object.keys(meta.variantes_propuestas).length > 0 && (
               <p className="rounded-2xl bg-violet-50 p-3 text-xs text-violet-900">
                 ✨ La IA vio varias opciones ({Object.values(meta.variantes_propuestas).flat().slice(0, 6).join(", ")}). Para llevar el stock de cada una, agrega variantes a la categoría en{" "}
-                <Link href="/store" className="font-semibold underline">Mi tienda</Link>.
+                <Link href="/settings/catalog" className="font-semibold underline">Mi catálogo</Link>.
               </p>
             )}
 
@@ -588,7 +588,7 @@ function Review() {
 
             {fields.length === 0 && draft.categoryId && (
               <p className="rounded-2xl bg-warn-50 p-3 text-sm text-warn-800">
-                Esta categoría aún no tiene datos definidos. <Link href="/templates" className="font-semibold underline">Definir datos</Link>
+                Esta categoría aún no tiene datos definidos. <Link href="/settings/catalog" className="font-semibold underline">Definir datos</Link>
               </p>
             )}
 

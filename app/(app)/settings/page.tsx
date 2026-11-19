@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient, setActor } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import { resetCoach, resetTour } from "@/lib/coach";
 import WhatsNew from "@/components/WhatsNew";
 import AiKeyCard from "@/components/AiKeyCard";
+import AiUsageCard from "@/components/AiUsageCard";
+import AlertsSection from "@/components/settings/AlertsSection";
+import { StepByStep } from "@/components/guide/Guide";
 import { useFlow } from "@/components/FlowProvider";
 import { clearDeviceData } from "@/lib/offline";
 import { DEFAULT_TZ } from "@/lib/dates";
 import { friendlyError } from "@/lib/errors";
-import { IconAlert, IconCheckCircle, IconChevronRight, IconDownload, IconFolder, IconList, IconLogout, IconRefresh, IconSparkles, IconTable, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
+import { ListRow, ScreenHeader } from "@/components/ui/Screen";
+import { IconChevronRight, IconCloud, IconLogout, IconSparkles, IconStore, IconUsers, Spinner } from "@/components/ui/Icons";
 
-/** Zonas horarias frecuentes (la del negocio decide qué es «hoy» en caja, ventas y reportes). */
+/** Zonas horarias frecuentes (la del negocio decide qué es «hoy» en caja, ventas y números). */
 const TIMEZONES: [string, string][] = [
   ["America/La_Paz", "Bolivia"],
   ["America/Lima", "Perú"],
@@ -30,17 +32,33 @@ const TIMEZONES: [string, string][] = [
   ["Europe/Madrid", "España"],
 ];
 
+const Chevron = () => <IconChevronRight className="shrink-0 text-slate-400" />;
+
+function Section({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="scroll-mt-24 space-y-2">
+      <h2 className="px-1 text-xs font-bold uppercase tracking-wide text-muted">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * Ajustes (C7.8 · RECONSTRUCCION_VISUAL.md §3.2): Negocio · Avisos · Equipo · Mi catálogo · Mis datos ·
+ * Inteligencia artificial · Mi cuenta · Ayuda y novedades. Lo ocasional vive aquí; el vendedor solo ve lo suyo
+ * (negocio en lectura, equipo/PIN, IA, cuenta y ayuda). `#avisos` abre directamente la sección de avisos.
+ */
 export default function SettingsPage() {
   const supabase = createClient();
   const toast = useToast();
-  const router = useRouter();
+  const flow = useFlow();
   const [email, setEmail] = useState("");
-  // Ajustes del NEGOCIO (023): nombre, moneda y zona horaria (antes el nombre era del perfil de cada usuario)
+  // Ajustes del NEGOCIO (023): nombre, moneda y zona horaria
   const [biz, setBiz] = useState({ name: "", currency: "Bs", timezone: DEFAULT_TZ });
   const [counts, setCounts] = useState<{ types: number; sections: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [tour, setTour] = useState(false);
-  const flow = useFlow();
+  const [guide, setGuide] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -53,6 +71,11 @@ export default function SettingsPage() {
       setCounts({ types: c.count ?? 0, sections: f.count ?? 0 });
     })();
   }, [supabase]);
+
+  // /settings#avisos (antes /alerts): baja a la sección cuando ya se dibujó
+  useEffect(() => {
+    if (window.location.hash === "#avisos" && flow.isOwner) setTimeout(() => document.getElementById("avisos")?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+  }, [flow.isOwner]);
 
   // Negocios de la persona (solo si está en más de uno): se ve y se escribe SOLO en el activo (024)
   const [myBiz, setMyBiz] = useState<{ id: string; name: string; role: string; current: boolean }[]>([]);
@@ -90,106 +113,105 @@ export default function SettingsPage() {
     window.location.href = "/login";
   }
 
-  return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <header className="animate-in">
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Ajustes</h1>
-        <p className="text-sm text-slate-500">{email}</p>
-      </header>
+  const active = flow.members.filter((m) => m.active).length;
 
-      {myBiz.length > 1 && (
-        <section className="animate-in card space-y-2">
-          <p className="text-sm font-bold text-ink">Estás en {myBiz.length} negocios</p>
-          <p className="text-xs text-slate-500">Ves y anotas solo en el que está marcado. Toca otro para cambiar.</p>
-          <ul className="grid gap-1.5">
-            {myBiz.map((b) => (
-              <li key={b.id}>
-                <button onClick={() => !b.current && switchTo(b.id)} className={`flex w-full items-center justify-between rounded-2xl border-2 px-3 py-2 text-left ${b.current ? "border-brand-500 bg-brand-50" : "border-slate-200"}`}>
-                  <span className="font-semibold text-ink">{b.name}</span>
-                  <span className="text-xs text-slate-500">{b.role === "dueno" ? "Dueño" : "Vendedor"}{b.current ? " · activo" : ""}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <ScreenHeader title="Ajustes" subtitle={email} />
+
+      <Section title="Negocio">
+        {myBiz.length > 1 && (
+          <div className="card space-y-2">
+            <p className="text-sm font-bold text-ink">Estás en {myBiz.length} negocios</p>
+            <p className="text-xs text-muted">Ves y anotas solo en el marcado. Toca otro para cambiar.</p>
+            <ul className="grid gap-1.5">
+              {myBiz.map((b) => (
+                <li key={b.id}>
+                  <button type="button" onClick={() => !b.current && switchTo(b.id)} className={`flex min-h-[48px] w-full items-center justify-between rounded-2xl border-2 px-3 py-2 text-left ${b.current ? "border-brand-500 bg-brand-50" : "border-slate-200"}`}>
+                    <span className="font-semibold text-ink">{b.name}</span>
+                    <span className="text-xs text-muted">{b.role === "dueno" ? "Dueño" : "Vendedor"}{b.current ? " · activo" : ""}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className="card space-y-3">
+          <div>
+            <label className="label" htmlFor="business">Nombre (sale en los tickets y mensajes)</label>
+            <input id="business" className="input min-h-[44px]" placeholder="Ej. Tienda Doña Rosa" value={biz.name} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, name: e.target.value })} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="label">Moneda</span>
+              <input className="input min-h-[44px]" list="monedas" maxLength={5} value={biz.currency} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, currency: e.target.value })} />
+              <datalist id="monedas">{["Bs", "S/", "$", "₲", "€", "R$"].map((c) => <option key={c} value={c} />)}</datalist>
+            </label>
+            <label className="block">
+              <span className="label">Zona horaria (para cortar «hoy»)</span>
+              <select className="input min-h-[44px]" value={biz.timezone} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, timezone: e.target.value })}>
+                {(TIMEZONES.some(([z]) => z === biz.timezone) ? TIMEZONES : [[biz.timezone, biz.timezone] as [string, string], ...TIMEZONES]).map(([z, t]) => <option key={z} value={z}>{t}</option>)}
+              </select>
+            </label>
+          </div>
+          {flow.isOwner ? (
+            <button type="button" onClick={saveBusiness} className="btn-primary min-h-[48px] w-full" disabled={saving || !dirty}>{saving ? <Spinner /> : "Guardar"}</button>
+          ) : (
+            <p className="text-xs text-muted">Estos datos los cambia el dueño.</p>
+          )}
+        </div>
+        <div className="card p-1">
+          <ListRow href="/settings/team" icon={<IconUsers size={20} />} title="Equipo" subtitle={active > 1 ? `${active} personas · roles, invitaciones y PIN` : "Invita a alguien o pon tu PIN para atender por turnos"} end={<Chevron />} />
+          {flow.isOwner && (
+            <ListRow href="/settings/catalog" icon={<IconStore size={20} />} title="Mi catálogo" subtitle={counts ? `${counts.types} categoría${counts.types === 1 ? "" : "s"} · ${counts.sections} subcategorías · datos y variantes` : "Categorías, datos y variantes"} end={<Chevron />} />
+          )}
+          {flow.isOwner && <ListRow href="/settings/data" icon={<IconCloud size={20} />} title="Mis datos" subtitle="Excel, respaldos, ordenar y limpiar, papelera" end={<Chevron />} />}
+        </div>
+      </Section>
+
+      {flow.isOwner && (
+        <Section id="avisos" title="Avisos">
+          <div className="card">
+            <AlertsSection />
+          </div>
+        </Section>
       )}
 
-      <section className="animate-in card space-y-3">
-        <p className="text-sm font-bold text-ink">Tu negocio</p>
-        <label className="label" htmlFor="business">Nombre (sale en los tickets y mensajes)</label>
-        <input id="business" className="input" placeholder="Ej. Tienda Doña Rosa" value={biz.name} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, name: e.target.value })} />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="label">Moneda</span>
-            <input className="input" list="monedas" maxLength={5} value={biz.currency} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, currency: e.target.value })} />
-            <datalist id="monedas">{["Bs", "S/", "$", "₲", "€", "R$"].map((c) => <option key={c} value={c} />)}</datalist>
-          </label>
-          <label className="block">
-            <span className="label">Zona horaria (para cortar «hoy»)</span>
-            <select className="input" value={biz.timezone} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, timezone: e.target.value })}>
-              {(TIMEZONES.some(([z]) => z === biz.timezone) ? TIMEZONES : [[biz.timezone, biz.timezone] as [string, string], ...TIMEZONES]).map(([z, t]) => <option key={z} value={z}>{t}</option>)}
-            </select>
-          </label>
-        </div>
-        {flow.isOwner ? (
-          <button onClick={saveBusiness} className="btn-primary w-full" disabled={saving || !dirty}>
-            {saving ? <Spinner /> : "Guardar"}
-          </button>
-        ) : (
-          <p className="text-xs text-slate-500">Estos datos los cambia el dueño.</p>
-        )}
-      </section>
+      <Section title="Inteligencia artificial">
+        {flow.isOwner && <AiUsageCard />}
+        <AiKeyCard />
+      </Section>
 
-      <section className="animate-in card divide-y divide-slate-100 p-0">
-        <Row href="/team" icon={<IconCheckCircle />} title="Equipo" subtitle={flow.members.length > 1 ? `${flow.members.filter((m) => m.active).length} personas · roles, invitaciones y PIN` : "Invita a alguien o pon tu PIN para atender por turnos"} />
-        {flow.isOwner && <Row href="/store" icon={<IconFolder />} title="Mi tienda" subtitle={counts ? `${counts.types} categoría${counts.types === 1 ? "" : "s"} · ${counts.sections} subcategorías · qué vendes, datos y variantes` : ""} />}
-        <Row href="/add/review" icon={<IconCheckCircle />} title="Revisar pendientes" subtitle="Confirma lo que la IA reconoció" />
-        <Row href="/add?mode=code" icon={<IconTag />} title="Escanear código de barras" subtitle="Repetidos y reposición sin gastar IA" />
-        {flow.isOwner && <Row href="/alerts" icon={<IconAlert />} title="Avisos de reposición" subtitle="Desde cuántas unidades avisar y de qué categorías o productos" />}
-        <Row href="/insights/history" icon={<IconList />} title="Historial" subtitle="Ingresos, entradas y retiros de stock" />
-        {flow.isOwner && <Row href="/export" icon={<IconDownload />} title="Exportar a Excel" subtitle="Descarga tu inventario" />}
-        {flow.isOwner && <Row href="/add?mode=excel" icon={<IconTable />} title="Importar desde Excel" subtitle="Carga tu inventario desde una planilla" />}
-        {flow.isOwner && <Row href="/backup" icon={<IconRefresh />} title="Respaldos" subtitle="Copia completa cada semana; guarda o descarga una ahora" />}
-        <Row href="/products?select=1" icon={<IconTag />} title="Etiquetas para imprimir" subtitle="En Productos: Seleccionar → Etiquetas" />
-        <Row href="/dashboard#guia" icon={<IconList />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" />
-        <Row href="/dashboard#limpiar" icon={<IconTrash />} title="Ordenar y limpiar" subtitle="Pendientes viejos, categorías vacías y fotos sueltas" />
-      </section>
-
-      <AiKeyCard />
-
-      <section className="animate-in card space-y-2">
-        <p className="text-sm font-bold text-ink">Ayuda</p>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setTour(true)} className="btn-secondary btn-sm"><IconSparkles size={14} /> Cómo usar la herramienta</button>
-          <button
+      <Section title="Ayuda y novedades">
+        <div className="card p-1">
+          <ListRow onClick={() => setTour(true)} icon={<IconSparkles size={20} />} title="Cómo usar la app" subtitle="Un recorrido corto por las 5 áreas" end={<Chevron />} />
+          <ListRow onClick={() => setGuide((v) => !v)} icon={<IconStore size={20} />} title="Guía paso a paso" subtitle="Cómo armar tu inventario completo" end={<IconChevronRight className={`shrink-0 text-slate-400 transition ${guide ? "rotate-90" : ""}`} />} />
+          <ListRow
             onClick={() => {
               resetCoach();
               resetTour();
-              toast("success", "Las burbujas de ayuda volverán a aparecer en cada pantalla");
+              toast("success", "Las burbujas de ayuda volverán a aparecer");
             }}
-            className="btn-secondary btn-sm"
-          >
-            Reactivar burbujas de ayuda
-          </button>
+            icon={<IconSparkles size={20} />}
+            title="Reactivar burbujas de ayuda"
+            subtitle="Aparecen las primeras veces que abres cada pantalla"
+          />
         </div>
-        <p className="text-xs text-slate-500">Las burbujas violetas aparecen las primeras 3 veces que abres cada pantalla y luego desaparecen.</p>
-      </section>
+        {guide && (
+          <StepByStep
+            progress={{ hasTypes: (counts?.types ?? 0) > 0, hasPhotos: flow.pending + flow.confirmed > 0, hasConfirmed: flow.confirmed > 0, pending: flow.pending }}
+          />
+        )}
+      </Section>
 
-      <button onClick={signOut} className="btn-ghost w-full text-rose-600"><IconLogout size={18} /> Cerrar sesión</button>
+      <Section title="Mi cuenta">
+        <div className="card space-y-2">
+          <p className="text-sm text-muted">Entraste como <b className="text-ink">{email || "…"}</b></p>
+          <button type="button" onClick={signOut} className="btn-ghost min-h-[48px] w-full text-danger-700"><IconLogout size={18} /> Cerrar sesión</button>
+        </div>
+      </Section>
+
       {tour && <WhatsNew force onClose={() => setTour(false)} />}
     </div>
-  );
-}
-
-function Row({ href, icon, title, subtitle }: { href: string; icon: React.ReactNode; title: string; subtitle: string }) {
-  return (
-    <Link href={href} className="group flex items-center gap-4 px-5 py-4 transition hover:bg-brand-50/60">
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-600 group-hover:bg-brand-100 group-hover:text-brand-700">{icon}</span>
-      <span className="flex-1">
-        <span className="block font-semibold text-ink">{title}</span>
-        <span className="block text-xs text-slate-500">{subtitle}</span>
-      </span>
-      <IconChevronRight className="text-slate-300 group-hover:text-brand-500" />
-    </Link>
   );
 }

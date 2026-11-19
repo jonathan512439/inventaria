@@ -184,8 +184,8 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 | C7.5 · Mercadería | ✅ 2026-11-19 | 17.12 |
 | C7.6 · Clientes | ✅ 2026-11-19 | 17.13 |
 | C7.7 · Números | ✅ 2026-11-19 | 17.14 |
-| C7.8 · Ajustes | ⏳ siguiente | |
-| C7.9 · Limpieza y ayuda | pendiente | |
+| C7.8 · Ajustes | ✅ 2026-11-19 | 17.15 |
+| C7.9 · Limpieza y ayuda | ⏳ siguiente | |
 
 **C7.1 (2026-11-18):**
 - Tokens en `tailwind.config.ts`: `ok`, `warn`, `danger`, `info`, `muted`, `canvas`. La escala de texto de Tailwind ya coincide con §5 (xs 12 · sm 14 · base 16…): se reemplazaron los 121 usos de 9–11 px por `text-xs` (12 px) en toda la app; queda solo el dibujo decorativo de la guía.
@@ -255,3 +255,20 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 - `app/(app)/insights/history/page.tsx` (antes /movements): filtros **en la consulta** (`?tipo=venta|entrada|salida|ajuste|todos&rango=hoy|7d|mes|todo&quien=<user_id>`, máximo 300 filas, con aviso al llegar al tope). Quién lo hizo sale de `members` (firma 015).
 - Borrados `/reports`, `/digest`, `/ask`, `/movements` y `lib/reports.ts` (cálculos en el navegador). Las redirecciones llevan a su pestaña. «Mejores clientes del mes» salió de la lista de Clientes.
 - En «Más», el grupo Números queda en dos entradas: Números e Historial.
+
+**C7.8 (2026-11-19):**
+- `app/(app)/settings/page.tsx` en secciones: Negocio (+ cambio de negocio si hay varios; filas a Equipo · Mi catálogo · Mis datos) · Avisos (`#avisos`, dueño) · Inteligencia artificial (`AiUsageCard` dueño + `AiKeyCard`) · Ayuda y novedades (recorrido `WhatsNew`, `StepByStep` plegado, reactivar burbujas: salen en C7.9) · Mi cuenta.
+- `components/settings/AlertsSection.tsx` (antes /alerts):
+  - mínimo y vencimiento del negocio; mínimo y silencio por categoría principal; lista de productos silenciados para reactivarlos.
+  - **Decisión:** la pestaña «Por producto» se quitó: el mínimo de un producto ya está en Ficha › Stock (F16 «se reparte donde se decide»).
+- `app/(app)/settings/catalog/page.tsx` (antes /store + /categories + /templates):
+  - **Datos de todos los productos** (`FieldsEditor` sin categoría), luego las categorías desplegables, cada una con subcategorías (chips), Datos (`FieldsEditor scope`) y Variantes (`AxisEditor`).
+  - La hoja de una subcategoría permite renombrarla, moverla de categoría (lo que hacía /categories), darle datos propios y eliminarla.
+  - Al eliminar se elige a dónde mover sus productos. «Quitar vacías» aparece con 5 o más subcategorías vacías. El mínimo por categoría salió de aquí: está en Avisos.
+- `components/settings/FieldsEditor.tsx`: lista con ▲▼, insignia IA/tú (se cambia al tocarla) y hoja para crear o editar (nombre, tipo, opciones, IA, valor por defecto, quitar).
+- `app/(app)/settings/data/page.tsx` (antes /export y /backup, más lo que estaba al final de Inicio):
+  - `ExportCard` se carga con `next/dynamic` y solo al abrirla (pide los productos en ese momento; `lib/export` también es dinámico);
+  - `BackupCard`, `CleanupCard` (`#limpiar`), y filas a Traer desde Excel (`/add?mode=excel`) y Papelera (`/products?filter=trash`).
+- `app/(app)/settings/team/page.tsx` (antes /team): `ScreenHeader` con la ayuda en «?» en vez del consejo, toques de 44 px y `friendlyError`.
+- Inicio sin «Herramientas»: `/dashboard#limpiar` lleva a `/settings/data#limpiar` y `#guia` a `/settings`. El primer paso «Crea tu tienda» abre Mi catálogo.
+- Redirecciones `/store`, `/categories`, `/templates` → `/settings/catalog`; `/alerts` → `/settings#avisos`; `/team` → `/settings/team`; `/export`, `/backup` → `/settings/data`. Se cambiaron los enlaces en Revisar, Agregar (Foto, A mano, Excel), tabla, variantes, «¿quién atiende?», lista de pedido y guía.

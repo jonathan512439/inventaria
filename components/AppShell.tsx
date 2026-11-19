@@ -12,9 +12,9 @@ import ConnectionChip from "./OfflineBar";
 import Sheet from "./ui/Sheet";
 import { LogoMark, LogoWordmark } from "./ui/Logo";
 import {
-  IconBell, IconBox, IconCamera, IconCart, IconChart, IconCheckCircle, IconClipboard, IconCloud, IconDownload, IconHelp, IconHome,
-  IconList, IconLogout, IconMore, IconPrinter, IconRegister, IconSettings, IconStore, IconTable,
-  IconTrash, IconTruck, IconUsers,
+  IconBell, IconBox, IconCamera, IconCart, IconChart, IconCheckCircle, IconClipboard, IconCloud, IconHelp, IconHome,
+  IconList, IconLogout, IconMore, IconPrinter, IconRegister, IconSettings, IconStore,
+  IconTruck, IconUsers,
 } from "./ui/Icons";
 
 type IconT = (p: { size?: number; className?: string; strokeWidth?: number }) => JSX.Element;
@@ -29,7 +29,7 @@ type IconT = (p: { size?: number; className?: string; strokeWidth?: number }) =>
 
 const AREAS: { key: string; href: string; label: string; Icon: IconT; match: string[] }[] = [
   { key: "inicio", href: "/dashboard", label: "Inicio", Icon: IconHome, match: ["/dashboard", "/onboarding"] },
-  { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/add", "/stock", "/export"] },
+  { key: "productos", href: "/products", label: "Productos", Icon: IconBox, match: ["/products", "/add", "/stock"] },
   { key: "vender", href: "/sell", label: "Vender", Icon: IconCart, match: ["/sell"] },
   { key: "clientes", href: "/customers", label: "Clientes", Icon: IconUsers, match: ["/customers"] },
 ];
@@ -71,14 +71,10 @@ const GROUPS: { title: string; items: Item[] }[] = [
   {
     title: "Ajustes",
     items: [
-      { href: "/settings", label: "Ajustes", hint: "Tu negocio y tu cuenta", Icon: IconSettings },
-      { href: "/store", label: "Mi catálogo", hint: "Categorías, datos y variantes", Icon: IconStore, ownerOnly: true },
-      { href: "/alerts", label: "Avisos", hint: "Cuándo avisar que falta", Icon: IconBell, ownerOnly: true },
-      { href: "/team", label: "Equipo", hint: "Personas, invitaciones y PIN", Icon: IconUsers },
-      { href: "/export", label: "Descargar Excel", hint: "Tu inventario en planilla", Icon: IconDownload, ownerOnly: true },
-      { href: "/add?mode=excel", label: "Traer desde Excel", hint: "Cargar una planilla", Icon: IconTable, ownerOnly: true },
-      { href: "/backup", label: "Respaldos", hint: "Copia semanal completa", Icon: IconCloud, ownerOnly: true },
-      { href: "/dashboard#limpiar", label: "Ordenar y limpiar", hint: "Quita lo que sobra", Icon: IconTrash, ownerOnly: true },
+      { href: "/settings", label: "Ajustes", hint: "Negocio, avisos, IA y tu cuenta", Icon: IconSettings },
+      { href: "/settings/catalog", label: "Mi catálogo", hint: "Categorías, datos y variantes", Icon: IconStore, ownerOnly: true },
+      { href: "/settings/team", label: "Equipo", hint: "Personas, invitaciones y PIN", Icon: IconUsers },
+      { href: "/settings/data", label: "Mis datos", hint: "Excel, respaldos, ordenar y papelera", Icon: IconCloud, ownerOnly: true },
     ],
   },
 ];

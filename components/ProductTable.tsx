@@ -176,7 +176,7 @@ export default function ProductTable({ products, categories, templates, mode, on
 
             {fields.length === 0 && (
               <p className="px-4 py-2 text-xs text-amber-700">
-                Esta subcategoría no tiene datos definidos. <Link href="/templates" className="underline">Definir datos</Link>
+                Esta subcategoría no tiene datos definidos. <Link href="/settings/catalog" className="underline">Definir datos</Link>
               </p>
             )}
 

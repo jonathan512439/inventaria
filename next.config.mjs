@@ -33,6 +33,14 @@ const nextConfig = {
       { source: "/reports", destination: "/insights?tab=ventas", permanent: false },
       { source: "/ask", destination: "/insights?tab=ask", permanent: false },
       { source: "/movements", destination: "/insights/history", permanent: false },
+      // C7.8 · Ajustes: Mi catálogo (un árbol), Avisos, Equipo y Mis datos
+      { source: "/store", destination: "/settings/catalog", permanent: false },
+      { source: "/categories", destination: "/settings/catalog", permanent: false },
+      { source: "/templates", destination: "/settings/catalog", permanent: false },
+      { source: "/alerts", destination: "/settings#avisos", permanent: false },
+      { source: "/team", destination: "/settings/team", permanent: false },
+      { source: "/export", destination: "/settings/data", permanent: false },
+      { source: "/backup", destination: "/settings/data", permanent: false },
     ];
   },
 };

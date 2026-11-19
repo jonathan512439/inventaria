@@ -126,7 +126,7 @@ export default function ProductVariants({ product, categories, axes, variants, o
         </div>
       ) : (
         <p className="mt-1 text-xs text-violet-800">
-          Esta categoría no tiene ejes de variación definidos. Agrégalos en <Link href="/store" className="font-semibold underline">Mi tienda</Link> para crear más variantes.
+          Esta categoría no tiene ejes de variación definidos. Agrégalos en <Link href="/settings/catalog" className="font-semibold underline">Mi catálogo</Link> para crear más variantes.
         </p>
       )}
 

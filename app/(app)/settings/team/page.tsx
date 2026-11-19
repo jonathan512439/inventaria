@@ -1,19 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { BusinessMember, Invite, MemberRole } from "@/types/database";
 import { useFlow } from "@/components/FlowProvider";
-import CoachTip from "@/components/CoachTip";
+import { ScreenHeader } from "@/components/ui/Screen";
+import { friendlyError } from "@/lib/errors";
 import { ListSkeleton } from "@/components/ui/Skeleton";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
-import { IconArrowLeft, IconCheck, IconPlus, IconTag, IconX, Spinner } from "@/components/ui/Icons";
+import { IconCheck, IconPlus, IconTag, IconX, Spinner } from "@/components/ui/Icons";
 
 const ROLE_LABEL: Record<MemberRole, string> = { dueno: "Dueño", vendedor: "Vendedor" };
 
-/** Equipo: quiénes usan el negocio, con qué rol, invitaciones y PIN para cambiar de persona en el mismo celular. */
+/**
+ * Ajustes › Equipo (C7.8 · antes /team, F37): quiénes usan el negocio, con qué rol, invitaciones y PIN para
+ * cambiar de persona en el mismo celular («¿quién atiende?» en la cabecera).
+ */
 export default function TeamPage() {
   const supabase = createClient();
   const toast = useToast();
@@ -50,7 +53,7 @@ export default function TeamPage() {
     } = await supabase.auth.getUser();
     const { error } = await supabase.from("invites").insert({ business_id: bid, code, role, created_by: user!.id });
     setBusy(false);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     toast("success", `Código ${code} creado. Compártelo por WhatsApp.`);
     load();
   }
@@ -58,7 +61,7 @@ export default function TeamPage() {
 
   async function setRole(m: BusinessMember, role: MemberRole) {
     const { error } = await supabase.from("business_members").update({ role }).eq("business_id", m.business_id).eq("user_id", m.user_id);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     load();
   }
   async function toggleActive(m: BusinessMember) {
@@ -67,7 +70,7 @@ export default function TeamPage() {
       if (!ok) return;
     }
     const { error } = await supabase.from("business_members").update({ active: !m.active }).eq("business_id", m.business_id).eq("user_id", m.user_id);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     load();
   }
   async function saveName() {
@@ -76,7 +79,7 @@ export default function TeamPage() {
       rename.id === flow.meId
         ? await supabase.rpc("set_my_name", { p_business: bid, p_name: rename.name })
         : await supabase.from("business_members").update({ display_name: rename.name.trim() || null }).eq("business_id", bid).eq("user_id", rename.id);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     setRename(null);
     load();
   }
@@ -84,7 +87,7 @@ export default function TeamPage() {
     if (!bid) return;
     if (!/^\d{4}$/.test(pin)) return toast("info", "El PIN son 4 números");
     const { error } = await supabase.rpc("set_pin", { p_business: bid, p_pin: pin });
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     setPin("");
     toast("success", "PIN guardado. Con él puedes cambiar a tu nombre en cualquier celular del negocio.");
     load();
@@ -94,14 +97,17 @@ export default function TeamPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <header className="animate-in">
-        <Link href="/settings" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-brand-700"><IconArrowLeft size={16} /> Ajustes</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Equipo</h1>
-        <p className="text-sm text-slate-500">Quiénes usan {flow.business?.name ?? "el negocio"}. Cada venta, conteo o abono queda con el nombre de quien lo hizo.</p>
-      </header>
-      <CoachTip screen="team" title="Dos formas de trabajar en equipo">
-        <b>Cada uno con su celular:</b> invítalo con un código y entra con su propia cuenta. <b>Un solo celular para todos:</b> cada persona pone su PIN y, al empezar a atender, toca su nombre en el Inicio.
-      </CoachTip>
+      <ScreenHeader
+        title="Equipo"
+        subtitle={`Quiénes usan ${flow.business?.name ?? "el negocio"}. Cada venta, conteo o abono queda con el nombre de quien lo hizo.`}
+        back={{ href: "/settings", label: "Ajustes" }}
+        help={
+          <>
+            <p><b>Cada uno con su celular:</b> invítalo con un código y entra con su propia cuenta.</p>
+            <p><b>Un solo celular para todos:</b> cada persona pone su PIN y, al empezar a atender, toca «¿Quién atiende?» arriba y elige su nombre.</p>
+          </>
+        }
+      />
 
       {loading ? (
         <ListSkeleton rows={3} />
@@ -123,11 +129,11 @@ export default function TeamPage() {
                   </span>
                   {flow.isOwner && m.user_id !== flow.business?.owner_id && (
                     <>
-                      <select className="input w-auto py-1 text-xs" value={m.role} onChange={(e) => setRole(m, e.target.value as MemberRole)}>
+                      <select className="input min-h-[44px] w-auto text-sm" value={m.role} onChange={(e) => setRole(m, e.target.value as MemberRole)}>
                         <option value="vendedor">Vendedor</option>
                         <option value="dueno">Dueño</option>
                       </select>
-                      <button onClick={() => toggleActive(m)} className={`btn-sm ${m.active ? "btn-ghost text-rose-600" : "btn-secondary"}`}>{m.active ? "Quitar" : "Reactivar"}</button>
+                      <button onClick={() => toggleActive(m)} className={`btn-sm min-h-[44px] ${m.active ? "btn-ghost text-danger-700" : "btn-secondary"}`}>{m.active ? "Quitar" : "Reactivar"}</button>
                     </>
                   )}
                 </li>
@@ -141,8 +147,8 @@ export default function TeamPage() {
               <p className="text-sm font-bold text-ink">Invitar a alguien</p>
               <p className="text-xs text-slate-500">Se crea un código de 6 letras que vale 7 días. La persona se registra con su correo y lo escribe (o abre el enlace).</p>
               <div className="flex gap-2">
-                <button onClick={() => invite("vendedor")} disabled={busy} className="btn-primary btn-sm"><IconPlus size={14} /> Código para vendedor</button>
-                <button onClick={() => invite("dueno")} disabled={busy} className="btn-secondary btn-sm"><IconPlus size={14} /> Código para dueño</button>
+                <button onClick={() => invite("vendedor")} disabled={busy} className="btn-primary btn-sm min-h-[44px]"><IconPlus size={14} /> Código para vendedor</button>
+                <button onClick={() => invite("dueno")} disabled={busy} className="btn-secondary btn-sm min-h-[44px]"><IconPlus size={14} /> Código para dueño</button>
               </div>
               {invites.length > 0 && (
                 <ul className="divide-y divide-slate-100">
@@ -150,8 +156,8 @@ export default function TeamPage() {
                     <li key={i.id} className="flex flex-wrap items-center gap-2 py-2">
                       <span className="rounded-xl bg-slate-100 px-3 py-1 font-mono text-lg font-bold tracking-widest text-ink">{i.code}</span>
                       <span className="min-w-0 flex-1 text-xs text-slate-500">{ROLE_LABEL[i.role]} · vence {new Date(i.expires_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}</span>
-                      <a href={`https://wa.me/?text=${encodeURIComponent(inviteText(i))}`} target="_blank" rel="noreferrer" className="btn-success btn-sm"><IconTag size={14} /> WhatsApp</a>
-                      <button onClick={async () => { await supabase.from("invites").delete().eq("id", i.id); load(); }} className="btn-ghost btn-sm text-rose-600"><IconX size={14} /></button>
+                      <a href={`https://wa.me/?text=${encodeURIComponent(inviteText(i))}`} target="_blank" rel="noreferrer" className="btn-success btn-sm min-h-[44px]"><IconTag size={14} /> WhatsApp</a>
+                      <button onClick={async () => { await supabase.from("invites").delete().eq("id", i.id); load(); }} className="grid h-11 w-11 place-items-center rounded-full text-danger-700 hover:bg-danger-50" aria-label="Anular código"><IconX size={16} /></button>
                     </li>
                   ))}
                 </ul>
@@ -160,8 +166,8 @@ export default function TeamPage() {
           )}
 
           <section className="animate-in card space-y-2 p-4">
-            <p className="text-sm font-bold text-ink">Mi PIN {me?.has_pin ? <span className="text-xs font-normal text-emerald-700">· ya tienes uno</span> : null}</p>
-            <p className="text-xs text-slate-500">4 números para pasar a tu nombre cuando atiendes desde un celular compartido (toca «¿Quién atiende?» en el Inicio). Tras 5 intentos fallidos se bloquea 10 minutos.</p>
+            <p className="text-sm font-bold text-ink">Mi PIN {me?.has_pin ? <span className="text-xs font-normal text-ok-700">· ya tienes uno</span> : null}</p>
+            <p className="text-xs text-slate-500">4 números para pasar a tu nombre cuando atiendes desde un celular compartido (toca «¿Quién atiende?» arriba). Tras 5 intentos fallidos se bloquea 10 minutos.</p>
             <div className="flex gap-2">
               <input type="password" inputMode="numeric" maxLength={4} pattern="\d{4}" className="input w-32 text-center text-2xl font-bold tracking-[0.5em]" placeholder="••••" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} />
               <button onClick={savePin} disabled={pin.length !== 4} className="btn-primary"><IconCheck size={16} /> {me?.has_pin ? "Cambiar PIN" : "Guardar PIN"}</button>

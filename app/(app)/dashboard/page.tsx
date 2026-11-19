@@ -7,12 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { queueSummary, useQueue } from "@/lib/queue";
 import { money } from "@/lib/inventory";
 import { todaySummary } from "@/lib/data/insights";
-import { StepByStep, type GuideProgress } from "@/components/guide/Guide";
-import AiUsageCard from "@/components/AiUsageCard";
-import CleanupCard from "@/components/CleanupCard";
 import { useFlow } from "@/components/FlowProvider";
 import { Stat, TaskCard } from "@/components/ui/Screen";
-import { IconAlert, IconBell, IconCamera, IconCart, IconCheck, IconCheckCircle, IconChevronRight, IconRegister, IconSettings, IconStore, IconTag, IconUsers, Spinner } from "@/components/ui/Icons";
+import { IconAlert, IconBell, IconCamera, IconCart, IconCheck, IconCheckCircle, IconChevronRight, IconRegister, IconStore, IconTag, IconUsers, Spinner } from "@/components/ui/Icons";
 
 interface Stats {
   types: number;
@@ -36,7 +33,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const flow = useFlow();
   const [stats, setStats] = useState<Stats | null>(null);
-  const [toolsOpen, setToolsOpen] = useState(false);
   const queue = useQueue();
   const q = queueSummary(queue.items);
   const { alerts } = flow;
@@ -75,19 +71,12 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q.done, router, minStock, expiryDays, flow.loaded, flow.pending, flow.confirmed]);
 
-  // «Más → Ordenar y limpiar» abre las herramientas (transitorio hasta C7.8: pasan a Ajustes → Mis datos)
+  // Enlaces antiguos a las herramientas de Inicio (C7.8: viven en Ajustes)
   useEffect(() => {
-    const openFromHash = () => {
-      const hash = window.location.hash;
-      if (hash === "#guia" || hash === "#limpiar") {
-        setToolsOpen(true);
-        setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
-      }
-    };
-    openFromHash();
-    window.addEventListener("hashchange", openFromHash);
-    return () => window.removeEventListener("hashchange", openFromHash);
-  }, [stats]);
+    const hash = window.location.hash;
+    if (hash === "#limpiar") router.replace("/settings/data#limpiar");
+    else if (hash === "#guia") router.replace("/settings");
+  }, [router]);
 
   if (!stats) {
     return (
@@ -102,12 +91,11 @@ export default function DashboardPage() {
   const working = q.queued + q.processing;
   const pending = flow.pending;
   const confirmed = flow.confirmed;
-  const progress: GuideProgress = { hasTypes: stats.types > 0, hasPhotos: pending + confirmed + q.total > 0, hasConfirmed: confirmed > 0, pending };
   const plural = (n: number, s: string, p = s + "s") => `${n} ${n === 1 ? s : p}`;
 
   // Primeros pasos (desaparecen al completarlos)
   const steps = [
-    { done: stats.types > 0, title: "Crea tu tienda", body: "Elige qué vendes: la IA ordena tus productos con eso.", href: "/store", cta: "Elegir", Icon: IconStore },
+    { done: stats.types > 0, title: "Crea tu tienda", body: "Elige qué vendes: la IA ordena tus productos con eso.", href: "/settings/catalog", cta: "Elegir", Icon: IconStore },
     { done: confirmed > 0, title: "Agrega productos", body: "Con una foto, el código de barras o a mano.", href: "/add", cta: "Agregar", Icon: IconCamera },
     { done: stats.salesEver > 0, title: "Haz tu primera venta", body: "El stock baja solo y queda el ticket.", href: "/sell", cta: "Vender", Icon: IconCart },
   ];
@@ -192,27 +180,6 @@ export default function DashboardPage() {
         <Link href="/products"><Stat label="En inventario" value={String(confirmed)} hint={plural(stats.types, "categoría")} /></Link>
         <Link href={stats.owed > 0 ? "/customers?filter=debt" : "/customers"}><Stat label="Te deben" value={money(stats.owed)} tone={stats.owed > 0 ? "warn" : undefined} hint={stats.owed > 0 ? "fiados por cobrar" : "nadie te debe"} /></Link>
       </div>
-
-      {/* Herramientas del dueño (transitorio: en C7.8 pasan a Ajustes → Mis datos e Inteligencia artificial) */}
-      {flow.isOwner && (
-        <section className="animate-in">
-          <button type="button" onClick={() => setToolsOpen((v) => !v)} className="btn-disclosure min-h-[56px]" aria-expanded={toolsOpen}>
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700"><IconSettings size={18} /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block">Herramientas</span>
-              <span className="block truncate text-xs font-normal text-muted">Consumo de IA · ordenar y limpiar · guía paso a paso</span>
-            </span>
-            <IconChevronRight className={`shrink-0 text-brand-600 transition ${toolsOpen ? "rotate-90" : ""}`} />
-          </button>
-          {toolsOpen && (
-            <div className="mt-3 space-y-4">
-              <AiUsageCard />
-              <div id="limpiar" className="scroll-mt-24"><CleanupCard /></div>
-              <div id="guia" className="scroll-mt-24 pt-2"><StepByStep progress={progress} /></div>
-            </div>
-          )}
-        </section>
-      )}
     </div>
   );
 }

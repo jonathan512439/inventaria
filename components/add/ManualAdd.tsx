@@ -165,7 +165,7 @@ export default function ManualAdd() {
               )}
               {fields.length === 0 && (
                 <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">
-                  Esta categoría no tiene datos definidos. <Link href={`/templates?scope=${categoryId}`} className="font-semibold underline">Definir datos</Link>
+                  Esta categoría no tiene datos definidos. <Link href="/settings/catalog" className="font-semibold underline">Definir datos</Link>
                 </p>
               )}
             </>

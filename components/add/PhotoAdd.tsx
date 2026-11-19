@@ -76,7 +76,7 @@ export default function PhotoAdd() {
       <input ref={folderRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPick(e, false)} {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} />
 
       {categories.length === 0 && (
-        <Link href="/store" className="flex min-h-[56px] items-center gap-3 rounded-2xl bg-warn-50 p-3 text-sm text-warn-900 ring-1 ring-warn-200">
+        <Link href="/settings/catalog" className="flex min-h-[56px] items-center gap-3 rounded-2xl bg-warn-50 p-3 text-sm text-warn-900 ring-1 ring-warn-200">
           <IconSparkles size={20} className="shrink-0 text-warn-600" />
           <span className="flex-1">Primero elige <b>qué vendes</b> para que la IA ordene tus fotos en categorías. Toma 30 segundos.</span>
           <span className="font-semibold">Elegir →</span>

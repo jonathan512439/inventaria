@@ -3,6 +3,33 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Fase 6.9 · C7.8 — Ajustes ordenado: lo ocasional en un solo lugar
+
+### 17.15 Ajustes, Mi catálogo y Mis datos
+- **Qué**:
+  - **Ajustes** está ordenado en secciones:
+    - **Negocio:** nombre, moneda y zona horaria, más los accesos a Equipo, Mi catálogo y Mis datos.
+    - **Avisos** (dueño): desde cuántas unidades avisar, días antes del vencimiento, el mínimo y el silencio por categoría, y los productos que se dejaron de avisar, para reactivarlos.
+    - **Inteligencia artificial:** consumo del día (dueño) y clave propia.
+    - **Ayuda y novedades:** recorrido, guía paso a paso y burbujas.
+    - **Mi cuenta:** cerrar sesión.
+  - **Mi catálogo** reúne en **una pantalla** lo que antes eran «Mi tienda», «Subcategorías (avanzado)» y «Datos de mis productos». Cada categoría se abre y muestra:
+    - sus **subcategorías**: al tocar una se le cambia el nombre, se pasa a otra categoría, se le dan datos propios o se elimina;
+    - sus **datos**: qué se guarda de cada producto y quién lo llena, la IA o tú;
+    - sus **variantes**: talla, color…
+    - Arriba quedan los **datos de todos los productos**.
+  - **Mis datos** junta Descargar Excel, Traer desde Excel, Respaldos, Ordenar y limpiar, y Papelera.
+  - **Inicio** ya no tiene «Herramientas» al final: consumo de IA, ordenar y limpiar y la guía están en Ajustes.
+  - **Equipo** se abre desde Ajustes, igual que antes.
+  - En «Más», la parte de Ajustes queda en 4 entradas: Ajustes · Mi catálogo · Equipo · Mis datos.
+  - Las direcciones antiguas (/store, /categories, /templates, /alerts, /team, /export, /backup) llevan a su lugar nuevo.
+- **Validar**:
+  - Más → Mi catálogo → abrir una categoría → «+ Subcategoría» → agregarla → tocarla → cambiarle el nombre → Guardar.
+  - En la misma categoría, «+ Dato» → «sabor», Opciones «fresa, uva» → Guardar → aparece con «✨ IA».
+  - Ajustes → Avisos → «Avisar desde» 5 → Guardar → el número «por reponer» de Inicio cambia.
+  - Más → Mis datos → Descargar Excel → se descarga. Respaldos → «Guardar respaldo ahora».
+  - Como vendedor: en Ajustes no aparecen Avisos, Mi catálogo ni Mis datos.
+
 ## 2026-11-19 · Fase 6.9 · C7.7 — Números: hoy, ventas, productos y preguntas en un solo lugar
 
 ### 17.14 Números e Historial

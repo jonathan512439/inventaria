@@ -197,7 +197,7 @@ export default function ExcelAdd() {
               </select>
             </label>
           )}
-          <p className="text-xs text-slate-500">¿No tienes planilla? Descarga tu inventario en <Link href="/export" className="underline">Exportar a Excel</Link>, complétalo y vuelve a subirlo: las columnas ya vienen con los nombres correctos.</p>
+          <p className="text-xs text-slate-500">¿No tienes planilla? Descarga tu inventario en <Link href="/settings/data" className="underline">Ajustes › Mis datos › Descargar Excel</Link>, complétalo y vuelve a subirlo: las columnas ya vienen con los nombres correctos.</p>
         </section>
 
         {sheet && (

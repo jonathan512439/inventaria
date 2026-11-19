@@ -81,7 +81,7 @@ export default function WhoIsServing() {
                 ))}
               </ul>
               {meWithoutPin && (
-                <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">Antes de pasar el celular, pon <b>tu</b> PIN en <Link href="/team" className="underline">Equipo</Link>: lo necesitarás para volver a tu cuenta.</p>
+                <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">Antes de pasar el celular, pon <b>tu</b> PIN en <Link href="/settings/team" className="underline">Equipo</Link>: lo necesitarás para volver a tu cuenta.</p>
               )}
               {needsPin && !meWithoutPin && (
                 <div className="mt-3">
@@ -91,7 +91,7 @@ export default function WhoIsServing() {
                       <input type="password" inputMode="numeric" maxLength={4} autoFocus className="input mt-1 text-center text-2xl font-bold tracking-[0.5em]" placeholder="••••" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} onKeyDown={(e) => e.key === "Enter" && pin.length === 4 && confirmPin()} />
                     </>
                   ) : (
-                    <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">Esa persona todavía no puso su PIN. Que entre con su cuenta a <Link href="/team" className="underline">Equipo</Link> y lo cree.</p>
+                    <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">Esa persona todavía no puso su PIN. Que entre con su cuenta a <Link href="/settings/team" className="underline">Equipo</Link> y lo cree.</p>
                   )}
                 </div>
               )}

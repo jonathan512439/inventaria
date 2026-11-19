@@ -157,7 +157,7 @@ export default function RestockSheet({
         <div className="space-y-4">
           <p className="text-xs text-muted">
             La cantidad sugerida alcanza para el doble del mínimo; cámbiala antes de compartir. Toca <b>×</b> para dejar de avisar de un producto (se vuelve a activar en{" "}
-            <Link href="/alerts" className="font-semibold text-brand-700 underline">Cuándo avisarme</Link>).
+            <Link href="/settings#avisos" className="font-semibold text-brand-700 underline">Cuándo avisarme</Link>).
           </p>
           {grouped.map(([sup, ls]) => (
             <section key={sup} className="space-y-1">
