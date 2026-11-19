@@ -3,6 +3,48 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Pendientes antes de C6 · P3
+
+### 17.18 Vender sin conexión
+- **Qué**:
+  - **Abrir la app sin señal:**
+    - La app guarda en el celular las pantallas que se abren y sus archivos.
+    - Vender, Inicio y Productos se guardan solos, una vez cada 12 h, con la sesión iniciada.
+    - En modo avión la app abre igual. Si una pantalla todavía no se guardó, aparece un aviso con el botón «Ir a Vender».
+    - No se guardan datos de nadie dentro de las pantallas.
+  - **Buscar y escanear sin señal:**
+    - Vender guarda una copia del inventario en el celular al abrirse, como mucho cada 30 minutos.
+    - Sin señal, la búsqueda, el escáner y las tallas o colores usan esa copia.
+    - También quedan guardados «Los más vendidos» y los datos del negocio (nombre, moneda, zona horaria y rol).
+  - **Cobrar sin señal:**
+    - Una venta **cobrada completa** queda guardada en el celular. Vale en efectivo, QR, transferencia o varios medios.
+    - Aparece «Venta guardada en el celular», con el vuelto y el ticket todavía sin N.º.
+    - La copia del inventario descuenta lo vendido, así la siguiente venta ve el stock que queda.
+    - Si la señal se corta a mitad del cobro, o el servidor no responde en 15 s, la venta también se guarda en el celular.
+  - **Envío al volver la señal:**
+    - La venta se envía sola, con la hora en que se cobró. Recién ahí recibe su N.º, entra a la caja de ese día y baja el stock.
+    - Lleva el mismo id que la venta original: si se envía dos veces, queda una sola.
+    - El indicador de arriba muestra «Sin conexión · N por enviar».
+    - Si el servidor rechaza la venta (por ejemplo, el producto fue borrado), aparece «N sin guardar» para verla y descartarla.
+  - **Lo que necesita internet:**
+    - Fiar o cobrar una parte, porque hay que ver la deuda y el límite del cliente.
+    - Elegir o crear un cliente.
+    - Sin señal, esas opciones aparecen apagadas.
+- **Validar** (en el celular, con la app instalada o abierta en el navegador):
+  1. Con internet, abrir Vender una vez y esperar unos segundos.
+  2. Poner el celular en **modo avión**.
+  3. Cerrar la app por completo y volver a abrirla en Vender: debe abrir.
+  4. Buscar un producto por nombre y otro con el escáner.
+  5. Tocar «Cobrar». Arriba sale el aviso negro de sin conexión, y «Paga una parte» y «A cuenta» aparecen apagados.
+  6. Cobrar en efectivo con vuelto. Aparece «Venta guardada en el celular» y arriba «Sin conexión · 1 por enviar».
+  7. Hacer una segunda venta del mismo producto: el stock mostrado ya descuenta la primera.
+  8. Quitar el modo avión. En unos segundos aparece «Se enviaron 2 ventas…», y en Caja de hoy y Números › Historial salen las 2 ventas con la hora en que se cobraron.
+  9. El stock real bajó una sola vez por venta.
+  - Pruebas: `npm run test:ops` (2 nuevas: una venta enviada dos veces queda una sola, con sus pagos a la hora original) y `test:e2e` (el service worker guarda pantallas y Vender trae sus archivos).
+  - **Cuidados:**
+    - No cerrar sesión con ventas por enviar: cerrar sesión borra lo guardado en el celular.
+    - Una venta enviada después de cerrar la caja de ese día cambia lo que debería haber en caja. Hay que volver a cerrar.
+
 ## 2026-11-19 · Pendientes antes de C6 · P1, P2 y P6
 
 ### 17.17 Fotos en el Excel, costo por variante y avisos sin texto técnico

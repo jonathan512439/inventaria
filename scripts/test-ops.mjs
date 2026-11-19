@@ -229,6 +229,19 @@ try {
   const m17 = (await a.rpc("cash_summary", { p_day: "2026-11-17" })).data;
   check(m18?.tz === "Europe/Madrid" && Number(m17?.sales_count) === 0 && Number(m18?.sales_count) >= 1, `con zona España la misma venta cae el 18 → 17: ${m17?.sales_count}, 18: ${m18?.sales_count}`);
   await a.from("businesses").update({ timezone: "America/La_Paz" }).eq("id", A.bid);
+  // Venta sin conexión (P3): el celular la envía con su id y la hora en que se cobró; si el envío se repite
+  // (la señal se cortó justo al responder), queda UNA sola venta, con sus pagos a esa hora y el stock bajado una vez
+  const offId = uuid();
+  const offAt = "2026-11-16T15:00:00Z";
+  const { data: before } = await a.from("products").select("stock").eq("id", P1.id).single();
+  const offSale = { p_id: offId, p_lines: [line(P1.id, 2, 5)], p_method: "mixto", p_status: "pagado", p_note: "registrada sin conexión", p_at: offAt, p_payments: [{ method: "efectivo", amount: 6 }, { method: "qr", amount: 4 }] };
+  const o1 = await a.rpc("register_sale", offSale);
+  const o2 = await a.rpc("register_sale", offSale);
+  const { data: offRows } = await a.from("sales").select("id,created_at,total").eq("id", offId);
+  const { data: offPays } = await a.from("payments").select("amount,method,created_at").eq("sale_id", offId);
+  const { data: after } = await a.from("products").select("stock").eq("id", P1.id).single();
+  check(!o1.error && !o2.error && o2.data?.repeated === true && offRows?.length === 1 && new Date(offRows[0].created_at).toISOString() === new Date(offAt).toISOString(), `venta sin conexión enviada 2 veces → 1 venta con la hora original ${o1.error?.message ?? o2.error?.message ?? ""}`);
+  check(offPays?.length === 2 && offPays.every((p) => new Date(p.created_at).toISOString() === new Date(offAt).toISOString()) && Number(before.stock) - Number(after.stock) === 2, `sus pagos (efectivo 6 + QR 4) caen en el día en que se cobró y el stock baja 2 una sola vez → ${offPays?.length} pagos, stock ${before.stock} → ${after.stock}`);
 } catch (e) {
   failed++;
   console.error("ERROR", e);

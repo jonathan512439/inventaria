@@ -256,7 +256,7 @@ Gravedad: **C** = crítico (datos o seguridad), **A** = alto (cifras de negocio 
 | N1 · N2 · N6 | ✅ | C3 (`022`): el dinero como pagos (abonos en caja, pago mixto, saldo a favor) | — |
 | N3 · N5 | ✅ | C4 (`023`): nombre y ajustes del negocio; zona horaria del negocio en «hoy» y «este mes» | — |
 | N4 | ✅ | C2: `consign_settle` vende sin volver a mover el stock | — |
-| N7 | ◐ | C2: la cola sin conexión marca «fallido» tras varios intentos y deja de reintentar | Vender sin conexión: **P3** |
+| N7 | ✅ | C2: la cola marca «fallido» tras varios intentos · P3 (17.18): venta del carrito sin conexión (cobrada completa) con `register_sale` idempotente, inventario en el celular y la app abre sin señal (`public/sw.js`) | Fiar sin conexión (necesita ver la deuda del cliente): no planificado |
 | E1 · E2 | ✅ | C1: búsqueda por código con índice; `search` real con `pg_trgm` e índices por negocio | — |
 | E3 | ◐ | C7.7 (`027`): Inicio y Números calculados en SQL | Productos y Etiquetas cargan la lista completa (la muestran); paginar si un negocio pasa de ~2.000 productos |
 | E4 | ◐ | C4: una `rpc` de contexto por pantalla (antes ~7 peticiones) | Refrescar por eventos y no por cada cambio de pantalla: **P5** |

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { createClient, getActor, setActor } from "@/lib/supabase/client";
 import type { Business, BusinessMember, MemberRole, SessionContext } from "@/types/database";
 import { hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
-import { rememberBusiness, syncMoves } from "@/lib/offline";
+import { cacheGet, cacheSet, isNetworkError, rememberBusiness, syncMoves } from "@/lib/offline";
 import { DEFAULT_ALERTS, setCurrency, type AlertSettings } from "@/lib/inventory";
 import { setBusinessTz } from "@/lib/dates";
 import { useToast } from "./ui/Toast";
@@ -57,8 +57,11 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
     (async () => {
       const { data, error } = await supabase.rpc("session_context");
-      const ctx = data as SessionContext | null;
-      if (error || !ctx) return;
+      let ctx = data as SessionContext | null;
+      // Sin conexión: el último contexto guardado en el celular (negocio, moneda, zona, rol) para poder vender
+      if (error && isNetworkError(error)) ctx = (await cacheGet<SessionContext>("session-context"))?.data ?? null;
+      else if (ctx) cacheSet("session-context", ctx);
+      if (!ctx) return;
       setCounts({ pending: ctx.counts?.pending ?? 0, confirmed: ctx.counts?.confirmed ?? 0, loaded: true });
       const biz = ctx.business;
       rememberBusiness(biz?.id);
@@ -90,7 +93,7 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
       if (!navigator.onLine) return;
       const { sent, failed } = await syncMoves(createClient());
       if (sent) {
-        toast("success", `${sent} cambio${sent === 1 ? "" : "s"} de stock hecho${sent === 1 ? "" : "s"} sin conexión ya se enviaron`);
+        toast("success", sent === 1 ? "Se envió 1 venta o cambio hecho sin conexión" : `Se enviaron ${sent} ventas o cambios hechos sin conexión`);
         refresh();
       }
       if (failed && !sent) toast("error", "Algunos cambios sin conexión no se pudieron enviar; se reintentará");

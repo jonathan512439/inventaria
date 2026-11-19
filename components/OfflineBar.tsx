@@ -33,7 +33,7 @@ export default function ConnectionChip() {
   }
   if (!online) {
     return (
-      <span className="flex min-h-[36px] items-center gap-1.5 rounded-full bg-slate-800 px-3 text-xs font-bold text-white" title="Puedes consultar y mover stock; se envía al reconectar">
+      <span className="flex min-h-[36px] items-center gap-1.5 rounded-full bg-slate-800 px-3 text-xs font-bold text-white" title="Puedes vender, consultar y mover stock; se envía al reconectar">
         <IconWifiOff size={16} /> Sin conexión{pending ? ` · ${pending} por enviar` : ""}
       </span>
     );

@@ -14,10 +14,11 @@ import { useToast } from "@/components/ui/Toast";
 import { useFlow } from "@/components/FlowProvider";
 import { newOpId } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
+import { bizKey, cacheGet, cacheSet, isNetworkError, localVariants, queueSale, refreshInventoryCache, useOffline } from "@/lib/offline";
 import Sheet from "@/components/ui/Sheet";
 import { EmptyState, ScreenHeader } from "@/components/ui/Screen";
 import { NumberPad, QtyStepper, padNumber } from "@/components/ui/NumberPad";
-import { IconAlert, IconCart, IconCheck, IconPlus, IconRegister, IconTag, IconTrash, Spinner } from "@/components/ui/Icons";
+import { IconAlert, IconCart, IconCheck, IconPlus, IconRegister, IconTag, IconTrash, IconWifiOff, Spinner } from "@/components/ui/Icons";
 
 type SplitMethod = "efectivo" | "qr" | "transferencia";
 const SPLIT_METHODS: SplitMethod[] = ["efectivo", "qr", "transferencia"];
@@ -26,7 +27,14 @@ type PayMode = "todo" | "parte" | "fiado";
 /**
  * Vender (C7.2 · RECONSTRUCCION_VISUAL.md §3.2): buscar o escanear → carrito → «Cobrar» (hoja con teclado grande,
  * vuelto, varios medios, fiado con cliente) → ticket. Todo se guarda en una operación (register_sale, 021/022).
+ * Sin conexión (P3 · N7): busca en la copia del inventario del celular y una venta COBRADA COMPLETA queda en la
+ * cola con su id; al volver la señal se envía con la hora original y el servidor no la duplica. Fiar necesita
+ * conexión (hay que ver la deuda y el límite del cliente).
  */
+
+/** Si el servidor no responde en este tiempo, la venta se guarda en el celular (mismo id: si llegó, no se repite). */
+const SALE_TIMEOUT_MS = 15_000;
+const OFFLINE_FULL_ONLY = "Sin conexión solo se puede cobrar completo. Para fiar hace falta internet.";
 export default function SellPage() {
   const supabase = createClient();
   const toast = useToast();
@@ -45,22 +53,25 @@ export default function SellPage() {
   const [saving, setSaving] = useState(false);
   // Id de la venta en curso (idempotencia): si se corta la red y se vuelve a tocar «Cobrar», no se duplica
   const [saleId, setSaleId] = useState(newOpId);
-  const [done, setDone] = useState<{ sale: Sale; items: SaleItem[]; change: number } | null>(null);
+  const [done, setDone] = useState<{ sale: Sale; items: SaleItem[]; change: number; offline?: boolean } | null>(null);
   const business = flow.business?.name ?? null;
+  const { online } = useOffline();
 
   useEffect(() => {
-    // Lo más vendido últimamente, a mano
-    supabase
-      .from("sale_items")
-      .select("product_id")
-      .order("created_at", { ascending: false })
-      .limit(60)
-      .then(async ({ data }) => {
-        const ids = Array.from(new Set((data ?? []).map((r) => r.product_id).filter(Boolean) as string[])).slice(0, 8);
-        if (!ids.length) return;
-        const { data: ps } = await supabase.from("product_summaries").select(SUMMARY_COLS).in("id", ids);
-        setRecent((ps ?? []).map(fromSummary));
-      });
+    // Copia del inventario en el celular (si tiene más de 30 min) para seguir vendiendo si se corta la señal
+    refreshInventoryCache(supabase);
+    // Lo más vendido últimamente, a mano (y guardado para cuando no hay señal)
+    (async () => {
+      const key = bizKey("sell-recent");
+      const { data, error } = await supabase.from("sale_items").select("product_id").order("created_at", { ascending: false }).limit(60);
+      if (error) return setRecent((await cacheGet<Product[]>(key))?.data ?? []);
+      const ids = Array.from(new Set((data ?? []).map((r) => r.product_id).filter(Boolean) as string[])).slice(0, 8);
+      if (!ids.length) return;
+      const { data: ps } = await supabase.from("product_summaries").select(SUMMARY_COLS).in("id", ids);
+      const list = (ps ?? []).map(fromSummary);
+      setRecent(list);
+      cacheSet(key, list);
+    })();
   }, [supabase]);
 
   useEffect(() => {
@@ -82,8 +93,9 @@ export default function SellPage() {
     });
   }
   async function addRecent(p: Product) {
-    const { data: vs } = await supabase.from("product_variants").select("id").eq("product_id", p.id).limit(1);
-    if (vs?.length) return toast("info", "Este producto tiene tallas o colores: búscalo o escanéalo para elegir cuál");
+    const { data, error } = await supabase.from("product_variants").select("id").eq("product_id", p.id).limit(1);
+    const vs = error && isNetworkError(error) ? await localVariants(p.id) : data ?? [];
+    if (vs.length) return toast("info", "Este producto tiene tallas o colores: búscalo o escanéalo para elegir cuál");
     add(p, null);
   }
   const setQty = (key: string, qty: number) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, qty: Math.max(1, qty) } : l)));
@@ -120,6 +132,47 @@ export default function SellPage() {
     setPart("");
     setCharging(true);
   }
+  // Sin conexión solo se cobra completo (fiar necesita ver la deuda del cliente)
+  useEffect(() => {
+    if (!online) {
+      setMode("todo");
+      setCustomer(null);
+    }
+  }, [online]);
+
+  function resetSale() {
+    setSaleId(newOpId());
+    setLines([]);
+    setDiscount("");
+    setSplit({ efectivo: "", qr: "", transferencia: "" });
+    setCustomer(null);
+    setCharging(false);
+    navigator.vibrate?.(30);
+  }
+
+  /** Guarda la venta en el celular y muestra el ticket provisional (sin N.º: lo pone el servidor al enviarla). */
+  async function saveOffline() {
+    const valid = lines.filter((l) => l.qty > 0);
+    await queueSale(
+      saleId,
+      {
+        lines: valid.map((l) => ({ product_id: l.product.id, variant_id: l.variant?.id ?? null, qty: l.qty, unit_price: l.unitPrice })),
+        method,
+        status: "pagado",
+        paid: paidNow,
+        discount: disc,
+        payments: splitPays,
+        customerId: customer?.id ?? null,
+        customerName: customer?.name ?? null,
+      },
+      total
+    );
+    const now = new Date().toISOString();
+    const sale = { id: saleId, user_id: "", number: null, customer_id: customer?.id ?? null, customer_name: customer?.name ?? null, status: "pagado", method, subtotal, discount: disc, total, paid: total, cost_total: 0, items: valid.length, note: "registrada sin conexión", created_at: now } as Sale;
+    const items = valid.map((l, i) => ({ id: String(i), sale_id: saleId, user_id: "", product_id: l.product.id, variant_id: l.variant?.id ?? null, product_name: productTitle(l.product.data) || "Producto", variant_label: l.variant?.label ?? null, qty: l.qty, unit_price: l.unitPrice, unit_cost: null, line_total: lineTotal(l), created_at: now })) as SaleItem[];
+    setDone({ sale, items, change, offline: true });
+    resetSale();
+  }
 
   async function finish() {
     if (!lines.length) return;
@@ -127,29 +180,36 @@ export default function SellPage() {
     if (method === "mixto" && splitSum === 0) return toast("info", "Escribe cuánto paga con cada medio");
     if (shortCash) return toast("info", `Faltan ${money(total - receivedNum)}: completa el efectivo o elige «Paga una parte»`);
     if (status !== "pagado" && !customer) return toast("info", "Elige o crea el cliente que va a deber");
+    if (!online && status !== "pagado") return toast("info", OFFLINE_FULL_ONLY);
     setSaving(true);
     try {
-      const out = await registerSale(supabase, lines, {
-        id: saleId,
-        method,
-        status,
-        paid: paidNow,
-        payments: splitPays,
-        discount: disc,
-        customerId: customer?.id ?? null,
-        customerName: customer?.name ?? null,
-      });
+      if (!online) return await saveOffline();
+      const out = await Promise.race([
+        registerSale(supabase, lines, {
+          id: saleId,
+          method,
+          status,
+          paid: paidNow,
+          payments: splitPays,
+          discount: disc,
+          customerId: customer?.id ?? null,
+          customerName: customer?.name ?? null,
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("network timeout")), SALE_TIMEOUT_MS)),
+      ]);
       setDone({ ...out, change });
-      setSaleId(newOpId());
-      setLines([]);
-      setDiscount("");
-      setSplit({ efectivo: "", qr: "", transferencia: "" });
-      setCustomer(null);
-      setCharging(false);
+      resetSale();
       flow.refresh();
-      navigator.vibrate?.(30);
     } catch (e) {
-      toast("error", friendlyError(e, "No se pudo registrar la venta"));
+      // Se cortó la señal o el servidor no respondió: una venta cobrada completa se guarda en el celular
+      if (isNetworkError(e) && status === "pagado") {
+        try {
+          await saveOffline();
+        } catch (e2) {
+          toast("error", friendlyError(e2, "No se pudo guardar la venta en el celular"));
+        }
+      } else if (isNetworkError(e)) toast("error", OFFLINE_FULL_ONLY);
+      else toast("error", friendlyError(e, "No se pudo registrar la venta"));
     } finally {
       setSaving(false);
     }
@@ -168,11 +228,24 @@ export default function SellPage() {
     return (
       <div className="mx-auto max-w-md space-y-4">
         <div className="animate-in card text-center">
-          <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-ok-100 text-ok-600"><IconCheck size={34} /></span>
-          <h1 className="mt-3 text-2xl font-bold text-ink">Venta N.º {s.number} registrada</h1>
+          {done.offline ? (
+            <>
+              <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-warn-100 text-warn-700"><IconWifiOff size={34} /></span>
+              <h1 className="mt-3 text-2xl font-bold text-ink">Venta guardada en el celular</h1>
+            </>
+          ) : (
+            <>
+              <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-ok-100 text-ok-600"><IconCheck size={34} /></span>
+              <h1 className="mt-3 text-2xl font-bold text-ink">Venta N.º {s.number} registrada</h1>
+            </>
+          )}
           <p className="mt-1 text-3xl font-bold tabular-nums text-ok-700">{money(Number(s.total))}</p>
           {done.change > 0 && <p className="mt-2 rounded-2xl bg-warn-100 px-3 py-2 text-lg font-bold text-warn-900">Vuelto: {money(done.change)}</p>}
-          <p className="mt-1 text-sm text-muted">{METHOD_LABEL[s.method]}{s.status !== "pagado" ? ` · debe ${money(Number(s.total) - Number(s.paid))}` : ""} · el stock ya bajó</p>
+          {done.offline ? (
+            <p className="mt-2 rounded-2xl bg-slate-100 px-3 py-2 text-sm text-slate-700">No hay señal. Se envía sola cuando vuelva el internet: recién ahí recibe su N.º, entra a la caja y baja el stock. No cierres sesión hasta que se envíe.</p>
+          ) : (
+            <p className="mt-1 text-sm text-muted">{METHOD_LABEL[s.method]}{s.status !== "pagado" ? ` · debe ${money(Number(s.total) - Number(s.paid))}` : ""} · el stock ya bajó</p>
+          )}
           <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-slate-50 p-3 text-left font-mono text-xs leading-snug text-slate-700">{ticketText(s, done.items, business)}</pre>
           <div className="mt-4 grid gap-2">
             <button onClick={() => setDone(null)} className="btn-primary btn-lg w-full"><IconPlus size={18} /> Nueva venta</button>
@@ -269,6 +342,11 @@ export default function SellPage() {
         }
       >
         <div className="space-y-4">
+          {!online && (
+            <p className="flex gap-2 rounded-2xl bg-slate-800 px-3 py-2 text-sm text-white">
+              <IconWifiOff size={18} className="mt-0.5 shrink-0" /> Sin conexión: la venta se guarda en el celular y se envía al volver la señal. Solo se cobra completo (para fiar hace falta internet).
+            </p>
+          )}
           <div className="flex items-end justify-between gap-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">Total</p>
@@ -305,7 +383,7 @@ export default function SellPage() {
             <>
               <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="¿Paga todo?">
                 {([["todo", "Paga todo"], ["parte", "Paga una parte"], ["fiado", "A cuenta"]] as [PayMode, string][]).map(([k, t]) => (
-                  <button key={k} type="button" role="radio" aria-checked={mode === k} onClick={() => setMode(k)} className={`min-h-[44px] rounded-2xl border-2 px-1 text-sm font-semibold ${mode === k ? (k === "todo" ? "border-ok-500 bg-ok-500 text-white" : "border-warn-500 bg-warn-500 text-white") : "border-slate-200 bg-white text-slate-700"}`}>{t}</button>
+                  <button key={k} type="button" role="radio" aria-checked={mode === k} disabled={!online && k !== "todo"} onClick={() => setMode(k)} className={`min-h-[44px] rounded-2xl disabled:opacity-40 border-2 px-1 text-sm font-semibold ${mode === k ? (k === "todo" ? "border-ok-500 bg-ok-500 text-white" : "border-warn-500 bg-warn-500 text-white") : "border-slate-200 bg-white text-slate-700"}`}>{t}</button>
                 ))}
               </div>
               {method === "efectivo" && mode !== "fiado" && (
@@ -335,12 +413,12 @@ export default function SellPage() {
             </>
           )}
 
-          {/* Cliente */}
-          <div>
+          {/* Cliente (sin conexión no se pueden buscar ni crear) */}
+          {online && <div>
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Cliente {status === "pagado" ? "(opcional)" : "· queda debiendo " + money(owes)}</p>
             <CustomerPicker value={customer} onChange={setCustomer} required={status !== "pagado"} />
             {customer && customerDebt > 0 && <p className="mt-1 text-xs text-warn-800">Ya debe {money(customerDebt)}{customer.credit_limit !== null ? ` · límite ${money(Number(customer.credit_limit))}` : ""}.</p>}
-          </div>
+          </div>}
 
           {(overLimit || stockWarn.length > 0) && (
             <div className="space-y-1 rounded-2xl bg-warn-50 p-3 text-sm text-warn-900">

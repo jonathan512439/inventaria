@@ -278,6 +278,10 @@ try {
     if (!(rp.status >= 300 && rp.status < 400 && loc.endsWith(to))) wrong.push(`${from} → ${rp.status} ${loc}`);
   }
   check(!wrong.length, `${Object.keys(OLD).length} direcciones antiguas redirigen ${wrong.join(", ")}`);
+  // Vender sin conexión (P3): el service worker guarda pantallas; Vender con sesión trae sus archivos de /_next/static
+  const sw = await (await fetch(`${BASE}/sw.js`)).text();
+  const sellHtml = await (await fetch(`${BASE}/sell`, { headers: { cookie: H.cookie } })).text();
+  check(sw.includes("inventaria-pages") && sw.includes('"warm"') && /\/_next\/static\/[^"']+\.js/.test(sellHtml), "service worker guarda pantallas y Vender referencia sus archivos (para abrir sin señal)");
 
   // 17. Medidor
   r = await fetch(`${BASE}/api/usage`, { headers: H });

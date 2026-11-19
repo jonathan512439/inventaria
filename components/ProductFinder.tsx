@@ -6,6 +6,7 @@ import type { Product, ProductVariant } from "@/types/database";
 import { fromSummary, money, stockOf, SUMMARY_COLS } from "@/lib/inventory";
 import { productTitle } from "@/lib/fields";
 import { suggestedPrice } from "@/lib/sales";
+import { isNetworkError, localByCode, localFind, localVariants } from "@/lib/offline";
 import BarcodeCamera from "./BarcodeCamera";
 import Sheet from "./ui/Sheet";
 import { useToast } from "./ui/Toast";
@@ -14,6 +15,7 @@ import { IconSearch, IconX } from "./ui/Icons";
 /**
  * Encontrar un producto siempre igual (C7 · §2.3): buscar por nombre/marca/código o escanear.
  * Si el producto tiene variantes (talla, color…) pregunta cuál. Se usa en Vender, Entrada de mercadería y Contar.
+ * Sin conexión busca y escanea en la copia del inventario guardada en el celular (lib/offline).
  */
 export default function ProductFinder({
   onPick,
@@ -37,8 +39,8 @@ export default function ProductFinder({
     const term = q.trim().toLowerCase().replace(/[%_]/g, "");
     if (!term) return setResults([]);
     const t = setTimeout(async () => {
-      const { data } = await supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed").ilike("search", `%${term}%`).order("nombre").limit(12);
-      setResults((data ?? []).map(fromSummary));
+      const { data, error } = await supabase.from("product_summaries").select(SUMMARY_COLS).eq("status", "confirmed").ilike("search", `%${term}%`).order("nombre").limit(12);
+      setResults(error && isNetworkError(error) ? await localFind(term) : (data ?? []).map(fromSummary));
     }, 200);
     return () => clearTimeout(t);
   }, [q, supabase]);
@@ -52,14 +54,22 @@ export default function ProductFinder({
   }
 
   async function pick(p: Product) {
-    const { data: vs } = await supabase.from("product_variants").select("*").eq("product_id", p.id).order("created_at");
-    if (vs?.length) return setPicking({ product: p, variants: vs as ProductVariant[] });
+    const { data, error } = await supabase.from("product_variants").select("*").eq("product_id", p.id).order("created_at");
+    const vs = error && isNetworkError(error) ? await localVariants(p.id) : ((data ?? []) as ProductVariant[]);
+    if (vs.length) return setPicking({ product: p, variants: vs });
     done(p, null);
   }
 
   async function onCode(code: string) {
-    const res = await fetch(`/api/barcode?code=${encodeURIComponent(code)}`);
-    const json = (await res.json().catch(() => ({}))) as { found?: string; product?: Product; variant?: ProductVariant | null; variants?: ProductVariant[] };
+    let json: { found?: string; product?: Product; variant?: ProductVariant | null; variants?: ProductVariant[] };
+    try {
+      const res = await fetch(`/api/barcode?code=${encodeURIComponent(code)}`);
+      json = await res.json().catch(() => ({}));
+    } catch (e) {
+      if (!isNetworkError(e)) throw e;
+      const local = await localByCode(code);
+      json = local ? { found: "own", ...local } : {};
+    }
     if (json.found !== "own" || !json.product) return toast("info", `Código ${code}: no está en tu inventario`);
     if (json.variant) return done(json.product, json.variant);
     if (json.variants?.length) return setPicking({ product: json.product, variants: json.variants });
