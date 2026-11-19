@@ -292,4 +292,8 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
   - Toques de Inicio a cobrar: **2** (Vender → Cobrar).
   - Textos de menos de 12 px: **0**.
   - Las direcciones antiguas siguen funcionando con 29 redirecciones (`next.config.mjs`).
+- **Error encontrado con `test:e2e` y corregido** (`lib/gemini/index.ts` · `generateContent`):
+  - Qué pasó: gemini-3.6/3.7-flash colgados (60 s sin respuesta a «hola»; lista de modelos OK en 1 s), y `fetch` no tenía límite → 524 de Cloudflare y la cadena nunca llegaba a 3.5-flash-lite o flash-lite-latest, que responden.
+  - Corrección: `AbortController` de 25 s por intento y presupuesto de 85 s por llamada. Si queda menos de 6 s se responde 429 «saturada» (la cola reintenta sola). Los 5xx y los colgados pasan al siguiente modelo y van al final de la cadena 10 minutos (`slowUntil`, por instancia y clave).
+  - Comprobado con la foto de prueba: respondió con gemini-flash-lite-latest en 41 s (antes, 524 a los 100 s).
 - **Pendiente del usuario:** la prueba con 3 personas (dueño, vendedor y alguien nuevo). Criterios: la persona nueva hace su primera venta sin ayuda y el vendedor no ve nada del dueño. Las observaciones se anotan aquí y se corrigen antes de C6.

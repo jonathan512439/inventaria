@@ -262,7 +262,7 @@ function parseFailure(status: number, errText: string): GeminiFailure {
 /**
  * Llama a generateContent probando la cadena de modelos. Devuelve el texto y el modelo usado.
  * - Cupo diario agotado → siguiente modelo (y se recuerda hasta el reinicio)
- * - "High demand" / 503 → siguiente modelo
+ * - "High demand", 5xx o sin respuesta en 25 s → siguiente modelo (todo el análisis, máx. 85 s)
  * - Límite por minuto → espera breve (máx. 12 s) y reintenta una vez en el mismo modelo, luego siguiente
  */
 /** Registro de cada intento (para el medidor de consumo). */
@@ -277,35 +277,70 @@ export function drainUsage(): UsageAttempt[] {
   return usageLog.splice(0, usageLog.length);
 }
 
+/**
+ * Tiempo máximo (C7.9 · 2026-11-19): un modelo de Google puede quedarse colgado sin responder (pasó con
+ * gemini-3.6/3.7-flash). Sin límite, la petición esperaba hasta que Cloudflare cortaba a los 100 s (524) sin probar
+ * el siguiente modelo. Ahora cada intento tiene un máximo y todo el análisis un presupuesto por debajo de ese corte.
+ */
+const BUDGET_MS = 85_000;
+const PER_MODEL_MS = 25_000;
+/** Modelos que se colgaron o dieron 5xx → se prueban al final durante 10 minutos (por instancia y clave). */
+const slowUntil = new Map<string, number>();
+const SLOW_MS = 10 * 60_000;
+
 export async function generateContent(parts: unknown[], generationConfig: Record<string, unknown>, key: KeyContext = serviceKey()): Promise<{ text: string; model: string }> {
   const apiKey = key.apiKey;
   const log = key.usage ?? usageLog;
   const now = Date.now();
-  const chain = modelChain().filter((m) => (exhaustedUntil.get(exKey(key.keyId, m)) ?? 0) < now);
-  if (chain.length === 0) {
+  const deadline = now + BUDGET_MS;
+  const available = modelChain().filter((m) => (exhaustedUntil.get(exKey(key.keyId, m)) ?? 0) < now);
+  if (available.length === 0) {
     const reset = nextQuotaReset();
     throw new QuotaError("Se agotó el cupo diario gratuito de la IA en todos los modelos.", Math.max(60, Math.ceil((reset.getTime() - now) / 1000)));
   }
+  // Los que hace poco se colgaron van al final (no se descartan: pueden recuperarse)
+  const isSlow = (m: string) => (slowUntil.get(exKey(key.keyId, m)) ?? 0) > now;
+  const chain = [...available.filter((m) => !isSlow(m)), ...available.filter(isSlow)];
   const body = JSON.stringify({ contents: [{ role: "user", parts }], generationConfig });
   let last: GeminiFailure | null = null;
 
-  for (const model of chain) {
+  outer: for (const model of chain) {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const res = await fetch(`${API_BASE}/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body,
-      });
+      const left = deadline - Date.now();
+      if (left < 6_000) break outer; // no alcanza para otro intento: mejor responder «reintenta» que cortar a los 100 s
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), Math.min(PER_MODEL_MS, left));
+      let res: Response;
+      let text: string;
+      try {
+        res = await fetch(`${API_BASE}/${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body,
+          signal: ctl.signal,
+        });
+        text = await res.text();
+      } catch {
+        // Colgado (se agotó el tiempo) o sin red hacia Google → siguiente modelo
+        clearTimeout(timer);
+        slowUntil.set(exKey(key.keyId, model), Date.now() + SLOW_MS);
+        last = { status: 504, message: `${model} no respondió a tiempo`, daily: false, demand: true, retryDelaySec: null, quotaLimit: null };
+        log.push({ model, status: "error" });
+        break;
+      }
+      clearTimeout(timer);
       if (res.ok) {
-        const json = (await res.json()) as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-          promptFeedback?: { blockReason?: string };
-        };
+        let json: { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>; promptFeedback?: { blockReason?: string } };
+        try {
+          json = JSON.parse(text);
+        } catch {
+          json = {};
+        }
         if (json.promptFeedback?.blockReason) throw new GeminiError(422, `La imagen fue bloqueada por seguridad (${json.promptFeedback.blockReason}).`);
         log.push({ model, status: "ok" });
         return { text: json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "", model };
       }
-      const f = parseFailure(res.status, await res.text().catch(() => ""));
+      const f = parseFailure(res.status, text);
       last = f;
       log.push({ model, status: f.daily ? "quota" : res.status === 429 ? "limited" : "error", quota_limit: f.quotaLimit ?? null });
       if (res.status === 404) break; // modelo inexistente → siguiente
@@ -313,10 +348,14 @@ export async function generateContent(parts: unknown[], generationConfig: Record
         exhaustedUntil.set(exKey(key.keyId, model), nextQuotaReset().getTime());
         break; // siguiente modelo
       }
-      if (res.status === 503 || f.demand) break; // siguiente modelo
+      if (res.status >= 500 || f.demand) {
+        // 500/502/503/504/524 o «high demand»: problema del modelo, no de la petición → siguiente modelo
+        if (res.status !== 503) slowUntil.set(exKey(key.keyId, model), Date.now() + SLOW_MS);
+        break;
+      }
       if (res.status === 429) {
         if (attempt === 0) {
-          await sleep(Math.min(12, f.retryDelaySec ?? 4) * 1000);
+          await sleep(Math.min(12, f.retryDelaySec ?? 4, Math.max(0, (deadline - Date.now() - 6_000) / 1000)) * 1000);
           continue; // reintento en el mismo modelo
         }
         break;

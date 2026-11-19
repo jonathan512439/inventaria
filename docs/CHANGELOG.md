@@ -17,11 +17,16 @@ Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
     - Cada pantalla tiene un **«?»** arriba que explica cómo se usa, y las listas vacías dicen qué hacer.
     - **«Cómo usar la app»** es un recorrido nuevo de 4 pantallas: los 5 lugares, Inicio, buscar o escanear y el «?». Se muestra una vez a todos y se reabre desde Ajustes › Ayuda o Más.
   - La prueba automática de extremo a extremo ahora recorre las 16 pantallas nuevas y las direcciones antiguas.
+  - **Corrección importante, Agregar por foto:**
+    - Hoy dos modelos de IA de Google (gemini-3.6 y 3.7-flash) se quedan colgados sin responder, y la app esperaba hasta que el servidor cortaba a los 100 s. La foto quedaba en error («Error de Gemini (524)») sin probar los otros modelos, que sí funcionan.
+    - Ahora cada modelo tiene 25 s para responder y todo el análisis, como máximo 85 s. Un modelo colgado o con error del servidor se salta y pasa al final de la cadena por 10 minutos.
+    - Si aun así no alcanza el tiempo, la foto se reintenta sola, en vez de quedar en error.
 - **Validar**:
   - Como vendedor en el celular: abajo aparece «Caja» en vez de «Más», y Caja se marca al estar en la caja. El botón de la cabecera abre Números, Ajustes y Cerrar sesión.
   - Como dueño: «Más» muestra solo las 8 entradas.
   - Al entrar por primera vez después de esta versión aparece «Cómo usar la app».
   - En Caja, el «?» de arriba explica cómo cerrar.
+  - Agregar → Foto → sacar una foto → en menos de 1 minuto queda lista para revisar, aunque algún modelo de IA esté caído.
 
 ## 2026-11-19 · Fase 6.9 · C7.8 — Ajustes ordenado: lo ocasional en un solo lugar
 

@@ -236,3 +236,5 @@ Gravedad: **C** = crítico (datos o seguridad), **A** = alto (cifras de negocio 
 | V6 | Moneda «Bs» escrita en el código (~87 apariciones) con formato `es` genérico. | `businesses.currency` + `fmtMoney(n, currency)` (ya previsto en la Fase 8). |
 | V7 | Al vendedor se le muestran pantallas que luego dicen «Esto lo maneja el dueño». | Ocultarlas desde el menú y la barra (ya parcial con `ownerOnly`) y evitar el destello inicial (S5). |
 | V8 | Cobro sin teclado numérico propio y sin cálculo de vuelto. | Hoja de cobro con teclado grande, «efectivo recibido → vuelto». |
+
+> **2026-11-19 · IA colgada (C7.9):** `generateContent` no tenía tiempo máximo; con modelos de Google colgados, el análisis de fotos fallaba con 524 a los 100 s. Corregido con 25 s por modelo, 85 s en total y reordenamiento de modelos lentos (ver `RECONSTRUCCION_VISUAL.md` §7 · C7.9).
