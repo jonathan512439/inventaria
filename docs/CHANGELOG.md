@@ -3,6 +3,31 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Ronda de validación 1 · R3 y R4
+
+### 17.21 Lista de productos por categorías en Vender y en Entrada de inventario
+- **Qué**:
+  - **Lista de productos** (debajo de la venta y de la entrada):
+    - Arriba, las **categorías** en chips. Al tocar una aparecen sus **subcategorías**.
+    - Los productos van ordenados por nombre, **de 20 en 20**, con «‹ Anterior» y «Siguiente ›» y el contador «1–20 de 134».
+    - Cada fila muestra foto, nombre, stock (o «Agotado» en rojo) y precio.
+    - Tocar un producto lo agrega a la venta o a la entrada. Si tiene tallas o colores, pregunta cuál.
+    - Los que ya están agregados muestran «×2».
+    - Sin conexión usa la lista guardada en el celular.
+    - Se puede plegar.
+  - **Entrada de inventario más compacta:**
+    - Cada producto ocupa **una fila**: foto pequeña, nombre, «4 → 7» y − n +.
+    - Se ven los últimos 10. Los anteriores se pliegan en «Ver los otros N productos», así el botón de guardar queda cerca.
+    - El botón dice «Guardar · 5 productos · +32 u.».
+  - **Entradas (dueño):**
+    - Agrupadas en **Hoy · Esta semana · Antes**.
+    - Cada entrada es una fila con la hora, el proveedor, cuántos productos y el total. Al tocarla se abre con sus productos, cantidades y costo.
+    - Se cargan de 20 en 20 con «Ver 20 entradas más».
+- **Validar**:
+  - Vender: debajo aparece «Todos los productos». Tocar una categoría y luego una subcategoría; pasar de página; tocar un producto: entra a la venta y la fila muestra «×1».
+  - Entrada de inventario: elegir 3 productos de la lista. Cada uno es una sola fila y el botón dice «Guardar · 3 productos · +3 u.».
+  - Entradas: la de recién aparece en «Hoy». Al tocarla se ven sus productos.
+
 ## 2026-11-19 · Ronda de validación 1 · R6, R7 y R8
 
 ### 17.20 Opciones con ejemplo, fiar más claro y entrega por unidad

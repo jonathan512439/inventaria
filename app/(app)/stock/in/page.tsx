@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { Product, ProductVariant, Purchase, Supplier } from "@/types/database";
+import type { Product, ProductVariant, Purchase, PurchaseItem, Supplier } from "@/types/database";
 import { currencyLabel, money, stockOf } from "@/lib/inventory";
 import { productTitle } from "@/lib/fields";
 import { bizKey } from "@/lib/offline";
 import ProductFinder from "@/components/ProductFinder";
+import ProductBrowser from "@/components/ProductBrowser";
+import Photo from "@/components/ui/Photo";
+import { businessDayKey, businessDayStart } from "@/lib/dates";
 import { useFlow } from "@/components/FlowProvider";
 import { EmptyState, ScreenHeader, Tabs } from "@/components/ui/Screen";
 import { QtyStepper } from "@/components/ui/NumberPad";
@@ -15,7 +18,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import { adjustStock, newOpId, registerPurchase } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
-import { IconCheck, IconChevronRight, IconPlus, IconTrash, IconTruck, IconX, Spinner } from "@/components/ui/Icons";
+import { IconBox, IconCheck, IconChevronRight, IconPlus, IconTrash, IconTruck, IconX, Spinner } from "@/components/ui/Icons";
 
 interface Line {
   key: string;
@@ -29,6 +32,9 @@ interface Line {
 }
 
 type Tab = "new" | "history" | "suppliers";
+/** Líneas que se ven de entrada; las más antiguas se pliegan para que el botón de guardar quede cerca (R4) */
+const SHOW_LINES = 10;
+const HISTORY_PAGE = 20;
 
 /**
  * Entrada de mercadería (C7.5 · RECONSTRUCCION_VISUAL.md §3.2, F19 + F06 «sumar stock»): buscar o escanear lo que
@@ -47,6 +53,8 @@ export default function StockInPage() {
   const [tab, setTab] = useState<Tab>("new");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[] | null>(null);
+  const [histMore, setHistMore] = useState(true);
+  const [showAll, setShowAll] = useState(false);
   const [supplierId, setSupplierId] = useState("");
   const [newSupplier, setNewSupplier] = useState<{ name: string; phone: string } | null>(null);
   const [doc, setDoc] = useState("");
@@ -90,11 +98,19 @@ export default function StockInPage() {
   const loadOwner = useCallback(async () => {
     const [s, p] = await Promise.all([
       supabase.from("suppliers").select("*").order("name"),
-      supabase.from("purchases").select("*").order("created_at", { ascending: false }).limit(30),
+      supabase.from("purchases").select("*").order("created_at", { ascending: false }).range(0, HISTORY_PAGE - 1),
     ]);
     setSuppliers((s.data ?? []) as Supplier[]);
     setPurchases((p.data ?? []) as Purchase[]);
+    setHistMore((p.data ?? []).length === HISTORY_PAGE);
   }, [supabase]);
+  /** 20 entradas más (Entradas › «Ver 20 más») */
+  async function loadMorePurchases() {
+    const from = purchases?.length ?? 0;
+    const { data } = await supabase.from("purchases").select("*").order("created_at", { ascending: false }).range(from, from + HISTORY_PAGE - 1);
+    setPurchases((list) => [...(list ?? []), ...((data ?? []) as Purchase[])]);
+    setHistMore((data ?? []).length === HISTORY_PAGE);
+  }
   useEffect(() => {
     if (isOwner) loadOwner();
   }, [isOwner, loadOwner]);
@@ -281,19 +297,24 @@ export default function StockInPage() {
                 <p className="text-sm font-bold text-ink">{lines.length} producto{lines.length === 1 ? "" : "s"} · +{units} unid.</p>
                 <button type="button" onClick={discard} className="btn-ghost btn-sm min-h-[44px] text-danger-700">Vaciar</button>
               </div>
-              <ul className="max-h-[60vh] divide-y divide-slate-100 overflow-y-auto overscroll-contain">
-                {lines.map((l) => {
+              <ul className="divide-y divide-slate-100">
+                {(showAll ? lines : lines.slice(0, SHOW_LINES)).map((l) => {
                   const now = (l.variant ? l.variant.stock : stockOf(l.product)) ?? 0;
                   return (
-                    <li key={l.key} className={`space-y-2 px-4 py-3 transition ${lastKey === l.key ? "bg-ok-50" : ""}`}>
+                    <li key={l.key} className={`space-y-2 px-3 py-2 transition ${lastKey === l.key ? "bg-ok-50" : ""}`}>
                       <div className="flex items-center gap-2">
+                        {l.product.image_url ? (
+                          <Photo src={l.product.image_url} wrapperClassName="h-10 w-10 shrink-0 rounded-lg" className="h-10 w-10 object-cover" />
+                        ) : (
+                          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-400"><IconBox size={18} /></span>
+                        )}
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold text-ink">
+                          <span className="block truncate text-sm font-semibold text-ink">
                             {productTitle(l.product.data) || "Sin nombre"}
                             {l.variant ? <span className="text-violet-800"> · {l.variant.label}</span> : null}
                           </span>
                           <span className="block text-xs text-muted">
-                            tenías {now} → quedarán <b className="text-ok-700">{now + l.qty}</b>
+                            {now} → <b className="text-ok-700">{now + l.qty}</b>
                           </span>
                         </span>
                         <QtyStepper value={l.qty} onChange={(n) => patch(l.key, { qty: n })} />
@@ -319,6 +340,12 @@ export default function StockInPage() {
                   );
                 })}
               </ul>
+              {lines.length > SHOW_LINES && (
+                <button type="button" onClick={() => setShowAll((v) => !v)} className="flex min-h-[44px] w-full items-center justify-center gap-1 border-t border-slate-100 text-sm font-semibold text-brand-700">
+                  {showAll ? "Mostrar solo los últimos 10" : `Ver los otros ${lines.length - SHOW_LINES} productos`}
+                  <IconChevronRight size={16} className={showAll ? "-rotate-90" : "rotate-90"} />
+                </button>
+              )}
             </section>
           )}
 
@@ -366,9 +393,11 @@ export default function StockInPage() {
             )}
           </section>
 
+          <ProductBrowser onPick={add} showPrice={false} title="Elegir de la lista" inList={(id) => lines.filter((l) => l.product.id === id).reduce((s, l) => s + l.qty, 0)} />
+
           <div className="sticky-action">
             <button type="button" onClick={save} disabled={saving || !lines.length} className="btn-success btn-lg mx-auto flex w-full max-w-2xl">
-              {saving ? <Spinner /> : <IconCheck size={20} />} Guardar entrada · +{units} unid.{isOwner && total > 0 ? ` · ${money(total)}` : ""}
+              {saving ? <Spinner /> : <IconCheck size={20} />} {lines.length ? `Guardar · ${lines.length} producto${lines.length === 1 ? "" : "s"} · +${units} u.${isOwner && total > 0 ? ` · ${money(total)}` : ""}` : "Agrega productos para guardar"}
             </button>
           </div>
         </>
@@ -380,25 +409,89 @@ export default function StockInPage() {
         ) : purchases.length === 0 ? (
           <EmptyState icon={<IconTruck size={28} />} title="Aún no hay entradas" body="Cuando guardes la primera, aparecerá aquí con su proveedor y total." />
         ) : (
-          <ul className="stagger space-y-2">
-            {purchases.map((p) => (
-              <li key={p.id} className="flex min-h-[56px] items-center gap-3 rounded-2xl bg-white p-3 shadow-card ring-1 ring-slate-900/10">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold text-ink">
-                    {p.supplier_name || "Sin proveedor"}
-                    {p.doc ? <span className="text-xs font-normal text-muted"> · {p.doc}</span> : null}
-                  </span>
-                  <span className="block text-xs text-muted">
-                    {new Date(p.created_at).toLocaleString("es", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {p.items} producto{p.items === 1 ? "" : "s"}
-                  </span>
-                </span>
-                <span className="font-bold tabular-nums text-ink">{money(Number(p.total))}</span>
-              </li>
-            ))}
-          </ul>
+          <PurchaseHistory purchases={purchases} hasMore={histMore} onMore={loadMorePurchases} />
         ))}
 
       {tab === "suppliers" && <SupplierList suppliers={suppliers} onAdd={addSupplier} onRemove={removeSupplier} />}
+    </div>
+  );
+}
+
+/** Entradas anteriores (R4): agrupadas Hoy · Esta semana · Antes; cada una en una fila que se abre con sus productos. */
+function PurchaseHistory({ purchases, hasMore, onMore }: { purchases: Purchase[]; hasMore: boolean; onMore: () => Promise<void> }) {
+  const supabase = createClient();
+  const [open, setOpen] = useState<string | null>(null);
+  const [items, setItems] = useState<Record<string, PurchaseItem[]>>({});
+  const [loadingMore, setLoadingMore] = useState(false);
+  const today = businessDayKey();
+  const weekStart = businessDayStart(6).getTime();
+  const groups: { title: string; list: Purchase[] }[] = [
+    { title: "Hoy", list: purchases.filter((p) => businessDayKey(p.created_at) === today) },
+    { title: "Esta semana", list: purchases.filter((p) => businessDayKey(p.created_at) !== today && new Date(p.created_at).getTime() >= weekStart) },
+    { title: "Antes", list: purchases.filter((p) => new Date(p.created_at).getTime() < weekStart) },
+  ].filter((g) => g.list.length);
+
+  async function toggle(p: Purchase) {
+    if (open === p.id) return setOpen(null);
+    setOpen(p.id);
+    if (!items[p.id]) {
+      const { data } = await supabase.from("purchase_items").select("*").eq("purchase_id", p.id).order("product_name");
+      setItems((m) => ({ ...m, [p.id]: (data ?? []) as PurchaseItem[] }));
+    }
+  }
+
+  return (
+    <div className="animate-in space-y-4">
+      {groups.map((g) => (
+        <section key={g.title}>
+          <p className="mb-1 px-1 text-xs font-bold uppercase tracking-wide text-muted">{g.title} · {g.list.length}</p>
+          <ul className="divide-y divide-slate-100 rounded-2xl bg-white shadow-card ring-1 ring-slate-900/10">
+            {g.list.map((p) => (
+              <li key={p.id}>
+                <button type="button" onClick={() => toggle(p)} className="flex min-h-[56px] w-full items-center gap-3 px-3 py-2 text-left" aria-expanded={open === p.id}>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-ink">
+                      {new Date(p.created_at).toLocaleString("es", g.title === "Hoy" ? { hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })} · {p.supplier_name || "Sin proveedor"}
+                    </span>
+                    <span className="block truncate text-xs text-muted">{p.items} producto{p.items === 1 ? "" : "s"}{p.doc ? ` · ${p.doc}` : ""}</span>
+                  </span>
+                  <span className="text-sm font-bold tabular-nums text-ink">{money(Number(p.total))}</span>
+                  <IconChevronRight size={18} className={`shrink-0 text-slate-400 transition ${open === p.id ? "rotate-90" : ""}`} />
+                </button>
+                {open === p.id && (
+                  <ul className="max-h-64 space-y-0.5 overflow-y-auto overscroll-contain bg-slate-50 px-3 py-2">
+                    {!items[p.id] ? (
+                      <li className="text-xs text-muted">Cargando…</li>
+                    ) : (
+                      items[p.id].map((i) => (
+                        <li key={i.id} className="flex items-center gap-2 text-sm">
+                          <span className="min-w-0 flex-1 truncate text-ink">{i.product_name}{i.variant_label ? <span className="text-violet-800"> · {i.variant_label}</span> : null}</span>
+                          <span className="shrink-0 font-semibold tabular-nums text-ok-700">+{i.qty}</span>
+                          {i.unit_cost !== null && <span className="w-20 shrink-0 text-right text-xs tabular-nums text-muted">{money(Number(i.unit_cost))} c/u</span>}
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      {hasMore && (
+        <button
+          type="button"
+          disabled={loadingMore}
+          onClick={async () => {
+            setLoadingMore(true);
+            await onMore();
+            setLoadingMore(false);
+          }}
+          className="btn-secondary min-h-[44px] w-full"
+        >
+          {loadingMore ? <Spinner /> : null} Ver 20 entradas más
+        </button>
+      )}
     </div>
   );
 }

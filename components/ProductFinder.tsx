@@ -8,7 +8,7 @@ import { productTitle } from "@/lib/fields";
 import { suggestedPrice } from "@/lib/sales";
 import { isNetworkError, localByCode, localFind, localVariants } from "@/lib/offline";
 import BarcodeCamera from "./BarcodeCamera";
-import Sheet from "./ui/Sheet";
+import VariantPickSheet from "./VariantPickSheet";
 import { useToast } from "./ui/Toast";
 import { IconSearch, IconX } from "./ui/Icons";
 
@@ -105,24 +105,7 @@ export default function ProductFinder({
       </div>
       <BarcodeCamera onCode={onCode} label="Escanear código" />
 
-      <Sheet open={!!picking} onClose={() => setPicking(null)} title={picking ? `${productTitle(picking.product.data)} · ¿cuál?` : ""}>
-        {picking && (
-          <div className="grid grid-cols-2 gap-2">
-            {picking.variants.map((v) => (
-              <button
-                key={v.id}
-                type="button"
-                onClick={() => done(picking.product, v)}
-                disabled={disableOutOfStockVariants && v.stock <= 0}
-                className="min-h-[56px] rounded-2xl border-2 border-violet-300 bg-white px-3 py-2 text-left font-semibold text-violet-900 transition hover:bg-violet-50 disabled:opacity-40"
-              >
-                <span className="block">{v.label}</span>
-                {showStock && <span className={`block text-xs font-normal ${v.stock <= 0 ? "text-danger-600" : "text-muted"}`}>{v.stock} en stock</span>}
-              </button>
-            ))}
-          </div>
-        )}
-      </Sheet>
+      <VariantPickSheet picking={picking} onPick={(p, v) => done(p, v)} onClose={() => setPicking(null)} showStock={showStock} disableOutOfStock={disableOutOfStockVariants} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Customer, PayMethod, Product, ProductVariant, Sale, SaleItem, SaleStatus } from "@/types/database";
 import CustomerPicker from "@/components/CustomerPicker";
 import ProductFinder from "@/components/ProductFinder";
+import ProductBrowser from "@/components/ProductBrowser";
 import { debtOf } from "@/lib/customers";
 import { currencyLabel, fromSummary, money, stockOf, SUMMARY_COLS } from "@/lib/inventory";
 import { productTitle } from "@/lib/fields";
@@ -16,9 +17,9 @@ import { newOpId } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
 import { bizKey, cacheGet, cacheSet, isNetworkError, localVariants, queueSale, refreshInventoryCache, useOffline } from "@/lib/offline";
 import Sheet from "@/components/ui/Sheet";
-import { EmptyState, ScreenHeader } from "@/components/ui/Screen";
+import { ScreenHeader } from "@/components/ui/Screen";
 import { NumberPad, QtyStepper, padNumber } from "@/components/ui/NumberPad";
-import { IconAlert, IconCart, IconCheck, IconPlus, IconRegister, IconTag, IconTrash, IconWifiOff, Spinner } from "@/components/ui/Icons";
+import { IconAlert, IconCheck, IconPlus, IconRegister, IconTag, IconTrash, IconWifiOff, Spinner } from "@/components/ui/Icons";
 
 type SplitMethod = "efectivo" | "qr" | "transferencia";
 const SPLIT_METHODS: SplitMethod[] = ["efectivo", "qr", "transferencia"];
@@ -290,7 +291,7 @@ export default function SellPage() {
       </section>
 
       {lines.length === 0 ? (
-        <EmptyState icon={<IconCart size={26} />} title="La venta está vacía" body="Busca o escanea un producto para empezar." />
+        <p className="px-1 text-sm text-muted">La venta está vacía: busca o escanea arriba, o toca un producto en la lista.</p>
       ) : (
         <section className="animate-in card p-2">
           <ul className="divide-y divide-slate-100">
@@ -323,6 +324,8 @@ export default function SellPage() {
           </ul>
         </section>
       )}
+
+      <ProductBrowser onPick={add} disableOutOfStockVariants inList={(id) => lines.filter((l) => l.product.id === id).reduce((s, l) => s + l.qty, 0)} />
 
       <div className="sticky-action">
         <button type="button" onClick={openCharge} disabled={!lines.length} className="btn-success btn-lg w-full">
