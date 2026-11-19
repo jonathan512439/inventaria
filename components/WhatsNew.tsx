@@ -14,7 +14,7 @@ interface Props {
 const SLIDES = [
   {
     title: "Cinco lugares, nada más",
-    text: "Abajo están Inicio, Productos, Vender (el botón grande del centro), Clientes y Más. Todo lo demás vive dentro de uno de ellos: la caja está en Vender, contar y lo que llegó en Productos, Números y Ajustes en Más.",
+    text: "Abajo están Inicio, Productos, Vender (el botón grande del centro), Clientes y Más. Todo lo demás vive dentro de uno de ellos: la caja está en Vender, contar y la entrada de inventario en Productos, Números y Ajustes en Más.",
     Art: ArtBar,
   },
   {
@@ -24,7 +24,7 @@ const SLIDES = [
   },
   {
     title: "Un producto se encuentra siempre igual",
-    text: "En Vender, Productos, Llegó mercadería y Contar: escribe parte del nombre o toca el escáner. Si tiene tallas o colores, te pregunta cuál.",
+    text: "En Vender, Productos, Entrada de inventario y Contar: escribe parte del nombre o toca el escáner. Si tiene tallas o colores, te pregunta cuál.",
     Art: ArtFinder,
   },
   {

@@ -24,7 +24,7 @@ type IconT = (p: { size?: number; className?: string; strokeWidth?: number }) =>
  *   Celular, vendedor: Inicio · Productos · VENDER · Clientes · Caja  (lo demás, con «Más» en la cabecera)
  *   Escritorio: barra lateral con las mismas áreas y «Más» desplegado
  * Cabecera: nombre del negocio, estado de conexión y «¿quién atiende?».
- * Cada sección vive dentro de su área (Agregar, Llegó mercadería y Contar en Productos; Caja en Vender;
+ * Cada sección vive dentro de su área (Agregar, Entrada de inventario y Contar en Productos; Caja en Vender;
  * Mercadería entregada en Clientes): «Más» solo lleva Números, Ajustes, Ayuda y Cerrar sesión (8 entradas).
  */
 
@@ -156,7 +156,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <Link href="/dashboard" className="flex min-w-0 items-center gap-2 md:hidden" aria-label="Inicio">
             <LogoMark size={30} />
           </Link>
-          <span className="min-w-0 flex-1 truncate text-base font-bold text-ink">{flow.business?.name ?? ""}</span>
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block truncate text-base font-bold text-ink">{flow.business?.name ?? ""}</span>
+            {flow.ready && <span className="block text-xs font-semibold text-muted">{flow.isOwner ? "Dueño" : "Vendedor"}</span>}
+          </span>
           <ConnectionChip />
           <WhoIsServing />
           {!flow.isOwner && (

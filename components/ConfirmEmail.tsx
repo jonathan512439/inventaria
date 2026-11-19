@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { friendlyError } from "@/lib/errors";
 
@@ -12,7 +11,6 @@ import { friendlyError } from "@/lib/errors";
  * Funciona desde cualquier dispositivo, no depende del navegador donde se hizo el registro.
  */
 export default function ConfirmEmail() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,9 +30,7 @@ export default function ConfirmEmail() {
       if (access_token && refresh_token) {
         const { error } = await supabase.auth.setSession({ access_token, refresh_token });
         if (error) return setError(friendlyError(error));
-        window.history.replaceState(null, "", "/auth/confirm");
-        router.replace("/dashboard");
-        router.refresh();
+        window.location.replace("/dashboard"); // recarga completa (R2)
         return;
       }
 
@@ -43,13 +39,12 @@ export default function ConfirmEmail() {
         data: { session },
       } = await supabase.auth.getSession();
       if (session) {
-        router.replace("/dashboard");
-        router.refresh();
+        window.location.replace("/dashboard");
         return;
       }
       setError("El enlace de confirmación no es válido.");
     })();
-  }, [router]);
+  }, []);
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">

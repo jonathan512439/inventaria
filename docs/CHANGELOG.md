@@ -3,6 +3,32 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Ronda de validación 1 · R1 y R2
+
+### 17.19 Invitación que funciona y cuentas que no se mezclan
+- **Qué**:
+  - **Enlace de invitación:**
+    - Abrir el enlace sin sesión lleva a **Crear cuenta**, con el aviso «Te invitaron a un negocio».
+    - La cuenta nueva entra **directo como vendedor** del negocio que invitó y **ya no se le crea un negocio propio**.
+    - Quien ya tiene cuenta toca «Inicia sesión» y vuelve al enlace con el código.
+    - Antes el código se perdía en el camino y toda cuenta nueva recibía su propio «Mi negocio».
+  - **Negocio vacío de más:**
+    - Al aceptar una invitación, si la persona tenía un negocio propio **vacío** (sin productos, ventas, clientes, movimientos ni compras), se quita.
+    - Si tiene datos, se conserva.
+    - Se quitó el «Mi negocio» vacío que había quedado en tu cuenta de vendedor.
+  - **Mismo celular con varias cuentas:**
+    - Entrar, salir y confirmar el correo **recargan la app por completo**, así no queda nada en memoria de la cuenta anterior.
+    - La cabecera muestra siempre el **negocio** y si quien atiende es **Dueño** o **Vendedor**.
+  - El mensaje de invitación del Equipo explica que el enlace sirve para crear la cuenta o entrar.
+  - Desde ahora, «Llegó mercadería» se llama **«Entrada de inventario»**.
+  - Migración `029_invitacion.sql`. Es compatible con la versión anterior y se aplicó antes de publicar.
+- **Validar**:
+  1. Como dueño, en Equipo, crear una invitación y copiar el enlace.
+  2. En otro navegador (o en modo incógnito), abrir el enlace: aparece «Crear cuenta» con el aviso de invitación.
+  3. Crear la cuenta y confirmar el correo: entra como **Vendedor** de tu negocio, y en Ajustes no aparece el selector de negocios (no hay un segundo negocio).
+  4. Con el mismo celular, cerrar sesión y entrar como dueño: la cabecera dice tu negocio y «Dueño». Mis datos › «Guardar respaldo ahora» funciona.
+  - Pruebas: `npm run test:team` (4 nuevas: el registro con código no crea negocio, el código usado no rompe el registro, el negocio vacío se quita y el que tiene datos se conserva).
+
 ## 2026-11-19 · Pendientes antes de C6 · P3
 
 ### 17.18 Vender sin conexión

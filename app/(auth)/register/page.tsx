@@ -1,17 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient as createPlainClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { friendlyError } from "@/lib/errors";
+import { inviteCodeIn, safeNext } from "@/lib/nav";
 
 /** URL pública de la app: los enlaces del correo siempre apuntan aquí (se pueden abrir desde cualquier dispositivo). */
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
 
 export default function RegisterPage() {
-  const router = useRouter();
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
+/**
+ * Crear cuenta. Si llega desde un enlace de invitación (`?next=/join?code=…`), el código viaja en los datos del
+ * registro y la base une a la persona al negocio como vendedor, sin crearle un negocio propio (029 · R1).
+ */
+function RegisterForm() {
+  const params = useSearchParams();
+  const next = safeNext(params.get("next"));
+  const invite = inviteCodeIn(next);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -33,7 +48,7 @@ export default function RegisterPage() {
       .signUp({
         email,
         password,
-        options: { emailRedirectTo: `${appUrl()}/auth/confirm` },
+        options: { emailRedirectTo: `${appUrl()}/auth/confirm`, data: invite ? { invite_code: invite } : undefined },
       })
       .catch((e: unknown) => ({ data: { session: null, user: null }, error: e as Error }));
     setLoading(false);
@@ -41,16 +56,20 @@ export default function RegisterPage() {
     // Si la confirmación de correo está desactivada, ya hay sesión: la guardamos en cookies.
     if (data.session) {
       await createClient().auth.setSession(data.session);
-      router.replace("/dashboard");
-      router.refresh();
+      window.location.href = invite ? "/dashboard" : next; // con invitación ya quedó unido al negocio
     } else {
-      router.replace("/login?registered=1");
+      window.location.href = `/login?registered=1${invite ? "&joined=1" : ""}`;
     }
   }
 
   return (
     <form onSubmit={onSubmit} className="card space-y-4">
       <h2 className="text-lg font-bold">Crear cuenta</h2>
+      {invite && (
+        <p className="rounded-2xl bg-brand-50 p-3 text-sm text-brand-800">
+          Te invitaron a un negocio (código <b className="font-mono">{invite}</b>). Crea tu cuenta y entrarás directo como parte del equipo, sin crear un negocio propio.
+        </p>
+      )}
       <div>
         <label className="label" htmlFor="email">Correo</label>
         <input id="email" type="email" className="input" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -69,7 +88,7 @@ export default function RegisterPage() {
       </button>
       <p className="text-center text-sm text-slate-500">
         ¿Ya tienes cuenta?{" "}
-        <Link href="/login" className="font-medium text-brand-600 hover:underline">Inicia sesión</Link>
+        <Link href={params.get("next") ? `/login?next=${encodeURIComponent(next)}` : "/login"} className="font-medium text-brand-600 hover:underline">Inicia sesión</Link>
       </p>
     </form>
   );

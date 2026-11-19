@@ -57,7 +57,7 @@ export default function TeamPage() {
     toast("success", `Código ${code} creado. Compártelo por WhatsApp.`);
     load();
   }
-  const inviteText = (i: Invite) => `Hola, te invito a usar InventarIA en ${flow.business?.name ?? "mi negocio"} como ${ROLE_LABEL[i.role].toLowerCase()}. Entra a ${location.origin}/join?code=${i.code} (o regístrate y usa el código ${i.code}). Vence en 7 días.`;
+  const inviteText = (i: Invite) => `Hola, te invito a usar InventarIA en ${flow.business?.name ?? "mi negocio"} como ${ROLE_LABEL[i.role].toLowerCase()}. Abre este enlace y crea tu cuenta (o entra con la tuya si ya tienes): ${location.origin}/join?code=${i.code} · Vence en 7 días.`;
 
   async function setRole(m: BusinessMember, role: MemberRole) {
     const { error } = await supabase.from("business_members").update({ role }).eq("business_id", m.business_id).eq("user_id", m.user_id);

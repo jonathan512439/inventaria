@@ -310,7 +310,7 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
 
 - Tocar **Gestionar** abre una hoja con fichas grandes, en este orden:
   1. **Vender**: la pantalla de siempre.
-  2. **Llegó mercadería**: sumar stock a lo que ya existe, escaneando o tocando en la lista.
+  2. **Entrada de inventario** (antes «Llegó mercadería», renombrada por el usuario): sumar stock a lo que ya existe, escaneando o tocando en la lista.
   3. **Producto nuevo**: foto con IA, código, Excel o a mano.
   4. **Contar**.
   - Si hay pendientes de revisar, una quinta ficha: **«Revisar (N)»**.
@@ -322,15 +322,15 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
   - La barra queda igual que la del dueño (Inicio · Productos · Gestionar · Clientes · Más), y «Más» vuelve a la barra.
   - La Caja está dentro de Gestionar y de Vender.
 - **Sin cambios:** las direcciones (/sell, /stock/in, /add, /stock/count) y las redirecciones antiguas.
-- **Productos** sigue siendo la lista y la ficha. Los atajos «Llegó mercadería» y «Contar» de su cabecera se quedan.
+- **Productos** sigue siendo la lista y la ficha. Los atajos «Entrada de inventario» y «Contar» de su cabecera se quedan.
 
 ### 8.2 Modo de uso del negocio
 
-Columna `businesses.mode` (migración `029`): `'inventario'` o `'completo'`, con `'completo'` por defecto para los negocios que ya existen. Se elige al empezar («¿Para qué vas a usar InventarIA?») y se cambia en Ajustes › Negocio. **Cambiar de modo no borra nada: solo muestra u oculta.**
+Columna `businesses.mode` (migración `030`): `'inventario'` o `'completo'`, con `'completo'` por defecto para los negocios que ya existen. Se elige al empezar («¿Para qué vas a usar InventarIA?») y se cambia en Ajustes › Negocio. **Cambiar de modo no borra nada: solo muestra u oculta.**
 
 | | **Solo inventario** (control de productos) | **Inventario y ventas** (completo, el de hoy) |
 |---|---|---|
-| Gestionar | **Llegó mercadería** · Producto nuevo · **Sacar del stock** · Contar | Vender · Llegó mercadería · Producto nuevo · Contar |
+| Gestionar | **Entrada de inventario** · Producto nuevo · **Sacar del stock** · Contar | Vender · Entrada de inventario · Producto nuevo · Contar |
 | Barra | Inicio · Productos · **Gestionar** · **Historial** · Más | Inicio · Productos · **Gestionar** · Clientes · Más |
 | Salidas | «Sacar del stock» con motivo (Vendido, Uso interno, Merma, Vencido, Devolución), **sin dinero** | Venta con cobro, caja, fiado |
 | Oculto | Vender, Caja, Clientes, Números › Ventas, costos y ganancia, proveedores con costo | — |

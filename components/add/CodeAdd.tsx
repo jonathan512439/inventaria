@@ -41,7 +41,7 @@ interface Row {
 /**
  * Agregar › Código de barras (antes /scan): alta desde catálogo público, lote continuo y repetidos — sin gastar IA.
  * Si el código ya es tuyo, suma stock (+1/+5/+10) como atajo; el lugar principal para sumar lo que llegó es
- * Productos › Llegó mercadería (/stock/in, C7.5), con proveedor, costo y vencimiento.
+ * Productos › Entrada de inventario (/stock/in, C7.5), con proveedor, costo y vencimiento.
  */
 export default function CodeAdd() {
   const supabase = createClient();
@@ -558,7 +558,7 @@ export default function CodeAdd() {
         {help && (
           <div className="mt-2 space-y-3 rounded-2xl border-2 border-slate-200 p-4 text-sm text-slate-700">
             <ol className="space-y-2">
-              <li className="flex gap-2"><b className="shrink-0 text-brand-700">1.</b><span><b>Tu inventario.</b> Si el código ya existe, no se crea nada: sumas stock con +1/+5/+10 (o ×N en lote). Si llegó mercadería de varios productos, usa <b>Productos › Llegó mercadería</b>: ahí anotas también proveedor, costo y vencimiento.</span></li>
+              <li className="flex gap-2"><b className="shrink-0 text-brand-700">1.</b><span><b>Tu inventario.</b> Si el código ya existe, no se crea nada: sumas stock con +1/+5/+10 (o ×N en lote). Si llegó mercadería de varios productos, usa <b>Productos › Entrada de inventario</b>: ahí anotas también proveedor, costo y vencimiento.</span></li>
               <li className="flex gap-2"><b className="shrink-0 text-brand-700">2.</b><span><b>Catálogos públicos gratuitos</b> (Open Food, Beauty, Products y Pet Food Facts, consultados a la vez). Si el producto existe: nombre, marca, contenido, <b>foto</b> y una <b>categoría sugerida</b> de las tuyas. Guardas sin usar IA.</span></li>
               <li className="flex gap-2"><b className="shrink-0 text-brand-700">3.</b><span><b>No encontrado.</b> Escribes nombre y precio (el código se guarda igual) o pasas a la foto con IA.</span></li>
             </ol>

@@ -18,7 +18,8 @@ export default function AuthGuard() {
       if (!data.session) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") clearDeviceData().finally(() => router.replace("/login"));
+      // Recarga completa: nada de la cuenta que salió queda en memoria (R2)
+      if (event === "SIGNED_OUT") clearDeviceData().finally(() => window.location.replace("/login"));
     });
     return () => sub.subscription.unsubscribe();
   }, [router, pathname]);

@@ -170,7 +170,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
         <div className="mt-1 grid grid-cols-2 gap-2">
           <button onClick={() => setMode("add")} className={`rounded-2xl border-2 p-3 text-left ${mode === "add" ? "border-emerald-500 bg-emerald-50" : "border-slate-200"}`}>
             <span className="block text-lg font-bold text-emerald-700">+ Sumar</span>
-            <span className="block text-xs text-slate-600">llegó mercadería</span>
+            <span className="block text-xs text-slate-600">entrada de inventario</span>
           </button>
           <button onClick={() => setMode("remove")} className={`rounded-2xl border-2 p-3 text-left ${mode === "remove" ? "border-rose-500 bg-rose-50" : "border-slate-200"}`}>
             <span className="block text-lg font-bold text-rose-700">− Restar</span>

@@ -336,7 +336,7 @@ function Products() {
             <p>Los botones de abajo del buscador filtran: <b>Por reponer</b> (con la lista de pedido para WhatsApp), <b>Por vencer</b>, <b>Agotados</b>, <b>Papelera</b>…</p>
             <p>Toca <b>Seleccionar</b> para cambiar el precio, imprimir etiquetas, mover de categoría, descargar en Excel o enviar a la papelera varios productos a la vez.</p>
             <p>El botón <b>±</b> de cada fila suma o resta stock sin abrir la ficha.</p>
-            <p><b>Llegó mercadería</b> suma al stock lo que te entregaron (escaneando). <b>Contar</b> revisa un estante y corrige las diferencias.</p>
+            <p><b>Entrada de inventario</b> suma al stock lo que te entregaron (escaneando o tocando en la lista). <b>Contar</b> revisa un estante y corrige las diferencias.</p>
           </>
         }
       />
@@ -344,7 +344,7 @@ function Products() {
       {/* Mercadería (C7.5): entradas y conteo viven dentro de Productos */}
       {!selecting && view !== "trash" && (
         <div className="animate-in grid grid-cols-2 gap-2">
-          <Link href="/stock/in" className="btn-secondary min-h-[44px]"><IconTruck size={18} /> Llegó mercadería</Link>
+          <Link href="/stock/in" className="btn-secondary min-h-[44px]"><IconTruck size={18} /> Entrada de inventario</Link>
           <Link href="/stock/count" className="btn-secondary min-h-[44px]"><IconClipboard size={18} /> Contar</Link>
         </div>
       )}

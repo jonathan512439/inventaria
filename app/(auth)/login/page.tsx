@@ -2,13 +2,13 @@
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient as createPlainClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { friendlyError } from "@/lib/errors";
+import { inviteCodeIn, safeNext } from "@/lib/nav";
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,6 +16,8 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [unconfirmed, setUnconfirmed] = useState(false);
   const [resent, setResent] = useState(false);
+  const next = safeNext(params.get("next"));
+  const invite = inviteCodeIn(next);
 
   /** Reenvía el correo de confirmación (flujo implicit: el enlace funciona desde cualquier dispositivo). */
   async function resend() {
@@ -44,17 +46,22 @@ function LoginForm() {
       setError(friendlyError(error));
       return;
     }
-    router.replace(params.get("next") || "/dashboard");
-    router.refresh();
+    // Recarga completa: no queda nada en memoria de otra cuenta usada antes en este celular (R2)
+    window.location.href = next;
   }
 
   return (
     <form onSubmit={onSubmit} className="card space-y-4">
       <h2 className="text-lg font-bold">Iniciar sesión</h2>
+      {invite && (
+        <p className="rounded-2xl bg-brand-50 p-3 text-sm text-brand-800">
+          Te invitaron a un negocio (código <b className="font-mono">{invite}</b>). Entra con tu cuenta para unirte. ¿No tienes cuenta? Créala abajo y entrarás directo al equipo.
+        </p>
+      )}
       {params.get("registered") && (
         <p className="rounded-lg bg-green-50 p-3 text-sm text-green-700">
-          Cuenta creada. Te enviamos un correo: abre el enlace de confirmación (desde cualquier dispositivo) y entrarás
-          directamente.
+          Cuenta creada{params.get("joined") ? " y unida al negocio que te invitó" : ""}. Te enviamos un correo: abre el enlace de
+          confirmación (desde cualquier dispositivo) y entrarás directamente.
         </p>
       )}
       {params.get("error") && (
@@ -90,7 +97,7 @@ function LoginForm() {
       </button>
       <p className="text-center text-sm text-slate-500">
         ¿No tienes cuenta?{" "}
-        <Link href="/register" className="font-medium text-brand-600 hover:underline">Regístrate</Link>
+        <Link href={params.get("next") ? `/register?next=${encodeURIComponent(next)}` : "/register"} className="font-medium text-brand-600 hover:underline">Regístrate</Link>
       </p>
     </form>
   );

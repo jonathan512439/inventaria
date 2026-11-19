@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { safeNext } from "@/lib/nav";
 
 const PUBLIC_PATHS = ["/login", "/register", "/auth/callback", "/auth/confirm"];
 
@@ -34,17 +35,16 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isPublic && !isApi) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    // Con la consulta (antes se perdía el ?code= del enlace de invitación). Quien llega por una invitación
+    // casi siempre aún no tiene cuenta: va a «Crear cuenta» (desde ahí puede ir a «Iniciar sesión»).
+    url.pathname = pathname === "/join" ? "/register" : "/login";
     url.search = "";
-    if (pathname !== "/") url.searchParams.set("next", pathname);
+    if (pathname !== "/") url.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 
   if (user && (pathname === "/login" || pathname === "/register" || pathname === "/")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    url.search = "";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL(safeNext(request.nextUrl.searchParams.get("next")), request.url));
   }
 
   return response;

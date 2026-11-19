@@ -197,7 +197,7 @@ export default function StockInPage() {
     let firstError: unknown = null;
     for (const l of lines) {
       try {
-        await adjustStock(supabase, { id: l.opId, productId: l.product.id, variantId: l.variant?.id ?? null, delta: l.qty, tipo: "entrada", motivo: "llegó mercadería" });
+        await adjustStock(supabase, { id: l.opId, productId: l.product.id, variantId: l.variant?.id ?? null, delta: l.qty, tipo: "entrada", motivo: "entrada de inventario" });
         if (l.expires) {
           const q = l.variant ? supabase.from("product_variants").update({ expires_at: l.expires }).eq("id", l.variant.id) : supabase.from("products").update({ expires_at: l.expires }).eq("id", l.product.id);
           // Si falla, la línea queda para reintentar: la entrada ya hecha no se repite (mismo id)
@@ -241,7 +241,7 @@ export default function StockInPage() {
   return (
     <div className={`${tab === "new" ? "has-action" : ""} mx-auto max-w-2xl space-y-4`}>
       <ScreenHeader
-        title="Llegó mercadería"
+        title="Entrada de inventario"
         subtitle="Busca o escanea lo que llegó: cada lectura suma 1."
         back={{ href: "/products", label: "Productos" }}
         help={

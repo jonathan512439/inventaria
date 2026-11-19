@@ -44,6 +44,28 @@ try {
   check(!je && joined === bid, `vendedor acepta la invitación ${inv.code}`);
   const { error: again } = await seller.c.rpc("accept_invite", { p_code: inv.code });
   check(!!again, "el código no vale dos veces");
+  // R1 (029): al unirse, su «Mi negocio» vacío (creado solo al registrarse) desaparece
+  const { data: sellerBiz } = await admin.from("business_members").select("business_id,role").eq("user_id", seller.id);
+  check(sellerBiz.length === 1 && sellerBiz[0].business_id === bid && sellerBiz[0].role === "vendedor", `al unirse, su negocio propio vacío se quita → ${sellerBiz.length} negocio(s)`);
+  // R1 (029): crear la cuenta CON el código (enlace de invitación) → entra directo como vendedor, sin negocio propio
+  const { data: inv2 } = await owner.c.from("invites").insert({ business_id: bid, code: "TEST" + Math.random().toString(36).slice(2, 4).toUpperCase(), role: "vendedor", created_by: owner.id }).select().single();
+  const { data: nu, error: nue } = await admin.auth.admin.createUser({ email: `invitado-${Date.now()}@example.com`, password: "Test123456!", email_confirm: true, user_metadata: { invite_code: inv2.code } });
+  const { data: nuBiz } = await admin.from("business_members").select("business_id,role").eq("user_id", nu?.user?.id);
+  const { data: nuOwn } = await admin.from("businesses").select("id").eq("owner_id", nu?.user?.id);
+  check(!nue && nuBiz?.length === 1 && nuBiz[0].business_id === bid && nuBiz[0].role === "vendedor" && nuOwn?.length === 0, `registro con código: 1 negocio (vendedor) y ninguno propio → ${nuBiz?.length} / ${nuOwn?.length} ${nue?.message ?? ""}`);
+  const { data: nu2 } = await admin.auth.admin.createUser({ email: `codigo-malo-${Date.now()}@example.com`, password: "Test123456!", email_confirm: true, user_metadata: { invite_code: inv2.code } });
+  const { data: nu2Own } = await admin.from("businesses").select("id").eq("owner_id", nu2?.user?.id);
+  check(nu2Own?.length === 1, "con un código ya usado, la cuenta se crea igual con su negocio propio");
+  // Un negocio propio CON datos no se borra al unirse a otro
+  const { data: inv3 } = await owner.c.from("invites").insert({ business_id: bid, code: "TEST" + Math.random().toString(36).slice(2, 4).toUpperCase(), role: "vendedor", created_by: owner.id }).select().single();
+  const nu2c = createClient(url, anon, { auth: { persistSession: false } });
+  await nu2c.auth.signInWithPassword({ email: nu2.user.email, password: "Test123456!" });
+  await nu2c.from("customers").insert({ name: "Cliente propio" });
+  await nu2c.rpc("accept_invite", { p_code: inv3.code });
+  const { data: nu2Still } = await admin.from("businesses").select("id").eq("owner_id", nu2.user.id);
+  check(nu2Still?.length === 1, "un negocio propio con datos (un cliente) se conserva al unirse a otro");
+  await admin.auth.admin.deleteUser(nu.user.id);
+  await admin.auth.admin.deleteUser(nu2.user.id);
 
   // 5) Ahora comparte el inventario (RLS por negocio) y no ve el costo
   const { data: after } = await seller.c.from("products").select("id,data");
