@@ -7,6 +7,7 @@ import WhatsNew from "@/components/WhatsNew";
 import AiKeyCard from "@/components/AiKeyCard";
 import AiUsageCard from "@/components/AiUsageCard";
 import AlertsSection from "@/components/settings/AlertsSection";
+import LogoCard from "@/components/settings/LogoCard";
 import { useFlow } from "@/components/FlowProvider";
 import { clearDeviceData } from "@/lib/offline";
 import { DEFAULT_TZ } from "@/lib/dates";
@@ -134,6 +135,7 @@ export default function SettingsPage() {
           </div>
         )}
         <div className="card space-y-3">
+          <LogoCard />
           <div>
             <label className="label" htmlFor="business">Nombre (sale en los tickets y mensajes)</label>
             <input id="business" className="input min-h-[44px]" placeholder="Ej. Tienda Doña Rosa" value={biz.name} disabled={!flow.isOwner} onChange={(e) => setBiz({ ...biz, name: e.target.value })} />

@@ -14,7 +14,12 @@ export type Business = {
   currency?: string;
   min_stock_default?: number | null;
   expiry_days?: number | null;
+  /** Logo (bucket público business-logos, 030) */
+  logo_url?: string | null;
+  /** Modo de uso (030): solo inventario o inventario y ventas */
+  mode?: BusinessMode;
 };
+export type BusinessMode = "completo" | "inventario";
 
 /** Lo que la app necesita al abrir, en una llamada (`session_context`, 023). */
 export type SessionContext = {

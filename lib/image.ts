@@ -37,6 +37,31 @@ export async function resizeImage(file: File, maxWidth = MAX_WIDTH): Promise<Fil
   return new File([blob], name, { type: "image/jpeg" });
 }
 
+/**
+ * Recorte cuadrado centrado y achicado a `size` px (logo del negocio, R9). WebP si el navegador lo sabe hacer
+ * (conserva la transparencia); si no, PNG.
+ */
+export async function squareImage(file: File, size = 256): Promise<Blob> {
+  const isHeic = /image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name);
+  if (isHeic) file = await resizeImage(file, 1024);
+  const bitmap = await loadBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const sx = (bitmap.width - side) / 2;
+  const sy = (bitmap.height - side) / 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("No se pudo procesar la imagen");
+  ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, size, size);
+  if ("close" in bitmap) (bitmap as ImageBitmap).close();
+  const webp = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
+  if (webp && webp.type === "image/webp") return webp;
+  const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!png) throw new Error("No se pudo comprimir la imagen");
+  return png;
+}
+
 async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
   // createImageBitmap respeta la orientación EXIF en navegadores modernos
   if ("createImageBitmap" in window) {

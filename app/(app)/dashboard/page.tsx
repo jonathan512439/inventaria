@@ -8,6 +8,7 @@ import { queueSummary, useQueue } from "@/lib/queue";
 import { money } from "@/lib/inventory";
 import { todaySummary } from "@/lib/data/insights";
 import { useFlow } from "@/components/FlowProvider";
+import BusinessLogo from "@/components/ui/BusinessLogo";
 import { Stat, TaskCard } from "@/components/ui/Screen";
 import { IconAlert, IconBell, IconCamera, IconCart, IconCheck, IconCheckCircle, IconChevronRight, IconRegister, IconStore, IconTag, IconUsers, Spinner } from "@/components/ui/Icons";
 
@@ -115,9 +116,12 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <header className="animate-in">
-        <p className="text-sm font-medium text-muted">{greeting} · {new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" })}</p>
-        <h1 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">{flow.business?.name || "Tu negocio"}</h1>
+      <header className="animate-in flex items-center gap-3">
+        <BusinessLogo name={flow.business?.name} url={flow.business?.logo_url} size={56} />
+        <span className="min-w-0">
+          <p className="text-sm font-medium text-muted">{greeting} · {new Date().toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" })}</p>
+          <h1 className="truncate text-2xl font-bold tracking-tight text-ink md:text-3xl">{flow.business?.name || "Tu negocio"}</h1>
+        </span>
       </header>
 
       {/* La acción del día: vender */}

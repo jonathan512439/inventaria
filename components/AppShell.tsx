@@ -10,7 +10,7 @@ import WhoIsServing from "./WhoIsServing";
 import WhatsNew from "./WhatsNew";
 import ConnectionChip from "./OfflineBar";
 import Sheet from "./ui/Sheet";
-import { LogoMark, LogoWordmark } from "./ui/Logo";
+import BusinessLogo from "./ui/BusinessLogo";
 import {
   IconBox, IconCart, IconChart, IconCloud, IconHelp, IconHome, IconList, IconLogout, IconMore, IconRegister, IconSettings,
   IconStore, IconUsers,
@@ -126,7 +126,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <>
       {/* Escritorio: barra lateral */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200/70 bg-white md:flex">
-        <Link href="/dashboard" className="flex h-16 shrink-0 items-center px-5"><LogoWordmark /></Link>
+        <Link href={flow.isOwner ? "/settings" : "/dashboard"} className="flex h-20 shrink-0 items-center gap-3 px-4" aria-label="Tu negocio">
+          <BusinessLogo name={flow.business?.name} url={flow.business?.logo_url} size={44} />
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate text-base font-bold text-ink">{flow.business?.name ?? ""}</span>
+            <span className="block text-xs font-semibold text-muted">{flow.ready ? (flow.isOwner ? "Dueño" : "Vendedor") : ""} · InventarIA</span>
+          </span>
+        </Link>
         <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4" aria-label="Principal">
           <ul className="grid gap-1">
             {areas.map(({ key, href, label, Icon }) =>
@@ -153,13 +159,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Cabecera (celular y escritorio) */}
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 backdrop-blur-md md:pl-64">
         <div className="flex h-14 items-center gap-2 px-4 md:px-6 xl:px-10">
-          <Link href="/dashboard" className="flex min-w-0 items-center gap-2 md:hidden" aria-label="Inicio">
-            <LogoMark size={30} />
+          <Link href={flow.isOwner ? "/settings" : "/dashboard"} className="flex min-w-0 flex-1 items-center gap-2.5 md:pointer-events-none" aria-label="Tu negocio">
+            <BusinessLogo name={flow.business?.name} url={flow.business?.logo_url} size={36} className="md:hidden" />
+            <span className="min-w-0 flex-1 leading-tight md:hidden">
+              <span className="block truncate text-base font-bold text-ink">{flow.business?.name ?? ""}</span>
+              {flow.ready && <span className="block text-xs font-semibold text-muted">{flow.isOwner ? "Dueño" : "Vendedor"}</span>}
+            </span>
           </Link>
-          <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-base font-bold text-ink">{flow.business?.name ?? ""}</span>
-            {flow.ready && <span className="block text-xs font-semibold text-muted">{flow.isOwner ? "Dueño" : "Vendedor"}</span>}
-          </span>
           <ConnectionChip />
           <WhoIsServing />
           {!flow.isOwner && (

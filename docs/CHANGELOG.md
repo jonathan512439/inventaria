@@ -3,6 +3,27 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Ronda de validación 1 · R9 y R11
+
+### 17.23 Logo del negocio y cabecera con identidad
+- **Qué**:
+  - **Logo:** en Ajustes › Negocio, «Subir logo» (foto o galería). Se recorta cuadrado y se achica a 256 px en el celular. «Cambiar» o «Quitar». Solo el dueño puede cambiarlo.
+  - **Dónde se ve:**
+    - En la **cabecera** del celular: logo, nombre del negocio y «Dueño» o «Vendedor». Al tocarla, el dueño va a Ajustes.
+    - En la **barra lateral** de escritorio, arriba: logo, nombre y rol.
+    - En **Inicio**, junto al saludo.
+    - En el **ticket** después de vender, también al imprimirlo.
+  - Sin logo aparece un cuadrado con la inicial del negocio en el color de la app.
+  - Migración `030_logo_y_modo.sql`:
+    - Agrega las columnas `logo_url` y `mode` (`mode` es para R10).
+    - Crea el bucket público `business-logos`, donde solo el dueño puede escribir.
+    - `session_context` devuelve el logo y el modo.
+    - Es compatible con la versión anterior.
+- **Validar**:
+  - Como dueño, en Ajustes › Negocio, subir una imagen: aparece en la cabecera, en Inicio y en el ticket de una venta.
+  - Como vendedor, en Ajustes dice «Lo cambia el dueño», y la cabecera muestra el logo con «Vendedor».
+  - Pruebas: `npm run test:access` (2 nuevas: el logo solo lo sube el dueño y se ve sin sesión; el modo solo lo cambia el dueño).
+
 ## 2026-11-19 · Ronda de validación 1 · R5
 
 ### 17.22 Qué hacer con los productos por vencer

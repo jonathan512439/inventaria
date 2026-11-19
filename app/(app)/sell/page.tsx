@@ -7,6 +7,7 @@ import type { Customer, PayMethod, Product, ProductVariant, Sale, SaleItem, Sale
 import CustomerPicker from "@/components/CustomerPicker";
 import ProductFinder from "@/components/ProductFinder";
 import ProductBrowser from "@/components/ProductBrowser";
+import BusinessLogo from "@/components/ui/BusinessLogo";
 import { debtOf } from "@/lib/customers";
 import { currencyLabel, fromSummary, money, stockOf, SUMMARY_COLS } from "@/lib/inventory";
 import { productTitle } from "@/lib/fields";
@@ -247,7 +248,13 @@ export default function SellPage() {
           ) : (
             <p className="mt-1 text-sm text-muted">{METHOD_LABEL[s.method]}{s.status !== "pagado" ? ` · debe ${money(Number(s.total) - Number(s.paid))}` : ""} · el stock ya bajó</p>
           )}
-          <pre className="mt-4 whitespace-pre-wrap rounded-2xl bg-slate-50 p-3 text-left font-mono text-xs leading-snug text-slate-700">{ticketText(s, done.items, business)}</pre>
+          <div className="mt-4 rounded-2xl bg-slate-50 p-3 text-left">
+            <div className="mb-2 flex items-center gap-2">
+              <BusinessLogo name={business} url={flow.business?.logo_url} size={40} />
+              <span className="truncate text-base font-bold text-ink">{business || "Mi negocio"}</span>
+            </div>
+            <pre className="whitespace-pre-wrap font-mono text-xs leading-snug text-slate-700">{ticketText(s, done.items, business)}</pre>
+          </div>
           <div className="mt-4 grid gap-2">
             <button onClick={() => setDone(null)} className="btn-primary btn-lg w-full"><IconPlus size={18} /> Nueva venta</button>
             <button onClick={shareTicket} className="btn-success w-full"><IconTag size={18} /> Enviar ticket por WhatsApp</button>

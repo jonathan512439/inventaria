@@ -161,6 +161,22 @@ try {
   check(!upErr && !vDl && !!aDl, `respaldos: el dueño descarga, el vendedor no ${upErr?.message ?? ""}`);
   await admin.storage.from("backups").remove([path]);
 
+  // --- Logo y modo de uso (030): solo el dueño; el logo se ve sin sesión (bucket público) ---
+  const png = new Blob([Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0))], { type: "image/png" });
+  const logoPath = `${A.bid}/logo-test.png`;
+  const { error: vLogo } = await v.storage.from("business-logos").upload(`${A.bid}/logo-vend.png`, png, { contentType: "image/png" });
+  const { error: aLogo } = await a.storage.from("business-logos").upload(logoPath, png, { contentType: "image/png", upsert: true });
+  const pub = await fetch(a.storage.from("business-logos").getPublicUrl(logoPath).data.publicUrl);
+  check(!!vLogo && !aLogo && pub.status === 200, `logo: el vendedor no lo sube, el dueño sí y se ve sin sesión → ${pub.status} ${aLogo?.message ?? ""}`);
+  await admin.storage.from("business-logos").remove([logoPath]);
+  await v.from("businesses").update({ mode: "inventario" }).eq("id", A.bid);
+  const { data: bm1 } = await admin.from("businesses").select("mode").eq("id", A.bid).single();
+  const { error: am } = await a.from("businesses").update({ mode: "inventario" }).eq("id", A.bid);
+  const { data: bm2 } = await admin.from("businesses").select("mode").eq("id", A.bid).single();
+  const { error: badMode } = await a.from("businesses").update({ mode: "otro" }).eq("id", A.bid);
+  check(bm1.mode === "completo" && !am && bm2.mode === "inventario" && !!badMode, `modo de uso: el vendedor no lo cambia, el dueño sí, y solo valen los 2 modos → ${bm1.mode} / ${bm2.mode}`);
+  await a.from("businesses").update({ mode: "completo" }).eq("id", A.bid);
+
   // --- Costos (025): el vendedor no los recibe en ninguna lectura ---
   await a.from("products").update({ data: { nombre: "Confirmado 2", precio: 10, precio_compra: 6 } }).eq("id", P.id);
   await v.from("products").update({ data: { nombre: "Confirmado 2", precio: 10, precio_compra: 1 } }).eq("id", P.id);
