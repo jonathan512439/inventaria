@@ -3,6 +3,31 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Pendientes antes de C6 · P1, P2 y P6
+
+### 17.17 Fotos en el Excel, costo por variante y avisos sin texto técnico
+- **Qué**:
+  - **Fotos en el Excel (P1):**
+    - Desde que las fotos son privadas, la columna «Foto» del Excel traía una dirección que no abría.
+    - Ahora dice **«Ver foto»** y es un enlace que abre la imagen **durante 7 días**.
+    - En el respaldo completo la columna dice solo «Sí». Una dirección que vence no sirve en un archivo que se guarda meses.
+    - Al volver a importar ese Excel, la columna «Foto» se sigue ignorando.
+  - **Costo por talla o color (P2):**
+    - En la ficha del producto › **Precios**, el dueño ve «Costo por variante». Cada talla o color tiene su costo y cuánto ganas por unidad.
+    - Si se deja vacío, usa el costo del producto.
+    - Se guarda con el mismo «Guardar cambios», y el historial de precios indica a qué variante corresponde.
+    - Las ventas de esa variante toman ese costo, así que la ganancia sale exacta.
+    - El vendedor no lo ve.
+    - Migración `028_costo_variante.sql`: `set_prices` acepta `variant_id`, solo para el costo y solo para el dueño. Es compatible con la versión anterior.
+  - **Avisos claros (P6):**
+    - Los últimos 13 lugares que mostraban errores técnicos en inglés ahora dan un mensaje sencillo. Son: variantes, ejes, categorías, clientes, tabla de productos, unirse a un negocio, confirmar correo, cámara, Excel, estante y respaldo.
+    - `AUDITORIA.md` tiene una tabla nueva (§2.7) con el estado de cada hallazgo: resuelto, parcial o planificado, y dónde.
+- **Validar**:
+  - Ajustes › Mis datos › Descargar Excel. En la columna «Foto», tocar «Ver foto» abre la imagen.
+  - Producto con tallas › Precios. Poner costo 12 a una talla y guardar. Volver a entrar: sigue en 12 y el historial dice «compra · M · Rojo» (o la que sea). Vender esa talla y, en Números › Ventas, la ganancia usa 12.
+  - Como vendedor, en Precios no aparece «Costo por variante».
+  - Pruebas: `npm run test:variants` (5 comprobaciones nuevas), `npm run test:import` (3 nuevas sobre el Excel), `npm run test:backup` («Foto» solo con «Sí»).
+
 ## 2026-11-19 · Fase 6.9 · C7.9 — Limpieza y ayuda: la reconstrucción queda completa
 
 ### 17.16 Menú final, ayuda «?» y limpieza

@@ -6,6 +6,7 @@ import { resizeImage } from "@/lib/image";
 import { enqueue } from "@/lib/queue";
 import { useToast } from "./ui/Toast";
 import { IconCheck, IconGrid, IconX, Spinner } from "./ui/Icons";
+import { friendlyError } from "@/lib/errors";
 
 interface Detected {
   nombre_visible: string;
@@ -63,7 +64,7 @@ export default function ShelfDetect({ categoryId }: Props) {
       setChecked(new Set(list.map((_, i) => i)));
     } catch (err) {
       setFile(null);
-      toast("error", err instanceof Error ? err.message : "No se pudo leer la foto");
+      toast("error", friendlyError(err, "No se pudo leer la foto"));
     } finally {
       setBusy(null);
     }

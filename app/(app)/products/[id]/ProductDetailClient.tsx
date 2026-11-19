@@ -14,7 +14,7 @@ import FieldInput from "@/components/FieldInput";
 import StockAdjust from "@/components/StockAdjust";
 import ProductVariants from "@/components/ProductVariants";
 import { minStockOf, money, stockOf } from "@/lib/inventory";
-import { STOCK_KEYS, newOpId, setStock, withoutStock } from "@/lib/data/ops";
+import { STOCK_KEYS, newOpId, setPrices, setStock, withoutStock } from "@/lib/data/ops";
 import { friendlyError } from "@/lib/errors";
 import { withCosts } from "@/lib/data/costs";
 import { storagePath } from "@/lib/photos";
@@ -62,6 +62,9 @@ export default function ProductDetailClient() {
   const [priceHist, setPriceHist] = useState<PriceHistory[]>([]);
   const [axes, setAxes] = useState<VariantAxis[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  // Costo por variante (028, solo dueño): lo guardado y lo escrito en Precios
+  const [varCostSaved, setVarCostSaved] = useState<Record<string, number>>({});
+  const [varCost, setVarCost] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     const [p, c, t, a, v] = await Promise.all([
@@ -76,6 +79,13 @@ export default function ProductDetailClient() {
     setAxes((a.data ?? []) as VariantAxis[]);
     setVariants((v.data ?? []) as ProductVariant[]);
     supabase.from("stock_movements").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(30).then(({ data }) => setMovements((data ?? []) as StockMovement[]));
+    // RLS (025): al vendedor no le llega ninguna fila
+    supabase.from("product_costs").select("variant_id,cost").eq("product_id", id).not("variant_id", "is", null).then(({ data }) => {
+      const m: Record<string, number> = {};
+      (data ?? []).forEach((c) => c.variant_id && (m[c.variant_id] = Number(c.cost)));
+      setVarCostSaved(m);
+      setVarCost(Object.fromEntries(Object.entries(m).map(([k, v]) => [k, String(v)])));
+    });
     supabase.from("price_history").select("*").eq("product_id", id).order("created_at", { ascending: false }).limit(20).then(({ data }) => setPriceHist((data ?? []) as PriceHistory[]));
     // El costo vive en product_costs (025): para el dueño se vuelve a poner en data; al vendedor no le llega
     const full = p.data ? (await withCosts(supabase, [p.data]))[0] : null;
@@ -145,6 +155,23 @@ export default function ProductDetailClient() {
     if (error) {
       setSaving(false);
       return setError(friendlyError(error));
+    }
+    // Costo por variante (028): solo lo que cambió, en una sola llamada
+    const costRows = isOwner
+      ? variants.flatMap((v) => {
+          const raw = (varCost[v.id] ?? "").trim().replace(",", ".");
+          const value = raw === "" ? null : Number(raw);
+          if (value !== null && (!Number.isFinite(value) || value < 0)) return [];
+          return value === (varCostSaved[v.id] ?? null) ? [] : [{ product_id: product.id, variant_id: v.id, field: "precio_compra" as const, value }];
+        })
+      : [];
+    if (costRows.length) {
+      try {
+        await setPrices(supabase, costRows, "ficha");
+      } catch (e) {
+        setSaving(false);
+        return setError(friendlyError(e));
+      }
     }
     if (stockChanged) {
       try {
@@ -403,6 +430,43 @@ export default function ProductDetailClient() {
               </p>
             )}
           </div>
+          {isOwner && variants.length > 0 && (
+            <section className="card space-y-2">
+              <div>
+                <h2 className="text-sm font-bold text-ink">Costo por variante <span className="text-xs font-normal text-muted">(solo lo ves tú)</span></h2>
+                <p className="text-xs text-muted">Vacío = usa el costo del producto{cost !== null ? ` (${money(cost)})` : ""}. Así la ganancia de cada talla o color sale exacta.</p>
+              </div>
+              <ul className="max-h-[50vh] space-y-1.5 overflow-y-auto">
+                {variants.map((v) => {
+                  const raw = (varCost[v.id] ?? "").trim().replace(",", ".");
+                  const c = raw === "" ? cost : Number(raw);
+                  const p = v.precio ?? price;
+                  return (
+                    <li key={v.id} className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-ink">{v.label}</span>
+                        <span className="block text-xs text-muted">
+                          Se vende a {p !== null ? money(p) : "—"}
+                          {p !== null && c !== null && Number.isFinite(c) && <> · {p > c ? <span className="text-ok-700">ganas {money(p - c)}</span> : <span className="text-danger-700">a costo o menos</span>}</>}
+                        </span>
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        min={0}
+                        aria-label={`Costo de ${v.label}`}
+                        className="input min-h-[44px] w-28 text-right tabular-nums"
+                        placeholder={cost !== null ? String(cost) : "Costo"}
+                        value={varCost[v.id] ?? ""}
+                        onChange={(e) => setVarCost({ ...varCost, [v.id]: e.target.value })}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
           {isOwner && (
             <section className="card">
               <h2 className="mb-2 text-sm font-bold text-ink">Historial de precios</h2>
@@ -412,7 +476,7 @@ export default function ProductDetailClient() {
                 <ul className="divide-y divide-slate-100 text-sm">
                   {priceHist.map((h) => (
                     <li key={h.id} className="flex items-center gap-2 py-2">
-                      <span className="w-28 shrink-0 text-xs text-muted">{new Date(h.created_at).toLocaleDateString("es", { day: "2-digit", month: "short", year: "2-digit" })} · {h.field === "precio" ? "venta" : h.field === "precio_compra" ? "compra" : "mayorista"}</span>
+                      <span className="w-32 shrink-0 text-xs text-muted">{new Date(h.created_at).toLocaleDateString("es", { day: "2-digit", month: "short", year: "2-digit" })} · {h.field === "precio" ? "venta" : h.field === "precio_compra" ? "compra" : "mayorista"}{h.variant_id ? ` · ${variants.find((v) => v.id === h.variant_id)?.label ?? "variante"}` : ""}</span>
                       <span className="tabular-nums text-slate-400 line-through">{h.old_value === null ? "—" : money(Number(h.old_value))}</span>
                       <span className="font-bold tabular-nums text-ink">{h.new_value === null ? "—" : money(Number(h.new_value))}</span>
                       <span className="ml-auto truncate text-xs text-muted">{h.source}</span>

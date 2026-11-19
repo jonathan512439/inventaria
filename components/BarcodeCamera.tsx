@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cleanCode, scanFrame } from "@/lib/barcode";
 import { IconCamera, IconX } from "./ui/Icons";
+import { friendlyError } from "@/lib/errors";
 
 interface Props {
   /** Cada lectura (con pausa de 1,5 s; el mismo código se repite solo tras 4 s) */
@@ -91,9 +92,7 @@ export default function BarcodeCamera({ onCode, label = "Escanear" }: Props) {
             ? "No se encontró ninguna cámara en este dispositivo."
             : name === "NotReadableError"
               ? "La cámara está ocupada por otra app. Ciérrala y vuelve a intentarlo."
-              : e instanceof Error && e.message
-                ? e.message
-                : "No se pudo abrir la cámara. Si la página no es segura (https), el navegador no la permite."
+              : friendlyError(e, "No se pudo abrir la cámara. Si la página no es segura (https), el navegador no la permite.")
       );
     }
   }

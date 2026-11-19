@@ -29,6 +29,8 @@ for (const n of ["Respaldo", "Inventario", "Ventas", "Clientes", "Movimientos", 
 const { count } = await admin.from("products").select("id", { count: "exact", head: true }).eq("business_id", biz.id).is("deleted_at", null);
 const inv = XLSX.utils.sheet_to_json(wb.Sheets.Inventario);
 check(inv.length >= (count ?? 0) || (count === 0 && inv.length <= 1), `Inventario: ${inv.length} fila(s) para ${count} producto(s)`);
+// Fotos (026, bucket privado): el respaldo no guarda la dirección (no abriría), solo «Sí»
+check(inv.every((r) => r.Foto === undefined || r.Foto === "" || r.Foto === "Sí"), `columna «Foto» solo con «Sí» (${inv.filter((r) => r.Foto === "Sí").length} con foto)`);
 const anon = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 const { data: anonList } = await anon.storage.from("backups").list(biz.id);
 const { error: anonDl } = await anon.storage.from("backups").download(`${biz.id}/${latest}`);

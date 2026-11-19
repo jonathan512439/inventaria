@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyError } from "@/lib/errors";
 
 /**
  * Destino del enlace de confirmación de correo (flujo implicit).
@@ -30,7 +31,7 @@ export default function ConfirmEmail() {
       const refresh_token = hash.get("refresh_token");
       if (access_token && refresh_token) {
         const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-        if (error) return setError(error.message);
+        if (error) return setError(friendlyError(error));
         window.history.replaceState(null, "", "/auth/confirm");
         router.replace("/dashboard");
         router.refresh();

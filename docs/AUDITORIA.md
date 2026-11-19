@@ -238,3 +238,37 @@ Gravedad: **C** = crítico (datos o seguridad), **A** = alto (cifras de negocio 
 | V8 | Cobro sin teclado numérico propio y sin cálculo de vuelto. | Hoja de cobro con teclado grande, «efectivo recibido → vuelto». |
 
 > **2026-11-19 · IA colgada (C7.9):** `generateContent` no tenía tiempo máximo; con modelos de Google colgados, el análisis de fotos fallaba con 524 a los 100 s. Corregido con 25 s por modelo, 85 s en total y reordenamiento de modelos lentos (ver `RECONSTRUCCION_VISUAL.md` §7 · C7.9).
+
+## 2.7 Estado de cada hallazgo (2026-11-19)
+
+✅ resuelto · ◐ parcial (lo que falta está en la columna «Pendiente») · ⏳ planificado. Pasos y pruebas en `PLAN_CIMIENTOS.md`; P1–P6 = «Pendientes antes de C6».
+
+| # | Estado | Dónde se resolvió | Pendiente |
+|---|---|---|---|
+| §2.0 (base pausada) | ✅ | C0: `keepalive.yml`, avisos de workflows fallidos, login con mensaje de red | Supabase Pro antes del primer cliente de pago (A4) |
+| C1 · C3 · C4 · C5 | ✅ | C2 (`021`): ventas, cobros, compras, entregas, conteos y ajustes en funciones SQL atómicas e idempotentes; sin recorte silencioso; costo y N.º de venta en el servidor | — |
+| C2 | ✅ | C1 (columnas reales) + C2 (stock solo por funciones SQL) + C5.1 (la base rechaza escribir el stock de un confirmado fuera de ellas) | — |
+| C6 | ✅ | C3 (`022`): `close_cash` calcula en SQL; cada cierre se guarda sin pisar el anterior | — |
+| S1 | ✅ | C5.1 (respaldos solo dueño) + C5.2 (`025`: costos en tablas que el vendedor no lee) | — |
+| S2–S10 | ✅ | C5.1 (`024`): políticas por rol y operación, firma puesta por la base y token de turno, PIN para volver al dueño, rol mínimo por defecto, plan inmutable, `/api/cleanup` y `/api/usage` solo dueño, negocio activo, limpieza al cerrar sesión | — |
+| S11 | ✅ | C1: código de barras único por negocio | — |
+| S12 | ✅ | C5.1 (consumo de IA por petición) + C5.3 (`026`: fotos privadas con enlace firmado) | Excel con enlace de foto: **P1 ✅** |
+| N1 · N2 · N6 | ✅ | C3 (`022`): el dinero como pagos (abonos en caja, pago mixto, saldo a favor) | — |
+| N3 · N5 | ✅ | C4 (`023`): nombre y ajustes del negocio; zona horaria del negocio en «hoy» y «este mes» | — |
+| N4 | ✅ | C2: `consign_settle` vende sin volver a mover el stock | — |
+| N7 | ◐ | C2: la cola sin conexión marca «fallido» tras varios intentos y deja de reintentar | Vender sin conexión: **P3** |
+| E1 · E2 | ✅ | C1: búsqueda por código con índice; `search` real con `pg_trgm` e índices por negocio | — |
+| E3 | ◐ | C7.7 (`027`): Inicio y Números calculados en SQL | Productos y Etiquetas cargan la lista completa (la muestran); paginar si un negocio pasa de ~2.000 productos |
+| E4 | ◐ | C4: una `rpc` de contexto por pantalla (antes ~7 peticiones) | Refrescar por eventos y no por cada cambio de pantalla: **P5** |
+| E5 · E6 | ⏳ | — | Duplicados con `similar_products()` en SQL y cupo de IA en tabla `ai_quota_state`: **P4** |
+| M1 | ◐ | C2–C7: `lib/data/ops.ts` (dinero y stock), `lib/data/insights.ts`, `lib/data/costs.ts` | ~160 consultas `from()` siguen en pantallas (lecturas y catálogo) |
+| M2 | ✅ | C1: campos del sistema como columnas, `data` solo para datos propios | — |
+| M3 · M5 · M6 · M7 | ⏳ | — | C6 (proyecto de pruebas) |
+| M4 | ◐ | C7: Clientes, Números, Ajustes y Mercadería separados en componentes | La ficha (540 líneas) y Revisar (628) siguen grandes |
+| M8 | ◐ | C0: Node 22 en los workflows | Next 15: C6 |
+| V1 · V2 · V7 | ✅ | C7.1 y C7.9: 5 lugares por rol, «Más» con 8 entradas, el vendedor no ve pantallas del dueño | — |
+| V3 | ✅ | C7: ningún texto menor a 12 px (`text-[9-11px]` = 0) | — |
+| V4 | ◐ | C7: botones de icono con `aria-label` (19 → 61) y toques de 44 px | Regla de lint `jsx-a11y` y revisión de contraste: C6 |
+| V5 | ✅ | `lib/errors.ts` en todos los avisos (los últimos 13 crudos, 2026-11-19 · P6) | — |
+| V6 | ✅ | C4: moneda del negocio con `money()` | — |
+| V8 | ✅ | C7.2: hoja de cobro con teclado grande y vuelto | — |

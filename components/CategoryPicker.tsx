@@ -8,6 +8,7 @@ import { useToast } from "./ui/Toast";
 import { IconArrowLeft, IconCheck, IconChevronRight, IconPlus, IconX, Spinner } from "./ui/Icons";
 import { categoryColor } from "@/lib/colors";
 import { findSibling } from "@/lib/categories";
+import { friendlyError } from "@/lib/errors";
 
 interface Props {
   categories: Category[];
@@ -118,7 +119,7 @@ export default function CategoryPicker({ categories, value, onChange, onCategori
       } = await supabase.auth.getUser();
       const { data, error } = await supabase.from("categories").insert({ user_id: user!.id, name, parent_id: step }).select().single();
       setBusy(false);
-      if (error) return toast("error", error.message);
+      if (error) return toast("error", friendlyError(error));
       onCategoriesChange?.([...categories, data]);
       setCreating(null);
       setNewName("");

@@ -10,6 +10,7 @@ import VariantGrid from "./VariantGrid";
 import StockAdjust from "./StockAdjust";
 import { useToast } from "./ui/Toast";
 import { useConfirm } from "./ui/Confirm";
+import { friendlyError } from "@/lib/errors";
 import { IconTrash, Spinner } from "./ui/Icons";
 
 interface Props {
@@ -60,7 +61,7 @@ export default function ProductVariants({ product, categories, axes, variants, o
       .select()
       .single();
     setCreating(false);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     onChanged();
     setAdjusting(data as ProductVariant); // pedir cuántas hay
   }
@@ -75,7 +76,7 @@ export default function ProductVariants({ product, categories, axes, variants, o
     });
     if (!ok) return;
     const { error } = await supabase.from("product_variants").delete().eq("id", v.id);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     onChanged();
   }
 
@@ -87,7 +88,7 @@ export default function ProductVariants({ product, categories, axes, variants, o
       const { error } = await supabase.from("product_variants").update({ precio: Number.isFinite(precio as number) ? precio : null, codigo_barras: codigo }).eq("id", id);
       if (error) {
         setSaving(false);
-        return toast("error", /product_variants_codigo/.test(error.message) ? "Ese código de barras ya está en otra variante" : error.message);
+        return toast("error", /product_variants_codigo/.test(error.message) ? "Ese código de barras ya está en otra variante" : friendlyError(error));
       }
     }
     setSaving(false);

@@ -15,7 +15,15 @@ interface ExportArgs {
   /** Variantes: una fila por variante (Talla, Color… con su stock y código) + hoja Resumen */
   variants?: ProductVariant[];
   axes?: VariantAxis[];
+  /**
+   * Fotos (026, bucket privado): la dirección guardada no abre fuera de la app. Con este mapa
+   * (image_url → enlace firmado) la columna «Foto» dice «Ver foto» y abre la imagen; sin él solo dice «Sí».
+   */
+  photoLinks?: Map<string, string>;
 }
+
+/** Cuánto dura el enlace de la foto en el Excel descargado. */
+const PHOTO_LINK_DAYS = 7;
 
 const CODE_KEYS = ["codigo_barras", "codigo", "sku", "barcode", "ean"];
 const hasCodeCol = (cols: { key: string }[]) => cols.some((c) => CODE_KEYS.includes(normalizeFieldName(c.key)));
@@ -56,7 +64,7 @@ function toCell(v: unknown, numeric: boolean): string | number {
   return typeof v === "number" ? v : String(v);
 }
 
-function rowFor(p: Product, cols: ReturnType<typeof columnsFor>, categories: Category[], v?: ProductVariant, axisLabels?: Map<string, string>) {
+function rowFor(p: Product, cols: ReturnType<typeof columnsFor>, categories: Category[], v?: ProductVariant, axisLabels?: Map<string, string>, photoLinks?: Map<string, string>) {
   const { top, sub } = topAndSub(categories, p.category_id);
   const row: Record<string, string | number> = {
     Categoría: top || "Sin categoría",
@@ -80,7 +88,7 @@ function rowFor(p: Product, cols: ReturnType<typeof columnsFor>, categories: Cat
   }
   row["Etiqueta leída"] = p.ai_meta?.etiqueta ?? "";
   row["Modelo IA"] = p.ai_meta?.modelo ?? "";
-  row.Foto = p.image_url ?? "";
+  row.Foto = !p.image_url ? "" : photoLinks ? (photoLinks.has(p.image_url) ? "Ver foto" : "Sí") : "Sí";
   row.Creado = new Date(p.created_at).toLocaleString("es");
   return row;
 }
@@ -98,13 +106,33 @@ export async function exportToExcel(args: ExportArgs) {
   // Carga bajo demanda: la librería (7 MB) no entra en el bundle del servidor ni en la carga inicial
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
-  addInventorySheets(XLSX, wb, args);
+  addInventorySheets(XLSX, wb, { ...args, photoLinks: args.photoLinks ?? (await signPhotoLinks(args.products).catch(() => new Map<string, string>())) });
   const stamp = businessDayKey();
   XLSX.writeFile(wb, `${args.fileName ?? "inventario"}-${stamp}.xlsx`);
 }
 
+/** Enlaces firmados de las fotos (válidos {@link PHOTO_LINK_DAYS} días), pedidos de a 500. Si falla, el Excel sale igual con «Sí». */
+async function signPhotoLinks(products: Product[]): Promise<Map<string, string>> {
+  const [{ createClient }, { storagePath }] = await Promise.all([import("./supabase/client"), import("./photos")]);
+  const byPath = new Map<string, string>(); // ruta en el bucket → image_url
+  products.forEach((p) => {
+    const path = storagePath(p.image_url);
+    if (path && p.image_url) byPath.set(path, p.image_url);
+  });
+  const links = new Map<string, string>();
+  const paths = Array.from(byPath.keys());
+  const storage = createClient().storage.from("product-images");
+  for (let i = 0; i < paths.length; i += 500) {
+    const { data } = await storage.createSignedUrls(paths.slice(i, i + 500), PHOTO_LINK_DAYS * 86400);
+    (data ?? []).forEach((d) => d.path && d.signedUrl && links.set(byPath.get(d.path)!, d.signedUrl));
+  }
+  // Fotos que no son del bucket (catálogo público): la dirección ya abre tal cual
+  products.forEach((p) => p.image_url && !storagePath(p.image_url) && links.set(p.image_url, p.image_url));
+  return links;
+}
+
 /** Añade al libro las hojas del inventario (Inventario o una por categoría, y Resumen si hay variantes). Sirve en navegador y en Node. */
-export function addInventorySheets(XLSX: XlsxLib, wb: import("xlsx").WorkBook, { products, categories, templates, sheetPerCategory = false, variants = [], axes = [] }: ExportArgs) {
+export function addInventorySheets(XLSX: XlsxLib, wb: import("xlsx").WorkBook, { products, categories, templates, sheetPerCategory = false, variants = [], axes = [], photoLinks }: ExportArgs) {
   const usedNames = new Set<string>(wb.SheetNames);
   const variantsOf = new Map<string, ProductVariant[]>();
   variants.forEach((v) => variantsOf.set(v.product_id, [...(variantsOf.get(v.product_id) ?? []), v]));
@@ -137,9 +165,19 @@ export function addInventorySheets(XLSX: XlsxLib, wb: import("xlsx").WorkBook, {
     // Una fila por variante; el producto sin variantes va en una sola fila
     const rows = list.flatMap((p) => {
       const vs = variantsOf.get(p.id);
-      return vs?.length ? vs.map((v) => rowFor(p, cols, categories, v, axisLabels)) : [rowFor(p, cols, categories, undefined, hasVariants ? axisLabels : undefined)];
+      return vs?.length ? vs.map((v) => rowFor(p, cols, categories, v, axisLabels, photoLinks)) : [rowFor(p, cols, categories, undefined, hasVariants ? axisLabels : undefined, photoLinks)];
     });
+    const rowProducts = list.flatMap((p) => Array(Math.max(1, variantsOf.get(p.id)?.length ?? 0)).fill(p) as Product[]);
     const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+    if (photoLinks) {
+      // «Ver foto» como enlace que se abre con un toque
+      const col = XLSX.utils.encode_col(headers.indexOf("Foto"));
+      rowProducts.forEach((p, i) => {
+        const link = p.image_url ? photoLinks.get(p.image_url) : undefined;
+        const c = ws[`${col}${i + 2}`];
+        if (link && c) c.l = { Target: link, Tooltip: `Abre la foto (el enlace dura ${PHOTO_LINK_DAYS} días)` };
+      });
+    }
     ws["!cols"] = autoWidth(rows, headers);
     ws["!autofilter"] = { ref: `A1:${XLSX.utils.encode_col(headers.length - 1)}${rows.length + 1}` };
     XLSX.utils.book_append_sheet(wb, ws, safeSheetName(name));

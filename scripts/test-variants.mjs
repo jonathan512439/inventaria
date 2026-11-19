@@ -64,6 +64,28 @@ try {
   await user.from("products").update({ status: "confirmed" }).eq("id", d2.id);
   const { error: late } = await user.from("product_variants").insert({ user_id: uid, product_id: d2.id, values: { talla: "S", color: "Rojo" }, label: "S · Rojo", stock: 3 });
   check(!!late, "el orden antiguo (confirmar y luego variantes con stock) lo rechaza la base");
+  // Costo por variante desde la ficha (028): set_prices con variant_id; la venta usa el de la variante y si no, el del producto
+  const { data: dv2 } = await user.from("product_variants").select("id,label").eq("product_id", d1.id);
+  const vS = dv2.find((x) => x.label === "S · Azul"), vM = dv2.find((x) => x.label === "M · Azul");
+  const { error: sc } = await user.rpc("set_prices", { p_rows: [
+    { product_id: d1.id, field: "precio_compra", value: 10 },
+    { product_id: d1.id, variant_id: vM.id, field: "precio_compra", value: 12.5 },
+  ], p_source: "ficha" });
+  const { data: costs } = await user.from("product_costs").select("variant_id,cost").eq("product_id", d1.id);
+  check(!sc && costs.some((c) => c.variant_id === vM.id && Number(c.cost) === 12.5) && costs.some((c) => !c.variant_id && Number(c.cost) === 10), `costo de la M azul 12,5 y del producto 10 ${sc?.message ?? ""}`);
+  const line = (vid) => ({ product_id: d1.id, variant_id: vid, qty: 1, unit_price: 20 });
+  const { data: sale, error: se } = await user.rpc("register_sale", { p_id: crypto.randomUUID(), p_lines: [line(vM.id), line(vS.id)] });
+  const saleId = sale?.sale?.id ?? sale?.id;
+  const { data: items } = await user.from("sale_items_v").select("variant_label,unit_cost").eq("sale_id", saleId);
+  const costOfLine = (l) => Number(items?.find((i) => i.variant_label === l)?.unit_cost);
+  check(!se && costOfLine("M · Azul") === 12.5 && costOfLine("S · Azul") === 10, `venta: M azul con su costo (12,5), S azul con el del producto (10) ${se?.message ?? JSON.stringify(items)}`);
+  const { data: hist } = await user.from("price_history").select("variant_id,new_value,source").eq("product_id", d1.id).eq("field", "precio_compra");
+  check(hist.some((h) => h.variant_id === vM.id && Number(h.new_value) === 12.5 && h.source === "ficha"), "el cambio de costo de la variante queda en el historial de precios");
+  await user.rpc("set_prices", { p_rows: [{ product_id: d1.id, variant_id: vM.id, field: "precio_compra", value: null }], p_source: "ficha" });
+  const { data: costs2 } = await user.from("product_costs").select("variant_id").eq("product_id", d1.id).not("variant_id", "is", null);
+  check(costs2.length === 0, "vaciar el costo de la variante vuelve a usar el del producto");
+  const { error: bad } = await user.rpc("set_prices", { p_rows: [{ product_id: d1.id, variant_id: vM.id, field: "precio", value: 1 }], p_source: "ficha" });
+  check(!!bad, "por variante solo se cambia el costo (el precio de venta va en la variante)");
   await admin.from("categories").delete().eq("id", cat.id);
   const { data: axesLeft } = await admin.from("variant_axes").select("id").eq("user_id", uid);
   check(axesLeft.length === 0, "borrar categoría borra sus ejes");

@@ -30,12 +30,12 @@ El usuario pidió dejar **todo validado y funcionando** antes del proyecto de pr
 | # | Qué | Por qué | Dónde | Prueba |
 |---|---|---|---|---|
 | P0 | **Validación del usuario** de C7.6–C7.9 (Clientes, Números, Ajustes, menú final) y **prueba con 3 personas** (dueño, vendedor, alguien nuevo) | Criterio de cierre de C7 | `RECONSTRUCCION_VISUAL.md` §7 (anotar observaciones) | manual |
-| P1 | **Fotos en el Excel**: la columna «Foto» exporta la ruta del bucket privado (026) → el enlace no abre | Regresión de C5.3 | `lib/export.ts` (enlace firmado de 7 días o «sí/no»), respaldo igual | `test:backup` + manual |
-| P2 | **Costo por variante**: hoy solo se puede poner desde «Llegó mercadería»; la ficha edita el costo del producto, no el de cada talla/color | Ganancia por variante incompleta | Ficha › Precios (dueño) → `product_costs` por variante | `test:variants` ampliada |
+| P1 | ✅ 2026-11-19 (17.17) · **Fotos en el Excel**: la columna «Foto» exporta la ruta del bucket privado (026) → el enlace no abre | Regresión de C5.3 | `lib/export.ts` (enlace firmado de 7 días o «sí/no»), respaldo igual | `test:backup` + manual |
+| P2 | ✅ 2026-11-19 (17.17, `028_costo_variante.sql`) · **Costo por variante**: hoy solo se puede poner desde «Llegó mercadería»; la ficha edita el costo del producto, no el de cada talla/color | Ganancia por variante incompleta | Ficha › Precios (dueño) → `product_costs` por variante | `test:variants` ampliada |
 | P3 | **Vender sin conexión** (N7): Vender exige red; solo los ajustes de stock se guardan sin conexión | Criterio de la Fase 1 («venta en modo avión») | cola de ventas con `register_sale` idempotente (id del celular) + aviso «N por enviar» | `test:ops` + manual en modo avión |
 | P4 | **IA: cupo agotado en memoria** (E6) y **duplicados leyendo 2.000 productos por foto** (E5) | Con varias instancias se reintentan modelos agotados; fotos lentas con inventarios grandes | tabla `ai_quota_state`; `similar_products()` con `pg_trgm` en SQL | `test:e2e` |
 | P5 | **Menos peticiones al navegar** (E4): `FlowProvider` vuelve a pedir el contexto en cada cambio de pantalla | Datos móviles y velocidad | refrescar por eventos (venta, revisar, cambio de negocio), no por ruta | manual (pestaña Red) |
-| P6 | **AUDITORIA al día**: las tablas de la Auditoría 2 no marcan lo ya resuelto en C1–C7 | Que el documento refleje el estado real | `AUDITORIA.md` (columna Estado) | — |
+| P6 | ✅ 2026-11-19 (17.17, `AUDITORIA.md` §2.7; además los últimos 13 errores crudos pasan por `friendlyError`) · **AUDITORIA al día**: las tablas de la Auditoría 2 no marcan lo ya resuelto en C1–C7 | Que el documento refleje el estado real | `AUDITORIA.md` (columna Estado) | — |
 
 Quedan para C6 (proyecto de pruebas): registro de migraciones (M7), tipos generados (M3), pruebas en CI (M6), código compartido analyze/reanalyze (M5), quitar columnas viejas de `profiles`, Next 15 (M8).
 

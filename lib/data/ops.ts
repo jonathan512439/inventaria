@@ -142,8 +142,11 @@ export function applyCount(db: DB, op: { id: string; categoryId: string | null; 
 
 // ---------- Precios ----------
 
-/** Cambia precios en lote (el historial lo escribe la base). Devuelve cuántos productos cambiaron. */
-export function setPrices(db: DB, rows: { product_id: string; field: "precio" | "precio_mayorista" | "precio_compra"; value: number | null }[], source = "masivo"): Promise<number> {
+/**
+ * Cambia precios en lote (el historial lo escribe la base). Devuelve cuántas filas cambiaron.
+ * Con `variant_id` (solo `precio_compra`) pone o quita el costo de esa variante (028).
+ */
+export function setPrices(db: DB, rows: { product_id: string; variant_id?: string | null; field: "precio" | "precio_mayorista" | "precio_compra"; value: number | null }[], source = "masivo"): Promise<number> {
   return call(db, "set_prices", { p_rows: rows, p_source: source });
 }
 

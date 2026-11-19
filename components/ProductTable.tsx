@@ -105,7 +105,7 @@ export default function ProductTable({ products, categories, templates, mode, on
     if (soft) {
       const { error } = await supabase.from("products").update({ deleted_at: new Date().toISOString() }).eq("id", p.id);
       setBusy((b) => ({ ...b, [p.id]: false }));
-      if (error) return setError(error.message);
+      if (error) return setError(friendlyError(error));
       return onChanged();
     }
     // Pendiente: se borra de verdad, con su foto (ruta = user_id/uuid.ext dentro del bucket)
@@ -115,7 +115,7 @@ export default function ProductTable({ products, categories, templates, mode, on
     }
     const { error } = await supabase.from("products").delete().eq("id", p.id);
     setBusy((b) => ({ ...b, [p.id]: false }));
-    if (error) return setError(error.message);
+    if (error) return setError(friendlyError(error));
     onChanged();
   }
 

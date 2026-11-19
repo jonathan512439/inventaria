@@ -46,7 +46,7 @@ export default function BackupCard() {
     const out: Record<string, unknown>[] = [];
     for (let from = 0; ; from += PAGE) {
       const { data, error } = await supabase.from(table as "products").select("*").range(from, from + PAGE - 1);
-      if (error) throw new Error(`${table}: ${error.message}`);
+      if (error) throw error; // lo traduce friendlyError al mostrarlo
       out.push(...((data ?? []) as Record<string, unknown>[]));
       if (!data || data.length < PAGE) break;
     }

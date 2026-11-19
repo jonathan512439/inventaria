@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Customer } from "@/types/database";
 import { useToast } from "./ui/Toast";
 import { IconPlus, IconSearch, IconX, Spinner } from "./ui/Icons";
+import { friendlyError } from "@/lib/errors";
 
 interface Props {
   value: Customer | null;
@@ -44,7 +45,7 @@ export default function CustomerPicker({ value, onChange, placeholder = "Sin cli
     } = await supabase.auth.getUser();
     const { data, error } = await supabase.from("customers").insert({ user_id: user!.id, name: creating.name.trim(), phone: creating.phone.trim() || null }).select().single();
     setBusy(false);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     onChange(data as Customer);
     setCreating(null);
     setOpen(false);

@@ -5,6 +5,7 @@
  */
 import * as XLSX from "xlsx";
 import { buildRows, initialMapping, planImport } from "../lib/import";
+import { addInventorySheets } from "../lib/export";
 import type { Category, Product } from "../types/database";
 
 let failed = 0;
@@ -45,6 +46,19 @@ check(plan.updates.length === 2 && plan.updates.some((u) => u.product.id === "p2
 check(plan.skipped.length === 2 && plan.skipped.some((r) => /Repetida/.test(r.error ?? "")), "se saltan la fila sin nombre y la repetida en la planilla");
 const nc = plan.newCategories.map((c) => `${c.top}>${c.sub ?? ""}`).sort();
 check(JSON.stringify(nc) === JSON.stringify(["Abarrotes>Granos", "Abarrotes>Pastas", "Bebidas>", "Lácteos>"]), `categorías nuevas: ${nc.join(", ")}`);
+
+// Excel con fotos (026, bucket privado): «Ver foto» con enlace firmado; sin enlace, solo «Sí»; al volver a importar se ignora
+const img = "https://x.supabase.co/storage/v1/object/public/product-images/u/a.jpg";
+const withPhoto = [{ ...products[0], image_url: img }, products[1]];
+const wbOut = XLSX.utils.book_new();
+addInventorySheets(XLSX, wbOut, { products: withPhoto, categories: cats, templates: [], photoLinks: new Map([[img, "https://firmado/a.jpg?token=1"]]) });
+const wsOut = wbOut.Sheets.Inventario;
+const fotoCol = XLSX.utils.encode_col((XLSX.utils.sheet_to_json<string[]>(wsOut, { header: 1 })[0] as string[]).indexOf("Foto"));
+check(wsOut[`${fotoCol}2`]?.v === "Ver foto" && wsOut[`${fotoCol}2`]?.l?.Target === "https://firmado/a.jpg?token=1" && !wsOut[`${fotoCol}3`]?.v, "Excel: «Ver foto» abre el enlace firmado; sin foto queda vacío");
+const wbBk = XLSX.utils.book_new();
+addInventorySheets(XLSX, wbBk, { products: withPhoto, categories: cats, templates: [] });
+check(XLSX.utils.sheet_to_json<Record<string, unknown>>(wbBk.Sheets.Inventario)[0].Foto === "Sí", "respaldo: la foto sale como «Sí», sin la dirección privada");
+check(initialMapping(["Foto"]).Foto === "ignorar", `al importar, la columna «Foto» se ignora (${initialMapping(["Foto"]).Foto})`);
 
 console.log(failed ? `\n${failed} fallo(s)` : "\nTodo OK");
 process.exit(failed ? 1 : 0);

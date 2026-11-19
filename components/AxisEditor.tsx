@@ -7,6 +7,7 @@ import { AXIS_LIBRARY, MAX_AXES, axisKey } from "@/lib/variants";
 import { useToast } from "./ui/Toast";
 import { useConfirm } from "./ui/Confirm";
 import { IconPlus, IconTrash, IconX, Spinner } from "./ui/Icons";
+import { friendlyError } from "@/lib/errors";
 
 interface Props {
   categoryId: string;
@@ -35,7 +36,7 @@ export default function AxisEditor({ categoryId, axes, suggested = [], onChanged
     } = await supabase.auth.getUser();
     const { error } = await supabase.from("variant_axes").insert({ user_id: user!.id, category_id: categoryId, key, label, options, sort_order: axes.length });
     setBusy(false);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     setAdding(false);
     setCustom("");
     toast("success", `"${label}" agregado: ahora los productos de esta categoría pueden tener variantes por ${label.toLowerCase()}`);
@@ -51,7 +52,7 @@ export default function AxisEditor({ categoryId, axes, suggested = [], onChanged
     });
     if (!ok) return;
     const { error } = await supabase.from("variant_axes").delete().eq("id", a.id);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     onChanged();
   }
 
@@ -59,7 +60,7 @@ export default function AxisEditor({ categoryId, axes, suggested = [], onChanged
     if (!editing) return;
     const options = Array.from(new Set(editing.options.split(/,|\n/).map((s) => s.trim()).filter(Boolean))).slice(0, 40);
     const { error } = await supabase.from("variant_axes").update({ options }).eq("id", editing.id);
-    if (error) return toast("error", error.message);
+    if (error) return toast("error", friendlyError(error));
     setEditing(null);
     onChanged();
   }

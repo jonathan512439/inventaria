@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import { IconCheck, Spinner } from "@/components/ui/Icons";
+import { friendlyError } from "@/lib/errors";
 
 export default function JoinPage() {
   return (
@@ -32,7 +33,7 @@ function Join() {
     setBusy(true);
     const { error } = await supabase.rpc("accept_invite", { p_code: code.trim().toUpperCase(), p_display_name: name.trim() || null });
     setBusy(false);
-    if (error) return toast("error", error.message.includes("válido") ? "Ese código no vale o ya venció. Pide uno nuevo." : error.message);
+    if (error) return toast("error", error.message.includes("válido") ? "Ese código no vale o ya venció. Pide uno nuevo." : friendlyError(error));
     toast("success", "¡Listo! Ya formas parte del negocio.");
     router.push("/dashboard");
     router.refresh();

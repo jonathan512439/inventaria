@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import { newOpId, setStock, withoutStock } from "@/lib/data/ops";
 import { IconCheck, IconTable, IconX, Spinner } from "@/components/ui/Icons";
+import { friendlyError } from "@/lib/errors";
 
 type Sheet = { name: string; headers: string[]; rows: Record<string, unknown>[] };
 type Existing = "update" | "skip";
@@ -68,7 +69,7 @@ export default function ExcelAdd() {
       setFileName(file.name);
       setMapping(initialMapping(list[0].headers));
     } catch (e) {
-      toast("error", e instanceof Error ? e.message : "No se pudo leer el archivo");
+      toast("error", friendlyError(e, "No se pudo leer el archivo"));
     } finally {
       setReading(false);
     }
@@ -164,7 +165,7 @@ export default function ExcelAdd() {
       setSheets([]);
       await loadInventory();
     } catch (e) {
-      toast("error", `Se importaron ${created + updated} y hubo un error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast("error", `Se importaron ${created + updated} y hubo un error: ${friendlyError(e)}`);
       await loadInventory();
     } finally {
       setBusy(null);
