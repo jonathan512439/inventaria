@@ -297,3 +297,49 @@ Cada función actual conserva su **objetivo**; cambia el lugar, la forma o se un
   - Corrección: `AbortController` de 25 s por intento y presupuesto de 85 s por llamada. Si queda menos de 6 s se responde 429 «saturada» (la cola reintenta sola). Los 5xx y los colgados pasan al siguiente modelo y van al final de la cadena 10 minutos (`slowUntil`, por instancia y clave).
   - Comprobado con la foto de prueba: respondió con gemini-flash-lite-latest en 41 s (antes, 524 a los 100 s).
 - **Pendiente del usuario:** la prueba con 3 personas (dueño, vendedor y alguien nuevo). Criterios: la persona nueva hace su primera venta sin ayuda y el vendedor no ve nada del dueño. Las observaciones se anotan aquí y se corrigen antes de C6.
+
+## 8. Cambio pedido el 2026-11-19: «Gestionar» al centro y modo de uso (R10 · `PLAN_CIMIENTOS.md`)
+
+**Idea del producto (del usuario):** InventarIA sirve sobre todo para **ingresar mercadería nueva o existente de la forma más rápida y fluida posible** (o automática, con la IA). Vender es una de las cosas que se hacen, no la principal, y algunos negocios solo quieren **controlar sus productos**, sin ventas ni contabilidad.
+
+### 8.1 Botón central «Gestionar»
+
+| Móvil (barra inferior) | Escritorio |
+|---|---|
+| Inicio · Productos · **Gestionar** (botón central grande) · Clientes · Más | Barra lateral: botón destacado **Gestionar** arriba (abre el mismo panel) + Inicio, Productos, Clientes, Números, Ajustes |
+
+- Tocar **Gestionar** abre una hoja con fichas grandes, en este orden:
+  1. **Vender**: la pantalla de siempre.
+  2. **Llegó mercadería**: sumar stock a lo que ya existe, escaneando o tocando en la lista.
+  3. **Producto nuevo**: foto con IA, código, Excel o a mano.
+  4. **Contar**.
+  - Si hay pendientes de revisar, una quinta ficha: **«Revisar (N)»**.
+  - El vendedor ve también **Caja**.
+- **Sin pasos de más:**
+  - La hoja recuerda la última ficha usada y la marca.
+  - Un toque largo en el botón abre directamente esa última acción.
+- **Vendedor:**
+  - La barra queda igual que la del dueño (Inicio · Productos · Gestionar · Clientes · Más), y «Más» vuelve a la barra.
+  - La Caja está dentro de Gestionar y de Vender.
+- **Sin cambios:** las direcciones (/sell, /stock/in, /add, /stock/count) y las redirecciones antiguas.
+- **Productos** sigue siendo la lista y la ficha. Los atajos «Llegó mercadería» y «Contar» de su cabecera se quedan.
+
+### 8.2 Modo de uso del negocio
+
+Columna `businesses.mode` (migración `029`): `'inventario'` o `'completo'`, con `'completo'` por defecto para los negocios que ya existen. Se elige al empezar («¿Para qué vas a usar InventarIA?») y se cambia en Ajustes › Negocio. **Cambiar de modo no borra nada: solo muestra u oculta.**
+
+| | **Solo inventario** (control de productos) | **Inventario y ventas** (completo, el de hoy) |
+|---|---|---|
+| Gestionar | **Llegó mercadería** · Producto nuevo · **Sacar del stock** · Contar | Vender · Llegó mercadería · Producto nuevo · Contar |
+| Barra | Inicio · Productos · **Gestionar** · **Historial** · Más | Inicio · Productos · **Gestionar** · Clientes · Más |
+| Salidas | «Sacar del stock» con motivo (Vendido, Uso interno, Merma, Vencido, Devolución), **sin dinero** | Venta con cobro, caja, fiado |
+| Oculto | Vender, Caja, Clientes, Números › Ventas, costos y ganancia, proveedores con costo | — |
+| Inicio | Por reponer, por vencer, pendientes de revisar, últimos ingresos | Igual que hoy |
+| Números | Hoy: entradas y salidas en unidades; Productos: por reponer, sin movimiento, valor del stock (opcional) | Igual que hoy |
+
+**Implementación:**
+- `session_context` devuelve `mode` y `useFlow().mode` lo expone.
+- `AppShell`, la hoja Gestionar, Inicio y Números filtran según el modo.
+- Las rutas ocultas redirigen a Inicio con un aviso: «Activa Ventas en Ajustes para usar esto».
+- La base no cambia permisos por modo: es una preferencia de pantalla, no de seguridad.
+- **Pruebas:** `test:e2e` en los dos modos (pantallas y redirecciones) y `test:access` sin cambios.
