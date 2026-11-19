@@ -9,6 +9,7 @@ import { friendlyError } from "@/lib/errors";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import Sheet from "@/components/ui/Sheet";
+import OptionsInput, { parseOptions } from "@/components/ui/OptionsInput";
 import { IconEdit, IconPlus, IconSparkles, IconTrash, Spinner } from "@/components/ui/Icons";
 
 const TYPE_LABEL: Record<FieldType, string> = { text: "Texto", number: "Número", select: "Opciones" };
@@ -22,10 +23,6 @@ interface Draft {
   def: string;
 }
 const EMPTY: Draft = { id: null, name: "", type: "text", options: "", ai: true, def: "" };
-const parseOptions = (raw: string) => {
-  const arr = raw.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
-  return arr.length ? arr : null;
-};
 
 /**
  * «Datos» de una categoría (o de todos los productos si `scope` es null): qué se guarda de cada producto y qué
@@ -42,7 +39,8 @@ export default function FieldsEditor({ scope, categories, templates, onChanged }
 
   async function save() {
     if (!draft || !draft.name.trim()) return;
-    const options = draft.type === "select" ? parseOptions(draft.options) : null;
+    const parsed = parseOptions(draft.options);
+    const options = draft.type === "select" && parsed.length ? parsed : null;
     if (draft.type === "select" && !options) return toast("info", "Una lista de opciones necesita al menos una opción");
     setSaving(true);
     const row = {
@@ -158,8 +156,8 @@ export default function FieldsEditor({ scope, categories, templates, onChanged }
             </div>
             {draft.type === "select" && (
               <div>
-                <label className="label" htmlFor="f-opts">Opciones (separadas por coma)</label>
-                <input id="f-opts" className="input min-h-[44px]" placeholder="rojo, azul, verde" value={draft.options} onChange={(e) => setDraft({ ...draft, options: e.target.value })} />
+                <label className="label" htmlFor="f-opts">Opciones</label>
+                <OptionsInput id="f-opts" value={draft.options} onChange={(v) => setDraft({ ...draft, options: v })} />
               </div>
             )}
             <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-2xl bg-brand-50 p-3 text-sm">

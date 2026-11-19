@@ -8,6 +8,7 @@ import { useToast } from "./ui/Toast";
 import { useConfirm } from "./ui/Confirm";
 import { IconPlus, IconTrash, IconX, Spinner } from "./ui/Icons";
 import { friendlyError } from "@/lib/errors";
+import OptionsInput, { parseOptions } from "./ui/OptionsInput";
 
 interface Props {
   categoryId: string;
@@ -58,7 +59,7 @@ export default function AxisEditor({ categoryId, axes, suggested = [], onChanged
 
   async function saveOptions() {
     if (!editing) return;
-    const options = Array.from(new Set(editing.options.split(/,|\n/).map((s) => s.trim()).filter(Boolean))).slice(0, 40);
+    const options = parseOptions(editing.options);
     const { error } = await supabase.from("variant_axes").update({ options }).eq("id", editing.id);
     if (error) return toast("error", friendlyError(error));
     setEditing(null);
@@ -75,11 +76,11 @@ export default function AxisEditor({ categoryId, axes, suggested = [], onChanged
           {axes.map((a) => (
             <li key={a.id} className="rounded-xl bg-white px-2.5 py-1.5 ring-1 ring-violet-100">
               {editing?.id === a.id ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="shrink-0 font-bold text-ink">{a.label}:</span>
-                  <input className="input flex-1 py-1 text-xs" value={editing.options} onChange={(e) => setEditing({ ...editing, options: e.target.value })} placeholder="Opciones separadas por coma" autoFocus onKeyDown={(e) => e.key === "Enter" && saveOptions()} />
-                  <button className="btn-primary btn-sm" onClick={saveOptions}>OK</button>
-                  <button className="btn-ghost btn-sm" onClick={() => setEditing(null)}><IconX size={12} /></button>
+                <div className="flex items-start gap-1.5">
+                  <span className="shrink-0 pt-2 font-bold text-ink">{a.label}:</span>
+                  <OptionsInput compact value={editing.options} onChange={(v) => setEditing({ ...editing, options: v })} example={a.key === "talla" ? "S, M, L, XL" : a.key === "color" ? "rojo, azul, negro" : "opción 1, opción 2"} autoFocus onEnter={saveOptions} />
+                  <button className="btn-primary btn-sm min-h-[40px]" onClick={saveOptions}>OK</button>
+                  <button className="btn-ghost btn-sm min-h-[40px]" onClick={() => setEditing(null)} aria-label="Cancelar"><IconX size={14} /></button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">

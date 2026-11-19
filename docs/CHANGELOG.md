@@ -3,6 +3,30 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Ronda de validación 1 · R6, R7 y R8
+
+### 17.20 Opciones con ejemplo, fiar más claro y entrega por unidad
+- **Qué**:
+  - **Opciones de un dato** (Mi catálogo) **y de las variantes:**
+    - Dicen «Separa cada opción con una coma. Ej.: fresa, uva, menta». En tallas, «S, M, L, XL».
+    - Mientras escribes, cada opción aparece en su chip, con la cantidad.
+  - **Vender a cuenta o con pago parcial:**
+    - Aparece abierta la tarjeta ámbar **«¿Quién queda debiendo Bs X?»**.
+    - Arriba tiene un botón grande **«Cliente nuevo»**, que pide solo el nombre (el teléfono es opcional). Debajo, el buscador de los clientes que ya tienes.
+    - El botón de cobrar dice **«Elige quién debe»** y está apagado hasta que eliges a alguien. Después dice «Registrar · Juana debe Bs X».
+    - Si paga todo, el cliente es un enlace plegado: «Agregar cliente (opcional)».
+  - **Entregar mercadería:**
+    - Cada producto dice **«Unidades»** y **«Precio por unidad»**, con la cuenta en vivo: «5 u. × Bs 10 = Bs 50».
+    - El botón muestra unidades y total: «Entregar 7 u. · Bs 70».
+  - **Rendir cuentas:**
+    - Cada producto muestra «Tiene 5 u. afuera · precio por unidad Bs 10».
+    - Los campos dicen «Unidades que vendió» y «Unidades que devuelve».
+    - Aparece la cuenta: «Vendió 3 u. × Bs 10 = Bs 30».
+- **Validar**:
+  - Mi catálogo → una categoría → «+ Dato» → tipo Opciones → escribir «fresa, uva»: aparecen 2 chips.
+  - Vender → Cobrar → «A cuenta»: la tarjeta «¿Quién queda debiendo?» ya está abierta y el botón dice «Elige quién debe». «Cliente nuevo» → nombre → Guardar → el botón cambia a «Registrar · … debe …».
+  - Cliente → Mercadería entregada → Entregar: se ven las etiquetas y el total. Rendir cuentas: «Vendió 1 u. × … = …».
+
 ## 2026-11-19 · Ronda de validación 1 · R1 y R2
 
 ### 17.19 Invitación que funciona y cuentas que no se mezclan

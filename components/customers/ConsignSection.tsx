@@ -187,7 +187,7 @@ export default function ConsignSection({ customer, consignments, items, onChange
         wide
         footer={
           <button type="button" onClick={deliver} disabled={saving || !lines.length} className="btn-primary btn-lg w-full">
-            {saving ? <Spinner /> : <IconCheck size={20} />} Entregar {lines.reduce((s, l) => s + l.qty, 0)} unid.
+            {saving ? <Spinner /> : <IconCheck size={20} />} Entregar {lines.reduce((s, l) => s + l.qty, 0)} u. · {money(lines.reduce((s, l) => s + l.qty * (Number(l.price.replace(",", ".")) || 0), 0))}
           </button>
         }
       >
@@ -203,13 +203,19 @@ export default function ConsignSection({ customer, consignments, items, onChange
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{productTitle(l.product.data)}{l.variant ? <span className="text-violet-800"> · {l.variant.label}</span> : null}</span>
                     <button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-danger-50 hover:text-danger-600" aria-label="Quitar"><IconTrash size={18} /></button>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <QtyStepper value={l.qty} onChange={(n) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, qty: n } : x)))} />
-                    <label className="flex flex-1 items-center gap-1 text-xs text-muted">
-                      a {currencyLabel()}
-                      <input type="number" min={0} step="any" inputMode="decimal" className="input min-h-[44px] text-center tabular-nums" value={l.price} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, price: e.target.value } : x)))} aria-label="Precio por unidad" />
+                  <div className="grid grid-cols-[auto_1fr] items-end gap-3">
+                    <div>
+                      <p className="mb-0.5 text-xs font-semibold text-muted">Unidades</p>
+                      <QtyStepper value={l.qty} onChange={(n) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, qty: n } : x)))} />
+                    </div>
+                    <label className="block text-xs font-semibold text-muted">
+                      Precio por unidad ({currencyLabel()})
+                      <input type="number" min={0} step="any" inputMode="decimal" className="input mt-0.5 min-h-[44px] text-center tabular-nums" value={l.price} onChange={(e) => setLines((ls) => ls.map((x) => (x.key === l.key ? { ...x, price: e.target.value } : x)))} />
                     </label>
                   </div>
+                  <p className="text-right text-sm text-muted">
+                    {l.qty} u. × {money(Number(l.price.replace(",", ".")) || 0)} = <b className="tabular-nums text-ink">{money(l.qty * (Number(l.price.replace(",", ".")) || 0))}</b>
+                  </p>
                 </li>
               ))}
             </ul>
@@ -237,12 +243,17 @@ export default function ConsignSection({ customer, consignments, items, onChange
                   <li key={i.id} className="rounded-2xl bg-slate-50 p-3">
                     <p className="text-sm font-semibold text-ink">
                       {i.product_name}{i.variant_label ? <span className="text-violet-800"> · {i.variant_label}</span> : null}
-                      <span className="text-xs font-normal text-muted"> · {pendingOf(i)} afuera · {money(Number(i.unit_price))} c/u</span>
                     </p>
+                    <p className="text-xs text-muted">Tiene <b className="text-ink">{pendingOf(i)} u.</b> afuera · precio por unidad <b className="text-ink">{money(Number(i.unit_price))}</b></p>
                     <div className="mt-2 grid grid-cols-2 gap-2">
-                      <label className="text-xs font-semibold text-muted">Vendió<input type="number" min={0} max={pendingOf(i)} inputMode="numeric" className="input mt-0.5 min-h-[44px] text-center font-bold tabular-nums" value={r.sold} onChange={(e) => settleRow(i, "sold", e.target.value)} /></label>
-                      <label className="text-xs font-semibold text-muted">Devuelve<input type="number" min={0} max={pendingOf(i)} inputMode="numeric" className="input mt-0.5 min-h-[44px] text-center font-bold tabular-nums" value={r.returned} onChange={(e) => settleRow(i, "returned", e.target.value)} /></label>
+                      <label className="text-xs font-semibold text-muted">Unidades que vendió<input type="number" min={0} max={pendingOf(i)} inputMode="numeric" className="input mt-0.5 min-h-[44px] text-center font-bold tabular-nums" value={r.sold} onChange={(e) => settleRow(i, "sold", e.target.value)} /></label>
+                      <label className="text-xs font-semibold text-muted">Unidades que devuelve<input type="number" min={0} max={pendingOf(i)} inputMode="numeric" className="input mt-0.5 min-h-[44px] text-center font-bold tabular-nums" value={r.returned} onChange={(e) => settleRow(i, "returned", e.target.value)} /></label>
                     </div>
+                    {(Number(r.sold) || 0) > 0 && (
+                      <p className="mt-1 text-right text-sm text-muted">
+                        Vendió {Number(r.sold)} u. × {money(Number(i.unit_price))} = <b className="tabular-nums text-ok-700">{money((Number(r.sold) || 0) * Number(i.unit_price))}</b>
+                      </p>
+                    )}
                   </li>
                 );
               })}

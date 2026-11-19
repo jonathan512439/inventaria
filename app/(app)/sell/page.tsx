@@ -336,8 +336,8 @@ export default function SellPage() {
         onClose={() => setCharging(false)}
         title="Cobrar"
         footer={
-          <button type="button" onClick={finish} disabled={saving} className="btn-success btn-lg w-full">
-            {saving ? <Spinner /> : <IconCheck size={20} />} {status === "pagado" ? `Cobrar ${money(total)}` : `Registrar · debe ${money(owes)}`}
+          <button type="button" onClick={finish} disabled={saving || (status !== "pagado" && !customer)} className="btn-success btn-lg w-full">
+            {saving ? <Spinner /> : <IconCheck size={20} />} {status === "pagado" ? `Cobrar ${money(total)}` : customer ? `Registrar · ${customer.name} debe ${money(owes)}` : "Elige quién debe"}
           </button>
         }
       >
@@ -415,8 +415,7 @@ export default function SellPage() {
 
           {/* Cliente (sin conexión no se pueden buscar ni crear) */}
           {online && <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Cliente {status === "pagado" ? "(opcional)" : "· queda debiendo " + money(owes)}</p>
-            <CustomerPicker value={customer} onChange={setCustomer} required={status !== "pagado"} />
+            <CustomerPicker value={customer} onChange={setCustomer} required={status !== "pagado"} owes={owes} />
             {customer && customerDebt > 0 && <p className="mt-1 text-xs text-warn-800">Ya debe {money(customerDebt)}{customer.credit_limit !== null ? ` · límite ${money(Number(customer.credit_limit))}` : ""}.</p>}
           </div>}
 
