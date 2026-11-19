@@ -262,8 +262,8 @@ try {
   const { count: afterAsk } = await admin.from("products").select("id", { count: "exact", head: true }).eq("user_id", uid);
   check(beforeAsk === afterAsk, "preguntar no cambia nada");
 
-  // 16. Reconstrucción (C7): las 16 pantallas abren y las direcciones antiguas llevan a su lugar nuevo
-  const SCREENS = ["/dashboard", "/sell", "/sell/cash", "/products", `/products/${taza.id}`, "/add", "/add/review", "/stock/in", "/stock/count", "/customers", "/insights", "/insights/history", "/settings", "/settings/catalog", "/settings/data", "/settings/team"];
+  // 16. Reconstrucción (C7 + R10 «Sacar del stock»): las 17 pantallas abren y las direcciones antiguas llevan a su lugar nuevo
+  const SCREENS = ["/dashboard", "/sell", "/sell/cash", "/products", `/products/${taza.id}`, "/add", "/add/review", "/stock/in", "/stock/out", "/stock/count", "/customers", "/insights", "/insights/history", "/settings", "/settings/catalog", "/settings/data", "/settings/team"];
   const bad = [];
   for (const p of SCREENS) {
     const rp = await fetch(`${BASE}${p}`, { headers: { cookie: H.cookie }, redirect: "manual" });

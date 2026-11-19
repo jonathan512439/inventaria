@@ -7,6 +7,7 @@ import type { MovementType, Product, ProductVariant } from "@/types/database";
 import { normalizeFieldName, productTitle } from "@/lib/fields";
 import { currencyLabel, money, priceOf, stockOf } from "@/lib/inventory";
 import { useToast } from "./ui/Toast";
+import { useFlow } from "./FlowProvider";
 import { isNetworkError, queueMove } from "@/lib/offline";
 import { registerSale } from "@/lib/sales";
 import { adjustStock, newOpId } from "@/lib/data/ops";
@@ -43,14 +44,17 @@ export default function StockAdjust({ product, variants = [], variant = null, on
   const [qty, setQty] = useState(1);
   const [asSale, setAsSale] = useState<boolean | null>(null); // null = aún no decidió
   const [salePrice, setSalePrice] = useState<string>(price !== null ? String(price) : "");
-  const [motivo, setMotivo] = useState(MOTIVOS_SALIDA[0]);
+  const { inventoryOnly } = useFlow();
+  const motivos = inventoryOnly ? ["Vendido", ...MOTIVOS_SALIDA] : MOTIVOS_SALIDA;
+  const [motivo, setMotivo] = useState(motivos[0]);
   const [saving, setSaving] = useState(false);
   // Id de esta operación (idempotencia): se reutiliza si se reintenta o si termina en la cola sin conexión
   const [opId] = useState(newOpId);
 
   useEffect(() => {
-    setAsSale(null);
-  }, [mode]);
+    // Modo «Solo inventario» (R10): no hay ventas en la app; restar es siempre una salida con motivo
+    setAsSale(inventoryOnly ? false : null);
+  }, [mode, inventoryOnly]);
 
   const newStock = mode === "add" ? current + qty : Math.max(0, current - qty);
   const total = asSale ? qty * (Number(salePrice) || 0) : 0;
@@ -197,6 +201,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
         {/* Paso 3 (solo al restar): ¿es una venta? */}
         {mode === "remove" && (
           <>
+            {!inventoryOnly && <>
             <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">3 · ¿Es una venta?</p>
             <div className="mt-1 grid gap-2">
               <button onClick={() => setAsSale(true)} className={`flex items-start gap-3 rounded-2xl border-2 p-3 text-left ${asSale === true ? "border-emerald-500 bg-emerald-50" : "border-slate-200"}`}>
@@ -214,6 +219,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
                 </span>
               </button>
             </div>
+            </>}
 
             {asSale === true && (
               <div className="mt-3 rounded-2xl bg-emerald-50 p-3">
@@ -226,7 +232,7 @@ export default function StockAdjust({ product, variants = [], variant = null, on
               <div className="mt-3">
                 <label className="label" htmlFor="motivo">Motivo</label>
                 <select id="motivo" className="input" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
-                  {MOTIVOS_SALIDA.map((m) => <option key={m}>{m}</option>)}
+                  {motivos.map((m) => <option key={m}>{m}</option>)}
                 </select>
               </div>
             )}

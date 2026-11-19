@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { markTourSeen, tourSeen } from "@/lib/tour";
-import { IconArrowRight, IconBox, IconCart, IconCheck, IconHelp, IconHome, IconMore, IconScan, IconUsers, IconX } from "./ui/Icons";
+import { IconArrowRight, IconBox, IconCheck, IconGrid, IconHelp, IconHome, IconMore, IconScan, IconUsers, IconX } from "./ui/Icons";
 
 interface Props {
   /** Abrir aunque ya se haya visto (desde Ajustes › Ayuda o Más › Cómo usar la app) */
@@ -14,7 +14,7 @@ interface Props {
 const SLIDES = [
   {
     title: "Cinco lugares, nada más",
-    text: "Abajo están Inicio, Productos, Vender (el botón grande del centro), Clientes y Más. Todo lo demás vive dentro de uno de ellos: la caja está en Vender, contar y la entrada de inventario en Productos, Números y Ajustes en Más.",
+    text: "Abajo están Inicio, Productos, Gestionar (el botón grande del centro), Clientes y Más. Gestionar junta lo que haces cada día: vender, entrada de inventario, producto nuevo y contar. Mantenlo apretado para ir directo a lo último que usaste.",
     Art: ArtBar,
   },
   {
@@ -87,7 +87,7 @@ function ArtBar() {
   const items = [
     { Icon: IconHome, t: "Inicio" },
     { Icon: IconBox, t: "Productos" },
-    { Icon: IconCart, t: "Vender", primary: true },
+    { Icon: IconGrid, t: "Gestionar", primary: true },
     { Icon: IconUsers, t: "Clientes" },
     { Icon: IconMore, t: "Más" },
   ];

@@ -3,7 +3,7 @@
  * Ajustes › Ayuda o Más › Cómo usar la app. Los 20 consejos por pantalla (CoachTip) se eliminaron en C7.9:
  * la ayuda ahora es el «?» de cada cabecera y los estados vacíos que explican qué hacer.
  */
-const TOUR_KEY = "inventaria.tour.v4"; // v4 = reconstrucción C7 (5 lugares)
+const TOUR_KEY = "inventaria.tour.v5"; // v5 = Gestionar al centro (R10); v4 = reconstrucción C7
 
 export function tourSeen(): boolean {
   try {

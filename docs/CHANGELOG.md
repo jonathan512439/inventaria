@@ -3,6 +3,43 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Ronda de validación 1 · R10
+
+### 17.24 «Gestionar» al centro y modo de uso del negocio
+- **Qué**:
+  - **Barra de abajo** (igual para el dueño y el vendedor): **Inicio · Productos · Gestionar · Clientes · Más**. El vendedor vuelve a tener «Más» abajo.
+  - **Gestionar** (botón grande del centro) abre fichas grandes:
+    - **Vender**, **Entrada de inventario**, **Producto nuevo** y **Contar**.
+    - **Revisar (N)** si hay pendientes.
+    - **Caja**, para el vendedor.
+    - La última usada aparece marcada como «La última». **Mantener apretado** el botón va directo a ella.
+    - En escritorio, «Gestionar» es el botón destacado de la barra lateral.
+  - **Modo de uso** (Ajustes › Modo de uso, solo el dueño, y en el primer paso del asistente inicial):
+    - **Inventario y ventas**: lo de siempre.
+    - **Solo inventario**: para controlar productos sin contabilidad.
+      - Gestionar ofrece Entrada de inventario · Producto nuevo · **Sacar del stock** · Contar.
+      - La barra cambia Clientes por **Historial**.
+      - Vender, Caja y Clientes no se muestran. Su dirección lleva a Inicio con un aviso.
+      - Inicio destaca «Entrada de inventario» y muestra «Por reponer» en vez de «Te deben».
+      - Números muestra Productos y Pregúntale.
+      - «± Stock › Restar» nunca es venta y ofrece el motivo «Vendido».
+    - Cambiar de modo **no borra nada**.
+  - **Pantalla nueva «Sacar del stock»** (`/stock/out`):
+    - Busca, escanea o elige de la lista. Las líneas son compactas.
+    - Motivos: Vendido, Uso interno, Merma o rotura, Vencido, Devolución al proveedor y Regalo o muestra.
+    - Cada línea es una salida sin dinero con su id: reintentar no resta dos veces.
+  - El recorrido «Cómo usar la app» se actualizó y se muestra otra vez a todos.
+  - Usa la columna `mode` de la migración `030`, aplicada en 17.23.
+- **Validar**:
+  - Celular: tocar «Gestionar» → aparecen las fichas → «Entrada de inventario». Volver, mantener apretado «Gestionar»: abre directo la Entrada de inventario.
+  - Ajustes › Modo de uso → «Solo inventario»:
+    - La barra muestra Historial y Gestionar ofrece «Sacar del stock».
+    - Sacar 1 unidad con el motivo «Uso interno»: el stock baja y el Historial la muestra como salida.
+    - Abrir /sell lleva a Inicio con el aviso.
+  - Volver a «Inventario y ventas»: Vender, Caja y Clientes reaparecen con todo lo de antes.
+  - Como vendedor: la barra es igual a la del dueño, y Gestionar incluye Caja.
+  - Pruebas: `test:e2e` (17 pantallas, incluida /stock/out) y `test:access` (solo el dueño cambia el modo).
+
 ## 2026-11-19 · Ronda de validación 1 · R9 y R11
 
 ### 17.23 Logo del negocio y cabecera con identidad

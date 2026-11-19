@@ -10,7 +10,7 @@ import { todaySummary } from "@/lib/data/insights";
 import { useFlow } from "@/components/FlowProvider";
 import BusinessLogo from "@/components/ui/BusinessLogo";
 import { Stat, TaskCard } from "@/components/ui/Screen";
-import { IconAlert, IconBell, IconCamera, IconCart, IconCheck, IconCheckCircle, IconChevronRight, IconRegister, IconStore, IconTag, IconUsers, Spinner } from "@/components/ui/Icons";
+import { IconAlert, IconBell, IconCamera, IconCart, IconCheck, IconCheckCircle, IconChevronRight, IconRegister, IconStore, IconTag, IconUsers, Spinner, IconTruck } from "@/components/ui/Icons";
 
 interface Stats {
   types: number;
@@ -98,7 +98,8 @@ export default function DashboardPage() {
   const steps = [
     { done: stats.types > 0, title: "Crea tu tienda", body: "Elige qué vendes: la IA ordena tus productos con eso.", href: "/settings/catalog", cta: "Elegir", Icon: IconStore },
     { done: confirmed > 0, title: "Agrega productos", body: "Con una foto, el código de barras o a mano.", href: "/add", cta: "Agregar", Icon: IconCamera },
-    { done: stats.salesEver > 0, title: "Haz tu primera venta", body: "El stock baja solo y queda el ticket.", href: "/sell", cta: "Vender", Icon: IconCart },
+    // Modo «Solo inventario» (R10): no hay ventas en la app
+    ...(flow.inventoryOnly ? [] : [{ done: stats.salesEver > 0, title: "Haz tu primera venta", body: "El stock baja solo y queda el ticket.", href: "/sell", cta: "Vender", Icon: IconCart }]),
   ];
   const firstUse = steps.some((s) => !s.done);
 
@@ -107,8 +108,8 @@ export default function DashboardPage() {
   const tasks: Task[] = [];
   if (working > 0) tasks.push({ key: "fotos", tone: "info", Icon: IconCamera, title: `Analizando ${plural(working, "foto")}…`, body: "Te aviso cuando estén listas para revisar.", href: "/add", cta: "Ver" });
   if (pending > 0) tasks.push({ key: "revisar", tone: "info", Icon: IconCheckCircle, title: `${plural(pending, "producto")} por revisar`, body: "Confirma nombre, precio y stock.", href: "/add/review", cta: "Revisar" });
-  if (stats.salesToday.count > 0 && !stats.closedToday && hour >= 18) tasks.push({ key: "caja", tone: "warn", Icon: IconRegister, title: "Falta cerrar la caja de hoy", body: "Cuenta el efectivo y mira si cuadra.", href: "/sell/cash", cta: "Cerrar" });
-  if (stats.oldDebtors > 0) tasks.push({ key: "fiados", tone: "danger", Icon: IconUsers, title: `${plural(stats.oldDebtors, "cliente")} debe${stats.oldDebtors === 1 ? "" : "n"} hace más de 30 días`, body: `En total te deben ${money(stats.owed)}.`, href: "/customers?filter=debt", cta: "Cobrar" });
+  if (!flow.inventoryOnly && stats.salesToday.count > 0 && !stats.closedToday && hour >= 18) tasks.push({ key: "caja", tone: "warn", Icon: IconRegister, title: "Falta cerrar la caja de hoy", body: "Cuenta el efectivo y mira si cuadra.", href: "/sell/cash", cta: "Cerrar" });
+  if (!flow.inventoryOnly && stats.oldDebtors > 0) tasks.push({ key: "fiados", tone: "danger", Icon: IconUsers, title: `${plural(stats.oldDebtors, "cliente")} debe${stats.oldDebtors === 1 ? "" : "n"} hace más de 30 días`, body: `En total te deben ${money(stats.owed)}.`, href: "/customers?filter=debt", cta: "Cobrar" });
   if (stats.porVencer > 0) tasks.push({ key: "vencer", tone: "warn", Icon: IconAlert, title: `${plural(stats.porVencer, "producto")} por vencer`, body: `Vencen en ${alerts.expiryDays} días o ya vencieron: oferta, retirar o devolver.`, href: "/products?filter=expiring", cta: "Qué hacer" });
   if (stats.porReponer > 0) tasks.push({ key: "reponer", tone: stats.agotados ? "danger" : "warn", Icon: IconBell, title: `${plural(stats.porReponer, "producto")} por reponer`, body: stats.agotados ? `${plural(stats.agotados, "agotado")}; la lista para pedir ya está armada.` : "Están bajo su mínimo; la lista ya está armada.", href: "/products?filter=restock", cta: "Ver lista" });
   if (stats.sinPrecio > 0 && confirmed > 0) tasks.push({ key: "precio", tone: "info", Icon: IconTag, title: `${plural(stats.sinPrecio, "producto")} sin precio`, body: "No se pueden vender bien sin precio.", href: "/products?filter=noprice", cta: "Completar" });
@@ -124,7 +125,17 @@ export default function DashboardPage() {
         </span>
       </header>
 
-      {/* La acción del día: vender */}
+      {/* La acción del día: vender (o, en «Solo inventario», registrar lo que llegó) */}
+      {flow.inventoryOnly ? (
+        <Link href="/stock/in" className="animate-in flex items-center gap-4 rounded-3xl p-5 text-white shadow-float transition active:scale-[0.99]" style={{ backgroundImage: "linear-gradient(135deg,#059669,#10b981)" }}>
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20"><IconTruck size={30} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-2xl font-bold leading-tight">Entrada de inventario</span>
+            <span className="block text-sm text-white/85">Suma lo que llegó: escanea o elige de la lista</span>
+          </span>
+          <IconChevronRight size={22} />
+        </Link>
+      ) : (
       <Link href="/sell" className="animate-in flex items-center gap-4 rounded-3xl p-5 text-white shadow-float transition active:scale-[0.99]" style={{ backgroundImage: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
         <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20"><IconCart size={30} /></span>
         <span className="min-w-0 flex-1">
@@ -136,6 +147,7 @@ export default function DashboardPage() {
         </span>
         <IconChevronRight size={22} />
       </Link>
+      )}
 
       {/* Primeros pasos */}
       {firstUse && (
@@ -182,7 +194,11 @@ export default function DashboardPage() {
       {/* Números rápidos */}
       <div className="animate-in grid grid-cols-2 gap-2">
         <Link href="/products"><Stat label="En inventario" value={String(confirmed)} hint={plural(stats.types, "categoría")} /></Link>
-        <Link href={stats.owed > 0 ? "/customers?filter=debt" : "/customers"}><Stat label="Te deben" value={money(stats.owed)} tone={stats.owed > 0 ? "warn" : undefined} hint={stats.owed > 0 ? "fiados por cobrar" : "nadie te debe"} /></Link>
+        {flow.inventoryOnly ? (
+          <Link href="/products?filter=restock"><Stat label="Por reponer" value={String(stats.porReponer)} tone={stats.porReponer > 0 ? "warn" : undefined} hint={stats.agotados ? plural(stats.agotados, "agotado") : "bajo su mínimo"} /></Link>
+        ) : (
+          <Link href={stats.owed > 0 ? "/customers?filter=debt" : "/customers"}><Stat label="Te deben" value={money(stats.owed)} tone={stats.owed > 0 ? "warn" : undefined} hint={stats.owed > 0 ? "fiados por cobrar" : "nadie te debe"} /></Link>
+        )}
       </div>
     </div>
   );

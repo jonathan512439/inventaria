@@ -343,3 +343,15 @@ Columna `businesses.mode` (migración `030`): `'inventario'` o `'completo'`, con
 - Las rutas ocultas redirigen a Inicio con un aviso: «Activa Ventas en Ajustes para usar esto».
 - La base no cambia permisos por modo: es una preferencia de pantalla, no de seguridad.
 - **Pruebas:** `test:e2e` en los dos modos (pantallas y redirecciones) y `test:access` sin cambios.
+
+### 8.3 Implementación (2026-11-19 · 17.24)
+- **Componentes:**
+  - `components/Gestionar.tsx`: fichas según el modo y el rol (`gestionarItems`), la última en `localStorage` y el toque largo de 550 ms.
+  - `components/AppShell.tsx`: barra única para los dos roles, la 4.ª área según el modo y la redirección de las rutas de ventas en «Solo inventario».
+  - `components/settings/ModePicker.tsx`: asistente inicial y Ajustes › Modo de uso.
+- **Contexto:** `useFlow().mode` / `inventoryOnly` (FlowProvider) leen `businesses.mode` desde `session_context` (030).
+- **Pantallas:**
+  - Nueva `/stock/out`, «Sacar del stock». Con ella las pantallas pasan de 16 a **17**.
+  - `/add` y `/stock/*` cuentan ahora como parte de «Gestionar» en la barra, no de Productos. Productos conserva sus atajos.
+- Recorrido `inventaria.tour.v5`: el primer lugar del recorrido presenta «Gestionar».
+

@@ -53,7 +53,7 @@ function Products() {
   const supabase = createClient();
   const toast = useToast();
   const confirm = useConfirm();
-  const { alerts, isOwner } = useFlow();
+  const { alerts, isOwner, inventoryOnly } = useFlow();
 
   // Las redirecciones de Cloudflare pegan la consulta antigua con «?» (p. ej. filter=expiring?tab=vencer): se corta ahí
   const param = (k: string) => params.get(k)?.split("?")[0] || null;
@@ -345,9 +345,10 @@ function Products() {
 
       {/* Mercadería (C7.5): entradas y conteo viven dentro de Productos */}
       {!selecting && view !== "trash" && (
-        <div className="animate-in grid grid-cols-2 gap-2">
-          <Link href="/stock/in" className="btn-secondary min-h-[44px]"><IconTruck size={18} /> Entrada de inventario</Link>
-          <Link href="/stock/count" className="btn-secondary min-h-[44px]"><IconClipboard size={18} /> Contar</Link>
+        <div className={`animate-in grid gap-2 ${inventoryOnly ? "grid-cols-3" : "grid-cols-2"}`}>
+          <Link href="/stock/in" className="btn-secondary min-h-[44px] px-2 text-sm"><IconTruck size={18} /> {inventoryOnly ? "Entrada" : "Entrada de inventario"}</Link>
+          {inventoryOnly && <Link href="/stock/out" className="btn-secondary min-h-[44px] px-2 text-sm">Sacar</Link>}
+          <Link href="/stock/count" className="btn-secondary min-h-[44px] px-2 text-sm"><IconClipboard size={18} /> Contar</Link>
         </div>
       )}
 

@@ -8,6 +8,8 @@ import AiKeyCard from "@/components/AiKeyCard";
 import AiUsageCard from "@/components/AiUsageCard";
 import AlertsSection from "@/components/settings/AlertsSection";
 import LogoCard from "@/components/settings/LogoCard";
+import ModePicker, { MODES } from "@/components/settings/ModePicker";
+import type { BusinessMode } from "@/types/database";
 import { useFlow } from "@/components/FlowProvider";
 import { clearDeviceData } from "@/lib/offline";
 import { DEFAULT_TZ } from "@/lib/dates";
@@ -104,6 +106,17 @@ export default function SettingsPage() {
     flow.refresh();
   }
 
+  const [savingMode, setSavingMode] = useState(false);
+  async function changeMode(m: BusinessMode) {
+    if (!saved || m === (saved.mode ?? "completo")) return;
+    setSavingMode(true);
+    const { error } = await supabase.from("businesses").update({ mode: m }).eq("id", saved.id);
+    setSavingMode(false);
+    if (error) return toast("error", friendlyError(error));
+    toast("success", m === "inventario" ? "Modo «Solo inventario»: se ocultan Vender, Caja y Clientes (no se borra nada)" : "Modo «Inventario y ventas»: ya puedes vender");
+    flow.refresh();
+  }
+
   async function signOut() {
     await clearDeviceData();
     await supabase.auth.signOut();
@@ -165,6 +178,19 @@ export default function SettingsPage() {
             <ListRow href="/settings/catalog" icon={<IconStore size={20} />} title="Mi catálogo" subtitle={counts ? `${counts.types} categoría${counts.types === 1 ? "" : "s"} · ${counts.sections} subcategorías · datos y variantes` : "Categorías, datos y variantes"} end={<Chevron />} />
           )}
           {flow.isOwner && <ListRow href="/settings/data" icon={<IconCloud size={20} />} title="Mis datos" subtitle="Excel, respaldos, ordenar y limpiar, papelera" end={<Chevron />} />}
+        </div>
+      </Section>
+
+      <Section id="modo" title="Modo de uso">
+        <div className="card space-y-2">
+          {flow.isOwner ? (
+            <>
+              <ModePicker value={saved?.mode ?? "completo"} onChange={changeMode} disabled={savingMode} />
+              <p className="text-xs text-muted">Cambiar de modo no borra nada: solo muestra u oculta Vender, Caja y Clientes.</p>
+            </>
+          ) : (
+            <p className="text-sm text-muted">Este negocio usa <b className="text-ink">{MODES.find((x) => x.value === (saved?.mode ?? "completo"))?.title}</b>. Lo cambia el dueño.</p>
+          )}
         </div>
       </Section>
 

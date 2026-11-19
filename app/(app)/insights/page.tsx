@@ -38,10 +38,12 @@ function Insights() {
   const router = useRouter();
   // Cloudflare puede unir consultas con «?» al redirigir: se corta ahí (ver nota de C7.3)
   const param = (k: string) => params.get(k)?.split("?")[0] ?? null;
-  const { isOwner, ready, business } = useFlow();
+  const { isOwner, ready, business, inventoryOnly } = useFlow();
   const raw = param("tab") as Tab | null;
-  const wanted: Tab = raw && TABS.includes(raw) ? raw : "hoy";
-  const tab: Tab = !isOwner && OWNER_TABS.includes(wanted) ? "hoy" : wanted;
+  // Modo «Solo inventario» (R10): sin Hoy (ventas) ni Ventas; el dueño ve Productos y todos, Pregúntale
+  const first: Tab = inventoryOnly ? (isOwner ? "productos" : "ask") : "hoy";
+  const wanted: Tab = raw && TABS.includes(raw) && !(inventoryOnly && (raw === "hoy" || raw === "ventas")) ? raw : first;
+  const tab: Tab = !isOwner && OWNER_TABS.includes(wanted) ? first : wanted;
   const period: Period = PERIODS.includes(param("period") as Period) ? (param("period") as Period) : "mes";
   const supabase = createClient();
   const [today, setToday] = useState<TodaySummary | null>(null);
@@ -83,8 +85,8 @@ function Insights() {
         value={tab}
         onChange={(t) => go(t)}
         items={[
-          { value: "hoy", label: "Hoy" },
-          ...(isOwner ? [{ value: "ventas" as Tab, label: "Ventas" }, { value: "productos" as Tab, label: "Productos" }] : []),
+          ...(inventoryOnly ? [] : [{ value: "hoy" as Tab, label: "Hoy" }]),
+          ...(isOwner ? [...(inventoryOnly ? [] : [{ value: "ventas" as Tab, label: "Ventas" }]), { value: "productos" as Tab, label: "Productos" }] : []),
           { value: "ask", label: "Pregúntale" },
         ]}
       />

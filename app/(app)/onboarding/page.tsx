@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import type { BusinessMode } from "@/types/database";
 import PresetPicker from "@/components/PresetPicker";
+import ModePicker from "@/components/settings/ModePicker";
+import { useFlow } from "@/components/FlowProvider";
 import { IconArrowRight, IconCamera } from "@/components/ui/Icons";
 
 /** Asistente inicial: 3 pantallas, 1 minuto. */
@@ -11,6 +15,17 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [business, setBusiness] = useState("");
   const [types, setTypes] = useState<string[]>([]);
+  const flow = useFlow();
+  const [mode, setMode] = useState<BusinessMode>(flow.business?.mode ?? "completo");
+
+  /** Paso 1 → 2: guarda el modo de uso elegido (R10). El nombre lo guarda el paso 2 junto con las categorías. */
+  async function next1() {
+    if (flow.business && flow.isOwner && mode !== (flow.business.mode ?? "completo")) {
+      await createClient().from("businesses").update({ mode }).eq("id", flow.business.id);
+      flow.refresh();
+    }
+    setStep(2);
+  }
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
@@ -33,9 +48,14 @@ export default function OnboardingPage() {
             value={business}
             onChange={(e) => setBusiness(e.target.value)}
             autoFocus
-            onKeyDown={(e) => e.key === "Enter" && setStep(2)}
+            onKeyDown={(e) => e.key === "Enter" && next1()}
           />
-          <button onClick={() => setStep(2)} className="btn-primary btn-lg w-full">
+          <div className="space-y-2">
+            <p className="text-base font-bold text-ink">¿Para qué vas a usar InventarIA?</p>
+            <ModePicker value={mode} onChange={setMode} />
+            <p className="text-xs text-muted">Lo puedes cambiar cuando quieras en Ajustes. No se borra nada.</p>
+          </div>
+          <button onClick={next1} className="btn-primary btn-lg w-full">
             Continuar <IconArrowRight size={18} />
           </button>
         </section>

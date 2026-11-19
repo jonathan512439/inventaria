@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient, getActor, setActor } from "@/lib/supabase/client";
-import type { Business, BusinessMember, MemberRole, SessionContext } from "@/types/database";
+import type { Business, BusinessMember, BusinessMode, MemberRole, SessionContext } from "@/types/database";
 import { hydrateQueue, queueSummary, useQueue } from "@/lib/queue";
 import { cacheGet, cacheSet, isNetworkError, rememberBusiness, syncMoves } from "@/lib/offline";
 import { DEFAULT_ALERTS, setCurrency, type AlertSettings } from "@/lib/inventory";
@@ -30,13 +30,17 @@ export interface FlowState {
   actorId: string | null;
   meId: string | null;
   isOwner: boolean;
+  /** Modo de uso del negocio (030 · R10): «completo» (inventario y ventas) o «inventario» (solo control de productos) */
+  mode: BusinessMode;
+  /** Atajo: el negocio usa la app solo para controlar productos (sin ventas, caja ni clientes) */
+  inventoryOnly: boolean;
   /** Cambiar de persona: con el token de `start_shift` (024), o null para volver a la cuenta de la sesión */
   switchActor: (userId: string | null, token?: string | null) => void;
   refresh: () => void;
 }
 
 // Por defecto, rol mínimo: hasta saber quién es, nadie ve pantallas ni datos de dueño (S5)
-const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, alerts: DEFAULT_ALERTS, business: null, ready: false, businesses: 0, role: "vendedor", members: [], actorId: null, meId: null, isOwner: false, switchActor: () => {}, refresh: () => {} });
+const Ctx = createContext<FlowState>({ pending: 0, confirmed: 0, working: 0, loaded: false, alerts: DEFAULT_ALERTS, business: null, ready: false, businesses: 0, role: "vendedor", members: [], actorId: null, meId: null, isOwner: false, mode: "completo", inventoryOnly: false, switchActor: () => {}, refresh: () => {} });
 
 
 export function FlowProvider({ children }: { children: React.ReactNode }) {
@@ -129,6 +133,8 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
       actorId,
       meId: team.meId,
       isOwner: team.ready && actorRole === "dueno",
+      mode: team.business?.mode ?? "completo",
+      inventoryOnly: team.business?.mode === "inventario",
       switchActor,
       working: q.queued + q.processing,
       refresh,
