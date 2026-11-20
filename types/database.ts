@@ -21,6 +21,15 @@ export type Business = {
 };
 export type BusinessMode = "completo" | "inventario";
 
+/** Cupo de IA compartido entre servidores (031 · P4): modelo agotado o colgado, y hasta cuándo. Solo el servidor. */
+export type AiQuotaState = {
+  key_id: string;
+  model: string;
+  exhausted_until: string | null;
+  slow_until: string | null;
+  updated_at: string;
+};
+
 /** Lo que la app necesita al abrir, en una llamada (`session_context`, 023). */
 export type SessionContext = {
   me: string;
@@ -536,6 +545,12 @@ export interface Database {
         Update: Partial<ProductVariant>;
         Relationships: [];
       };
+      ai_quota_state: {
+        Row: AiQuotaState;
+        Insert: Pick<AiQuotaState, "key_id" | "model"> & { exhausted_until?: string | null; slow_until?: string | null; updated_at?: string };
+        Update: Partial<AiQuotaState>;
+        Relationships: [];
+      };
       ai_usage: {
         Row: AiUsage;
         Insert: Omit<AiUsage, "id" | "created_at" | "quota_limit" | "own_key"> & { id?: string; created_at?: string; quota_limit?: number | null; own_key?: boolean };
@@ -829,7 +844,11 @@ export interface Database {
         Args: { p_id: string; p_category: string | null; p_category_name: string | null; p_rows: CountRowInput[]; p_note?: string | null };
         Returns: { count: StockCount; adjusted: number; repeated: boolean };
       };
-      set_prices: { Args: { p_rows: { product_id: string; field: "precio" | "precio_mayorista" | "precio_compra"; value: number | null }[]; p_source?: string }; Returns: number };
+      set_prices: { Args: { p_rows: { product_id: string; variant_id?: string | null; field: "precio" | "precio_mayorista" | "precio_compra"; value: number | null }[]; p_source?: string }; Returns: number };
+      similar_products: {
+        Args: { p_name: string; p_code?: string | null; p_exclude?: string | null; p_limit?: number };
+        Returns: { id: string; nombre: string | null; marca: string | null; codigo_barras: string | null; status: string; sim: number; wsim: number }[];
+      };
     };
     Enums: { field_type: FieldType; product_status: ProductStatus; movement_type: MovementType; sale_status: SaleStatus; pay_method: PayMethod };
     CompositeTypes: { [_ in never]: never };

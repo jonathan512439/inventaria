@@ -1,4 +1,5 @@
 import type { FieldTemplate } from "@/types/database";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Cliente mínimo de Gemini vía REST (compatible con edge runtime / Cloudflare).
@@ -202,9 +203,85 @@ export function modelChain(): string[] {
   return Array.from(new Set(list));
 }
 
-/** Modelos con cupo diario agotado (por instancia del servidor y por clave) → hasta cuándo evitarlos. */
+/** Modelos con cupo diario agotado (por clave) → hasta cuándo evitarlos. Copia local de `ai_quota_state` (031). */
 const exhaustedUntil = new Map<string, number>();
 const exKey = (keyId: string, model: string) => `${keyId}:${model}`;
+
+/**
+ * Cupo compartido entre servidores (P4 · 031 · AUDITORIA E6). Cloudflare atiende cada petición en una instancia
+ * distinta: lo que una aprendía (modelo agotado o colgado) quedaba en su memoria y las demás volvían a probarlo.
+ * Ahora se anota en `ai_quota_state` y cada instancia lo lee como mucho cada 30 s. Si la base falla, se sigue
+ * con lo que hay en memoria (la IA nunca se detiene por esto).
+ */
+const SHARED_TTL_MS = 30_000;
+const sharedLoadedAt = new Map<string, number>();
+function quotaDb() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) return null;
+  try {
+    return createAdminClient();
+  } catch {
+    return null;
+  }
+}
+export async function loadSharedQuota(keyId: string, force = false): Promise<void> {
+  const now = Date.now();
+  if (!force && now - (sharedLoadedAt.get(keyId) ?? 0) < SHARED_TTL_MS) return;
+  const db = quotaDb();
+  if (!db) return;
+  sharedLoadedAt.set(keyId, now);
+  try {
+    const nowIso = new Date(now).toISOString();
+    const { data } = await db.from("ai_quota_state").select("model,exhausted_until,slow_until").eq("key_id", keyId).or(`exhausted_until.gt.${nowIso},slow_until.gt.${nowIso}`);
+    for (const r of data ?? []) {
+      const ex = r.exhausted_until ? Date.parse(r.exhausted_until) : 0;
+      const sl = r.slow_until ? Date.parse(r.slow_until) : 0;
+      if (ex > (exhaustedUntil.get(exKey(keyId, r.model)) ?? 0)) exhaustedUntil.set(exKey(keyId, r.model), ex);
+      if (sl > (slowUntil.get(exKey(keyId, r.model)) ?? 0)) slowUntil.set(exKey(keyId, r.model), sl);
+    }
+  } catch {
+    /* sin base: solo memoria */
+  }
+}
+async function saveSharedQuota(keyId: string, model: string, patch: { exhausted_until?: number; slow_until?: number }): Promise<void> {
+  const db = quotaDb();
+  if (!db) return;
+  try {
+    await db.from("ai_quota_state").upsert(
+      {
+        key_id: keyId,
+        model,
+        ...(patch.exhausted_until !== undefined ? { exhausted_until: new Date(patch.exhausted_until).toISOString() } : {}),
+        ...(patch.slow_until !== undefined ? { slow_until: new Date(patch.slow_until).toISOString() } : {}),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key_id,model" }
+    );
+  } catch {
+    /* sin base: queda en memoria */
+  }
+}
+/** ¿Este modelo está agotado para esta clave? (para pruebas y el medidor) */
+export function isExhaustedNow(keyId: string, model: string): boolean {
+  return (exhaustedUntil.get(exKey(keyId, model)) ?? 0) > Date.now();
+}
+/** Olvida lo que sabe esta instancia (pruebas: simula otro servidor que recién arranca). */
+export function forgetLocalQuota(): void {
+  exhaustedUntil.clear();
+  slowUntil.clear();
+  sharedLoadedAt.clear();
+}
+/** Marca un modelo como agotado hasta el reinicio del cupo (en memoria y en la base). */
+export async function markExhausted(keyId: string, model: string): Promise<void> {
+  const until = nextQuotaReset().getTime();
+  exhaustedUntil.set(exKey(keyId, model), until);
+  await saveSharedQuota(keyId, model, { exhausted_until: until });
+}
+/** Marca un modelo como lento (colgado o 5xx): se prueba al final durante SLOW_MS. */
+async function markSlow(keyId: string, model: string): Promise<void> {
+  const until = Date.now() + SLOW_MS;
+  slowUntil.set(exKey(keyId, model), until);
+  await saveSharedQuota(keyId, model, { slow_until: until });
+}
 
 /** Próximo reinicio del cupo diario de Google (medianoche, hora del Pacífico). */
 export function nextQuotaReset(): Date {
@@ -291,6 +368,7 @@ const SLOW_MS = 10 * 60_000;
 export async function generateContent(parts: unknown[], generationConfig: Record<string, unknown>, key: KeyContext = serviceKey()): Promise<{ text: string; model: string }> {
   const apiKey = key.apiKey;
   const log = key.usage ?? usageLog;
+  await loadSharedQuota(key.keyId);
   const now = Date.now();
   const deadline = now + BUDGET_MS;
   const available = modelChain().filter((m) => (exhaustedUntil.get(exKey(key.keyId, m)) ?? 0) < now);
@@ -323,7 +401,7 @@ export async function generateContent(parts: unknown[], generationConfig: Record
       } catch {
         // Colgado (se agotó el tiempo) o sin red hacia Google → siguiente modelo
         clearTimeout(timer);
-        slowUntil.set(exKey(key.keyId, model), Date.now() + SLOW_MS);
+        await markSlow(key.keyId, model);
         last = { status: 504, message: `${model} no respondió a tiempo`, daily: false, demand: true, retryDelaySec: null, quotaLimit: null };
         log.push({ model, status: "error" });
         break;
@@ -345,12 +423,12 @@ export async function generateContent(parts: unknown[], generationConfig: Record
       log.push({ model, status: f.daily ? "quota" : res.status === 429 ? "limited" : "error", quota_limit: f.quotaLimit ?? null });
       if (res.status === 404) break; // modelo inexistente → siguiente
       if (res.status === 429 && f.daily) {
-        exhaustedUntil.set(exKey(key.keyId, model), nextQuotaReset().getTime());
+        await markExhausted(key.keyId, model);
         break; // siguiente modelo
       }
       if (res.status >= 500 || f.demand) {
         // 500/502/503/504/524 o «high demand»: problema del modelo, no de la petición → siguiente modelo
-        if (res.status !== 503) slowUntil.set(exKey(key.keyId, model), Date.now() + SLOW_MS);
+        if (res.status !== 503) await markSlow(key.keyId, model);
         break;
       }
       if (res.status === 429) {

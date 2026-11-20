@@ -24,7 +24,8 @@
     "storage:clean": "node scripts/cleanup-orphans.mjs",
     "backup": "tsx scripts/backup.mts",
     "test:backup": "node scripts/test-backup.mjs",
-    "test:import": "tsx scripts/test-import.mts"
+    "test:import": "tsx scripts/test-import.mts",
+    "test:duplicates": "tsx scripts/test-duplicates.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

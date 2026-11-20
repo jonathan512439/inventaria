@@ -3,6 +3,25 @@
 Cada entrada indica **qué cambió**, **por qué** y **cómo validarlo** en <https://inventaria.pages.dev>.
 Referencia de riesgos: [AUDITORIA.md](AUDITORIA.md).
 
+## 2026-11-19 · Pendientes antes de C6 · P4
+
+### 17.25 IA: cupo compartido y «posible duplicado» más certero
+- **Qué**:
+  - **El cupo diario de la IA lo comparten todos los servidores:**
+    - Cuando un modelo de Google agota su cupo del día, o se queda colgado, se anota en la base (`ai_quota_state`).
+    - Los demás servidores lo leen, como mucho cada 30 s, y lo saltan sin volver a probarlo.
+    - Antes cada servidor de Cloudflare lo recordaba solo en su memoria, y las fotos perdían tiempo con modelos ya agotados.
+  - **«¿Ya tienes este producto?» al agregar por foto:**
+    - La base busca solo los productos parecidos (`similar_products()`, por parecido de texto). Antes se descargaban hasta 2.000 productos por foto.
+    - Reconoce como el mismo producto nombres escritos distinto: «Coca Cola 2L» = «Coca-Cola 2 litros», «Taza de cerámica blanca» = «Taza ceramica blanca 300 ml».
+    - **No avisa** si la marca o el **tamaño** son distintos: «Arroz 1kg» no es «Arroz 5kg», «Coca Cola 2L» no es «500ml», «Leche Pil» no es «Leche Gloria».
+    - La misma regla de tamaños se aplica al traer productos desde Excel.
+  - Migración `031_ia_cupo_y_parecidos.sql`. Es compatible con la versión anterior y se aplicó antes de publicar.
+- **Validar**:
+  - Agregar › Foto de un producto que ya tienes, escrito un poco distinto. En Revisar debe aparecer el aviso de posible duplicado.
+  - Foto de otra presentación del mismo producto (otro tamaño): no debe avisar.
+  - Pruebas: `npm run test:duplicates` (nueva, 16 comprobaciones: 7 casos de nombres, código de barras, aislamiento entre negocios y cupo compartido entre servidores). También `test:import` y `test:e2e`.
+
 ## 2026-11-19 · Ronda de validación 1 · R10
 
 ### 17.24 «Gestionar» al centro y modo de uso del negocio

@@ -260,7 +260,7 @@ Gravedad: **C** = crítico (datos o seguridad), **A** = alto (cifras de negocio 
 | E1 · E2 | ✅ | C1: búsqueda por código con índice; `search` real con `pg_trgm` e índices por negocio | — |
 | E3 | ◐ | C7.7 (`027`): Inicio y Números calculados en SQL | Productos y Etiquetas cargan la lista completa (la muestran); paginar si un negocio pasa de ~2.000 productos |
 | E4 | ◐ | C4: una `rpc` de contexto por pantalla (antes ~7 peticiones) | Refrescar por eventos y no por cada cambio de pantalla: **P5** |
-| E5 · E6 | ⏳ | — | Duplicados con `similar_products()` en SQL y cupo de IA en tabla `ai_quota_state`: **P4** |
+| E5 · E6 | ✅ | P4 (17.25 · `031`): `similar_products()` con pg_trgm + reglas de marca y tamaño; cupo de IA compartido en `ai_quota_state` | «Pregúntale» sigue resumiendo en el servidor (B7) |
 | M1 | ◐ | C2–C7: `lib/data/ops.ts` (dinero y stock), `lib/data/insights.ts`, `lib/data/costs.ts` | ~160 consultas `from()` siguen en pantallas (lecturas y catálogo) |
 | M2 | ✅ | C1: campos del sistema como columnas, `data` solo para datos propios | — |
 | M3 · M5 · M6 · M7 | ⏳ | — | C6 (proyecto de pruebas) |

@@ -20,7 +20,7 @@ import { categoryPath } from "@/lib/categories";
 import { parseProposals } from "@/lib/variants";
 import { parseExpiry } from "@/lib/inventory";
 import { userExamples } from "@/lib/aiExamples";
-import { findDuplicate } from "@/lib/duplicates";
+import { findDuplicate, type DupCandidate } from "@/lib/duplicates";
 import { businessIdOf } from "@/lib/business";
 import type { AiMeta, Category, FieldTemplate, ProductData } from "@/types/database";
 
@@ -207,12 +207,14 @@ export async function POST(request: Request) {
   applyDefaults(effective, data);
 
   // ¿Ya existe este producto? (código de barras, mismo nombre o muy parecido) → solo se avisa; el usuario decide en Revisar
-  const { data: others } = await supabase.from("product_summaries").select("id,nombre,marca,codigo_barras,status").neq("id", productId).limit(2000);
+  // P4 (031 · E5): la base trae solo los candidatos parecidos (pg_trgm) en vez de descargar hasta 2.000 productos
   const nameKeyField = effective.find((f) => /^(nombre|name|producto|titulo)$/i.test(f.name))?.name ?? "nombre";
   const codeField = Object.keys(data).find((k) => /^(codigo_barras|codigo|sku|barcode|ean)$/i.test(k));
   const expiresAt = parseExpiry(String(result[META_KEYS.vencimiento] ?? ""));
+  const probe = { nombre: String(data[nameKeyField] ?? ""), marca: String(data.marca ?? ""), codigo: codeField ? String(data[codeField] ?? "") : null };
+  const { data: others } = await supabase.rpc("similar_products", { p_name: probe.nombre, p_code: probe.codigo, p_exclude: productId, p_limit: 8 });
 
-  const dup = findDuplicate(others ?? [], { nombre: String(data[nameKeyField] ?? ""), marca: String(data.marca ?? ""), codigo: codeField ? String(data[codeField] ?? "") : null }, productId);
+  const dup = findDuplicate((others ?? []) as DupCandidate[], probe, productId);
   if (dup) aiMeta.posible_duplicado = { product_id: dup.product_id, nombre: dup.nombre, motivo: dup.motivo };
 
   // 5. Crear pendiente
